@@ -1,0 +1,12 @@
+// Shared chat components - barrel export
+export { CustomerProfile } from './CustomerProfile'
+export { WorkflowStatusManager } from './WorkflowStatus'
+export { NoteForm, NoteCard } from './NoteForm'
+export { InputBar } from './InputBar'
+export { MessageBubble } from './MessageBubble'
+export { ChatLabels } from './ChatLabels'
+export { DateSeparator } from './DateSeparator'
+export { ConversationItem } from './ConversationItem'
+export { ContactDetailModal } from './ContactDetailModal'
+export { ConversationHistory } from './ConversationHistory'
+export { AgentAssignment } from './AgentAssignment'

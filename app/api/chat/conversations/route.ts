@@ -1,0 +1,98 @@
+// Example API route using middleware pattern
+import { NextRequest } from 'next/server'
+import { withAuth, withRole } from '@/core/auth/middleware'
+import { requirePermission } from '@/core/permissions/middleware'
+import { chatService } from '@/features/chat/services'
+
+/**
+ * GET /api/chat/conversations
+ * Get conversations for current user
+ * Requires authentication
+ */
+export const GET = withAuth(async (req: NextRequest, context) => {
+  try {
+    // Check permission
+    requirePermission(context, 'canViewAllConversations')
+
+    // Get query params
+    const { searchParams } = new URL(req.url)
+    const status = searchParams.get('status') as 'open' | 'closed' | null
+    const searchQuery = searchParams.get('q')
+
+    // Get conversations using service
+    const conversations = await chatService.conversations.getConversations(
+      context.user.id,
+      context.user.role,
+      {
+        status: status || undefined,
+        searchQuery: searchQuery || undefined,
+      }
+    )
+
+    return new Response(
+      JSON.stringify({
+        success: true,
+        data: conversations,
+      }),
+      {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }
+    )
+  } catch (error: any) {
+    return new Response(
+      JSON.stringify({
+        success: false,
+        error: error.message || 'Failed to get conversations',
+      }),
+      {
+        status: 500,
+        headers: { 'Content-Type': 'application/json' },
+      }
+    )
+  }
+})
+
+/**
+ * POST /api/chat/conversations
+ * Create new conversation
+ * Requires owner role
+ */
+export const POST = withRole(['owner', 'supervisor'], async (req: NextRequest, context) => {
+  try {
+    const body = await req.json()
+    const { phoneNumber, name, message } = body
+
+    if (!phoneNumber) {
+      throw new Error('Phone number is required')
+    }
+
+    // Create contact
+    const contact = await chatService.contacts.getOrCreateContact(phoneNumber, name)
+
+    // Create conversation
+    // ... implementation
+
+    return new Response(
+      JSON.stringify({
+        success: true,
+        data: { contact },
+      }),
+      {
+        status: 201,
+        headers: { 'Content-Type': 'application/json' },
+      }
+    )
+  } catch (error: any) {
+    return new Response(
+      JSON.stringify({
+        success: false,
+        error: error.message || 'Failed to create conversation',
+      }),
+      {
+        status: 500,
+        headers: { 'Content-Type': 'application/json' },
+      }
+    )
+  }
+})

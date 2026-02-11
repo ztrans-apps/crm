@@ -1,0 +1,30 @@
+{
+  "name": "whatsapp-service",
+  "version": "1.0.0",
+  "description": "WhatsApp Web.js service for CRM",
+  "main": "src/server.js",
+  "type": "module",
+  "scripts": {
+    "dev": "node src/server.js",
+    "start": "node src/server.js",
+    "cleanup": "lsof -ti:3001 | xargs kill -9 2>/dev/null; pkill -9 -f 'Google Chrome for Testing' 2>/dev/null; pkill -9 -f chrome 2>/dev/null; find .wwebjs_auth -name 'Singleton*' -delete 2>/dev/null; echo 'Cleanup complete'",
+    "restart": "npm run cleanup && sleep 2 && npm run dev"
+  },
+  "keywords": [
+    "whatsapp",
+    "whatsapp-web",
+    "crm"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.39.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "qrcode": "^1.5.3",
+    "qrcode-terminal": "^0.12.0",
+    "socket.io": "^4.6.1",
+    "whatsapp-web.js": "^1.23.0"
+  }
+}
