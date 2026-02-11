@@ -89,18 +89,18 @@ export function useChat() {
           canViewConversation(currentRole, currentUserId, conv)
         )
         
-        const hasChanged = JSON.stringify(filtered) !== JSON.stringify(conversations)
-        if (hasChanged) {
-          setConversations(filtered)
-        }
+        setConversations(filtered)
       }
     } catch (error) {
       console.error('Error loading conversations:', error)
     }
-  }, [userId, userRole, conversations])
+  }, [userId, userRole]) // Remove conversations from deps
 
-  // Setup socket connection
+  // Setup socket connection and Supabase Realtime
   useEffect(() => {
+    let debounceTimer: NodeJS.Timeout
+    
+    // Socket.IO for WhatsApp messages
     const checkServiceAndConnect = async () => {
       try {
         const response = await fetch(`${serviceUrl}/health`, { 
@@ -117,11 +117,17 @@ export function useChat() {
           })
 
           socketRef.current.on('message', () => {
-            loadConversations()
+            console.log('📨 Socket: New message received')
+            // Debounce refresh
+            clearTimeout(debounceTimer)
+            debounceTimer = setTimeout(() => loadConversations(), 500)
           })
 
           socketRef.current.on('message_status', () => {
-            loadConversations()
+            console.log('📨 Socket: Message status updated')
+            // Debounce refresh
+            clearTimeout(debounceTimer)
+            debounceTimer = setTimeout(() => loadConversations(), 500)
           })
         }
       } catch (error) {
@@ -131,16 +137,38 @@ export function useChat() {
 
     checkServiceAndConnect()
 
-    // Polling fallback
-    const pollInterval = setInterval(() => {
-      loadConversations()
-    }, 5000)
+    // Supabase Realtime for database changes
+    const conversationsChannel = supabase
+      .channel('conversations-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'conversations'
+        },
+        (payload) => {
+          console.log('🔄 Supabase Realtime: Conversation changed', payload.eventType)
+          // Debounce refresh
+          clearTimeout(debounceTimer)
+          debounceTimer = setTimeout(() => loadConversations(), 300)
+        }
+      )
+      // REMOVED: Don't refresh all conversations on every message change!
+      // Messages are handled by useMessages hook per conversation
+      .subscribe((status) => {
+        console.log('📡 Supabase Realtime status:', status)
+      })
+
+    // NO POLLING - Realtime only!
+    // Polling removed for smooth experience
 
     return () => {
+      clearTimeout(debounceTimer)
       socketRef.current?.disconnect()
-      clearInterval(pollInterval)
+      conversationsChannel.unsubscribe()
     }
-  }, [serviceUrl, loadConversations])
+  }, [serviceUrl, loadConversations, supabase])
 
   // Initialize on mount
   useEffect(() => {

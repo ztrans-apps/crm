@@ -1,11 +1,27 @@
 // Chat window component with messages and input
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useRef, useState, useCallback } from 'react'
 import { MessageSquare, RefreshCw, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import type { ConversationWithRelations, MessageWithRelations, MediaAttachment } from '@/lib/types/chat'
-import { MessageBubble, DateSeparator, InputBar } from '@/features/chat/components/shared'
+import { InputBar, MessagesList, BackToBottomButton } from '@/features/chat/components/shared'
+import { useChatScrollBehavior } from '@/features/chat/hooks'
+
+// Helper functions - outside component to avoid re-creation
+const getDisplayName = (contact: any) => {
+  if (contact?.name && contact.name.trim()) {
+    return contact.name
+  }
+  return contact?.phone_number || 'Unknown'
+}
+
+const getAvatarInitial = (contact: any) => {
+  if (contact?.name && contact.name.trim()) {
+    return contact.name.charAt(0).toUpperCase()
+  }
+  return contact?.phone_number?.replace(/\D/g, '').charAt(0) || 'U'
+}
 
 interface ChatWindowProps {
   conversation: ConversationWithRelations | null
@@ -41,35 +57,41 @@ export function ChatWindow({
   disabled = false,
 }: ChatWindowProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const messagesContainerRef = useRef<HTMLDivElement>(null)
   const [replyingTo, setReplyingTo] = useState<MessageWithRelations | null>(null)
 
-  // Auto-scroll to bottom when messages change
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages])
+  // Use chat scroll behavior hook
+  const {
+    showBackToBottom,
+    newMessageCount,
+    scrollToBottom,
+    handleScroll,
+    resetCounter,
+  } = useChatScrollBehavior({
+    messagesContainerRef: messagesContainerRef as React.RefObject<HTMLDivElement>,
+    messages,
+    conversationId: conversation?.id,
+    enabled: !!conversation,
+  })
 
-  const handleReply = (message: MessageWithRelations) => {
+  // Handle back to bottom button click
+  const handleBackToBottomClick = useCallback(() => {
+    scrollToBottom('smooth')
+    resetCounter()
+    // Focus back to input
+    if (onChatWindowClick) {
+      onChatWindowClick()
+    }
+  }, [scrollToBottom, resetCounter, onChatWindowClick])
+
+  // Memoize handlers
+  const handleReply = useCallback((message: MessageWithRelations) => {
     setReplyingTo(message)
-    // Focus on input (will be handled by InputBar)
-  }
+  }, [])
 
-  const handleCancelReply = () => {
+  const handleCancelReply = useCallback(() => {
     setReplyingTo(null)
-  }
-
-  const getDisplayName = (contact: any) => {
-    if (contact?.name && contact.name.trim()) {
-      return contact.name
-    }
-    return contact?.phone_number || 'Unknown'
-  }
-
-  const getAvatarInitial = (contact: any) => {
-    if (contact?.name && contact.name.trim()) {
-      return contact.name.charAt(0).toUpperCase()
-    }
-    return contact?.phone_number?.replace(/\D/g, '').charAt(0) || 'U'
-  }
+  }, [])
 
   if (!conversation) {
     return (
@@ -98,11 +120,11 @@ export function ChatWindow({
               <h3 className="font-semibold text-base">{getDisplayName(conversation.contact)}</h3>
               <div className="flex items-center space-x-2 text-xs text-gray-500">
                 <span>{conversation.contact?.phone_number}</span>
-                {conversation.assigned_to_user && (
+                {conversation.assigned_to && (
                   <>
                     <span>•</span>
                     <span className="text-blue-600">
-                      Agent: {conversation.assigned_to_user.full_name || conversation.assigned_to_user.email}
+                      Assigned
                     </span>
                   </>
                 )}
@@ -128,7 +150,7 @@ export function ChatWindow({
                 Unread
               </span>
             )}
-            {(conversation.status === 'closed' || conversation.workflow_status === 'done') && (
+            {conversation.status === 'closed' && (
               <span className="px-2 py-1 bg-gray-100 text-gray-700 text-xs rounded-full">
                 Selesai
               </span>
@@ -138,7 +160,7 @@ export function ChatWindow({
       </div>
 
       {/* Closed conversation notice */}
-      {(conversation.status === 'closed' || conversation.workflow_status === 'done') && (
+      {conversation.status === 'closed' && (
         <div className="bg-yellow-50 border-b border-yellow-200 px-3 py-2">
           <p className="text-xs text-yellow-800 text-center">
             ⚠️ Chat sudah berakhir. Tidak bisa membalas lagi kecuali customer mengirim pesan baru.
@@ -147,7 +169,7 @@ export function ChatWindow({
       )}
       
       {/* Unassigned conversation notice */}
-      {!conversation.assigned_to && conversation.status !== 'closed' && conversation.workflow_status !== 'done' && (
+      {!conversation.assigned_to && conversation.status !== 'closed' && (
         <div className="bg-orange-50 border-b border-orange-200 px-3 py-2">
           <p className="text-xs text-orange-800 text-center">
             ⚠️ Silakan ambil obrolan ini terlebih dahulu sebelum membalas.
@@ -155,58 +177,44 @@ export function ChatWindow({
         </div>
       )}
 
-      {/* Messages Area with smooth scroll */}
-      <div className="flex-1 overflow-y-auto p-3 scroll-smooth min-h-0">
-        {loading ? (
-          <div className="flex items-center justify-center h-full">
-            <div className="text-center text-gray-500">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-500 mx-auto mb-2"></div>
-              <p className="text-sm">Loading messages...</p>
+      {/* Messages Area with smooth scroll - Wrapped with relative positioning */}
+      <div className="flex-1 relative min-h-0">
+        <div 
+          ref={messagesContainerRef}
+          className="absolute inset-0 overflow-y-auto p-3 scroll-smooth"
+          onScroll={handleScroll}
+        >
+          {loading ? (
+            <div className="flex items-center justify-center h-full">
+              <div className="text-center text-gray-500">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-500 mx-auto mb-2"></div>
+                <p className="text-sm">Loading messages...</p>
+              </div>
             </div>
-          </div>
-        ) : messages.length === 0 ? (
-          <div className="flex items-center justify-center h-full text-gray-500">
-            <p>No messages yet</p>
-          </div>
-        ) : (
-          <>
-            {messages.map((msg, index) => {
-              const prevMsg = index > 0 ? messages[index - 1] : null
-              const nextMsg = index < messages.length - 1 ? messages[index + 1] : null
-              
-              // Check if we need a date separator
-              const showDateSeparator = !prevMsg || 
-                new Date(msg.created_at).toDateString() !== new Date(prevMsg.created_at).toDateString()
-              
-              // Message grouping logic
-              const isSameSender = prevMsg && prevMsg.is_from_me === msg.is_from_me
-              const isWithin5Minutes = prevMsg && 
-                (new Date(msg.created_at).getTime() - new Date(prevMsg.created_at).getTime()) < 5 * 60 * 1000
-              
-              const isGrouped = isSameSender && isWithin5Minutes
-              const showAvatar = !isGrouped || !prevMsg
-              const showSender = !isGrouped || !prevMsg
-              
-              return (
-                <div key={msg.id}>
-                  {showDateSeparator && (
-                    <DateSeparator date={new Date(msg.created_at)} />
-                  )}
-                  <MessageBubble
-                    message={msg}
-                    translation={translations[msg.id]}
-                    onTranslate={!msg.is_from_me ? () => onTranslate(msg.id) : undefined}
-                    translating={translating[msg.id]}
-                    showAvatar={showAvatar}
-                    showSender={showSender}
-                    onReply={handleReply}
-                  />
-                </div>
-              )
-            })}
-            <div ref={messagesEndRef} />
-          </>
-        )}
+          ) : messages.length === 0 ? (
+            <div className="flex items-center justify-center h-full text-gray-500">
+              <p>No messages yet</p>
+            </div>
+          ) : (
+            <>
+              <MessagesList
+                messages={messages}
+                translations={translations}
+                translating={translating}
+                onTranslate={onTranslate}
+                onReply={handleReply}
+              />
+              <div ref={messagesEndRef} />
+            </>
+          )}
+        </div>
+
+        {/* Back to Bottom Button - Fixed position relative to messages area */}
+        <BackToBottomButton
+          show={showBackToBottom}
+          newMessageCount={newMessageCount}
+          onClick={handleBackToBottomClick}
+        />
       </div>
 
       {/* Input Area */}

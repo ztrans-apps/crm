@@ -240,7 +240,7 @@ function UnifiedChatsContent() {
         messages={messages}
         messageInput={messageInput}
         onMessageInputChange={setMessageInput}
-        onSendMessage={() => handleSendMessage(selectedConversation)}
+        onSendMessage={(media) => handleSendMessage(selectedConversation, media)}
         onQuickReplyClick={() => setShowQuickReplies(true)}
         onRefresh={() => selectedConversationId && loadSidebarData(selectedConversationId)}
         onChatWindowClick={handleChatWindowClick}

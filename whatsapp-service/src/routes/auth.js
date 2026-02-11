@@ -15,8 +15,6 @@ router.post('/generate-qr', async (req, res) => {
       })
     }
 
-    console.log('Generating QR for session:', sessionId)
-
     // Initialize WhatsApp client (frontend already saved to database)
     const client = await whatsappService.initializeClient(sessionId)
     
@@ -73,12 +71,31 @@ router.get('/status/:sessionId', async (req, res) => {
   }
 })
 
+// Force delete session (including auth files) - MUST BE BEFORE generic delete
+router.delete('/sessions/:sessionId/force', async (req, res) => {
+  try {
+    const { sessionId } = req.params
+    
+    await whatsappService.forceDeleteSession(sessionId)
+    
+    res.json({ 
+      success: true,
+      message: 'Session and auth files deleted successfully',
+      sessionId
+    })
+  } catch (error) {
+    console.error('Force delete error:', error)
+    res.status(500).json({
+      success: false,
+      error: error.message
+    })
+  }
+})
+
 // Disconnect session
 router.delete('/sessions/:sessionId', async (req, res) => {
   try {
     const { sessionId } = req.params
-    
-    console.log('Disconnecting session:', sessionId)
     
     await whatsappService.disconnectSession(sessionId)
     
@@ -89,6 +106,28 @@ router.delete('/sessions/:sessionId', async (req, res) => {
     })
   } catch (error) {
     console.error('Disconnect error:', error)
+    res.status(500).json({
+      success: false,
+      error: error.message
+    })
+  }
+})
+
+// Reconnect session
+router.post('/reconnect/:sessionId', async (req, res) => {
+  try {
+    const { sessionId } = req.params
+    
+    // Try to initialize client again
+    await whatsappService.initializeClient(sessionId)
+    
+    res.json({ 
+      success: true,
+      message: 'Session reconnection initiated',
+      sessionId
+    })
+  } catch (error) {
+    console.error('Reconnect error:', error)
     res.status(500).json({
       success: false,
       error: error.message

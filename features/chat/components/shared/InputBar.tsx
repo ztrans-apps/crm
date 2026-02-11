@@ -488,12 +488,21 @@ export function InputBar({
 
   const handleSendLocation = () => {
     if (currentLocation) {
-      const locationMessage = `📍 Location: ${locationName || 'My Location'}\nhttps://www.google.com/maps?q=${currentLocation.lat},${currentLocation.lng}`
-      onChange(locationMessage)
+      // Send as location media type
+      const locationMedia: MediaAttachment = {
+        type: 'location',
+        latitude: currentLocation.lat,
+        longitude: currentLocation.lng,
+        address: locationName || undefined,
+        name: locationName || 'My Location'
+      }
+      
+      onSend(locationMedia)
       setShowLocationPicker(false)
       setLocationName('')
       setLocationSearch('')
       setSearchResults([])
+      setCurrentLocation(null)
     }
   }
 

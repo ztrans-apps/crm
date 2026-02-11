@@ -7,7 +7,15 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { QrCode, Smartphone, CheckCircle, XCircle, Loader2 } from 'lucide-react'
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogDescription, 
+  DialogFooter, 
+  DialogHeader, 
+  DialogTitle 
+} from '@/components/ui/dialog'
+import { QrCode, Smartphone, CheckCircle, XCircle, Loader2, AlertTriangle } from 'lucide-react'
 import { io, Socket } from 'socket.io-client'
 
 export default function WhatsAppPage() {
@@ -18,6 +26,35 @@ export default function WhatsAppPage() {
   const [qrCode, setQrCode] = useState<string | null>(null)
   const [connectingSession, setConnectingSession] = useState<string | null>(null)
   const socketRef = useRef<Socket | null>(null)
+
+  // Dialog states
+  const [confirmDialog, setConfirmDialog] = useState<{
+    open: boolean
+    title: string
+    description: string
+    onConfirm: () => void
+    confirmText?: string
+    variant?: 'default' | 'destructive'
+  }>({
+    open: false,
+    title: '',
+    description: '',
+    onConfirm: () => {},
+    confirmText: 'Confirm',
+    variant: 'default'
+  })
+
+  const [alertDialog, setAlertDialog] = useState<{
+    open: boolean
+    title: string
+    description: string
+    variant?: 'default' | 'destructive'
+  }>({
+    open: false,
+    title: '',
+    description: '',
+    variant: 'default'
+  })
 
   const supabase = createClient()
   const serviceUrl = process.env.NEXT_PUBLIC_WHATSAPP_SERVICE_URL || 'http://localhost:3001'
@@ -84,7 +121,12 @@ export default function WhatsAppPage() {
 
   const handleConnect = async () => {
     if (!phoneNumber || !sessionName) {
-      alert('Please fill all fields')
+      setAlertDialog({
+        open: true,
+        title: 'Missing Information',
+        description: 'Please fill in both phone number and session name.',
+        variant: 'default'
+      })
       return
     }
 
@@ -150,12 +192,12 @@ export default function WhatsAppPage() {
         })
       })
 
-      if (!response.ok) {
-        const errorText = await response.text()
-        throw new Error(`HTTP ${response.status}: ${errorText}`)
+      let result
+      try {
+        result = await response.json()
+      } catch (parseError) {
+        throw new Error(`Server error (${response.status}): Unable to parse response. Service may be down.`)
       }
-
-      const result = await response.json()
       
       if (!result.success) {
         throw new Error(result.message || 'Failed to generate QR')
@@ -168,7 +210,12 @@ export default function WhatsAppPage() {
       setTimeout(loadSessions, 2000)
     } catch (error: any) {
       console.error('QR Generation error:', error)
-      alert('Failed to generate QR: ' + error.message)
+      setAlertDialog({
+        open: true,
+        title: 'Connection Failed',
+        description: error.message || 'Failed to generate QR code. Please check if WhatsApp service is running.',
+        variant: 'destructive'
+      })
       setQrCode(null)
     } finally {
       setLoading(false)
@@ -176,15 +223,31 @@ export default function WhatsAppPage() {
   }
 
   const handleDisconnect = async (sessionId: string) => {
-    if (!confirm('Disconnect this session?')) return
+    setConfirmDialog({
+      open: true,
+      title: 'Disconnect Session',
+      description: 'Are you sure you want to disconnect this WhatsApp session? You can reconnect it later.',
+      confirmText: 'Disconnect',
+      variant: 'destructive',
+      onConfirm: async () => {
+        await performDisconnect(sessionId)
+      }
+    })
+  }
 
+  const performDisconnect = async (sessionId: string) => {
     try {
       // Delete from WhatsApp Service
       const response = await fetch(`${serviceUrl}/api/whatsapp/sessions/${sessionId}`, {
         method: 'DELETE'
       })
 
-      const result = await response.json()
+      let result
+      try {
+        result = await response.json()
+      } catch (parseError) {
+        throw new Error(`Server error (${response.status}): Unable to parse response. Service may be down.`)
+      }
       
       if (result.success) {
         // Also delete from database
@@ -199,11 +262,76 @@ export default function WhatsAppPage() {
 
         loadSessions()
       } else {
-        alert('Failed to disconnect: ' + (result.message || 'Unknown error'))
+        setAlertDialog({
+          open: true,
+          title: 'Disconnect Failed',
+          description: 'Failed to disconnect: ' + (result.message || result.error || 'Unknown error'),
+          variant: 'destructive'
+        })
       }
     } catch (error: any) {
       console.error('Disconnect error:', error)
-      alert('Error: ' + error.message)
+      setAlertDialog({
+        open: true,
+        title: 'Error',
+        description: error.message || 'An error occurred while disconnecting',
+        variant: 'destructive'
+      })
+    }
+  }
+
+  const handleDeleteDevice = async (sessionId: string) => {
+    setConfirmDialog({
+      open: true,
+      title: 'Delete Device',
+      description: 'Are you sure you want to delete this device permanently? This will remove all authentication data and cannot be undone. You will need to scan QR code again to reconnect.',
+      confirmText: 'Delete Device',
+      variant: 'destructive',
+      onConfirm: async () => {
+        await performDeleteDevice(sessionId)
+      }
+    })
+  }
+
+  const performDeleteDevice = async (sessionId: string) => {
+    try {
+      // Force delete from WhatsApp Service (including auth files)
+      const response = await fetch(`${serviceUrl}/api/whatsapp/sessions/${sessionId}/force`, {
+        method: 'DELETE'
+      })
+
+      let result
+      try {
+        result = await response.json()
+      } catch (parseError) {
+        // If JSON parse fails, show generic error
+        throw new Error(`Server error (${response.status}): Unable to connect to WhatsApp service. Please check if service is running.`)
+      }
+      
+      if (result.success) {
+        setAlertDialog({
+          open: true,
+          title: 'Device Deleted',
+          description: 'Device deleted successfully. You can now connect a new device.',
+          variant: 'default'
+        })
+        loadSessions()
+      } else {
+        setAlertDialog({
+          open: true,
+          title: 'Delete Failed',
+          description: 'Failed to delete device: ' + (result.message || result.error || 'Unknown error'),
+          variant: 'destructive'
+        })
+      }
+    } catch (error: any) {
+      console.error('Delete device error:', error)
+      setAlertDialog({
+        open: true,
+        title: 'Error',
+        description: error.message || 'An error occurred while deleting device',
+        variant: 'destructive'
+      })
     }
   }
 
@@ -217,14 +345,30 @@ export default function WhatsAppPage() {
 
       if (error) {
         console.error('Error updating status:', error)
-        alert('Failed to update status: ' + error.message)
+        setAlertDialog({
+          open: true,
+          title: 'Update Failed',
+          description: error.message || 'Failed to update status',
+          variant: 'destructive'
+        })
       } else {
         console.log('Status updated to:', newStatus)
+        setAlertDialog({
+          open: true,
+          title: 'Status Updated',
+          description: `Session status updated to ${newStatus}`,
+          variant: 'default'
+        })
         loadSessions()
       }
     } catch (error: any) {
       console.error('Update status error:', error)
-      alert('Error: ' + error.message)
+      setAlertDialog({
+        open: true,
+        title: 'Error',
+        description: error.message || 'An error occurred while updating status',
+        variant: 'destructive'
+      })
     }
   }
 
@@ -236,18 +380,38 @@ export default function WhatsAppPage() {
         method: 'POST'
       })
 
-      const result = await response.json()
+      let result
+      try {
+        result = await response.json()
+      } catch (parseError) {
+        throw new Error(`Server error (${response.status}): Unable to parse response. Service may be down.`)
+      }
       
       if (result.success) {
         console.log('Reconnect initiated:', result)
-        alert('Session reconnection initiated. Please wait...')
+        setAlertDialog({
+          open: true,
+          title: 'Reconnecting',
+          description: 'Session reconnection initiated. Please wait...',
+          variant: 'default'
+        })
         setTimeout(loadSessions, 2000)
       } else {
-        alert('Failed to reconnect: ' + (result.error || 'Unknown error'))
+        setAlertDialog({
+          open: true,
+          title: 'Reconnect Failed',
+          description: 'Failed to reconnect: ' + (result.error || result.message || 'Unknown error'),
+          variant: 'destructive'
+        })
       }
     } catch (error: any) {
       console.error('Reconnect error:', error)
-      alert('Error: ' + error.message)
+      setAlertDialog({
+        open: true,
+        title: 'Error',
+        description: error.message || 'An error occurred while reconnecting',
+        variant: 'destructive'
+      })
     }
   }
 
@@ -379,14 +543,24 @@ export default function WhatsAppPage() {
                       
                       {/* Debug: Manual status update for stuck "connecting" */}
                       {session.status === 'connecting' && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleUpdateStatus(session.id, 'connected')}
-                          className="text-xs"
-                        >
-                          Force Connected
-                        </Button>
+                        <>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleUpdateStatus(session.id, 'connected')}
+                            className="text-xs"
+                          >
+                            Force Connected
+                          </Button>
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            onClick={() => handleDeleteDevice(session.id)}
+                            className="text-xs"
+                          >
+                            Delete Device
+                          </Button>
+                        </>
                       )}
                       
                       <Button
@@ -405,6 +579,65 @@ export default function WhatsAppPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Confirmation Dialog */}
+      <Dialog open={confirmDialog.open} onOpenChange={(open) => setConfirmDialog({ ...confirmDialog, open })}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              {confirmDialog.variant === 'destructive' && (
+                <AlertTriangle className="h-5 w-5 text-red-600" />
+              )}
+              {confirmDialog.title}
+            </DialogTitle>
+            <DialogDescription>
+              {confirmDialog.description}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setConfirmDialog({ ...confirmDialog, open: false })}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant={confirmDialog.variant}
+              onClick={() => {
+                confirmDialog.onConfirm()
+                setConfirmDialog({ ...confirmDialog, open: false })
+              }}
+            >
+              {confirmDialog.confirmText}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Alert Dialog */}
+      <Dialog open={alertDialog.open} onOpenChange={(open) => setAlertDialog({ ...alertDialog, open })}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              {alertDialog.variant === 'destructive' && (
+                <AlertTriangle className="h-5 w-5 text-red-600" />
+              )}
+              {alertDialog.title}
+            </DialogTitle>
+            <DialogDescription>
+              {alertDialog.description}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setAlertDialog({ ...alertDialog, open: false })}
+            >
+              OK
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

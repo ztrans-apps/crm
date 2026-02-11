@@ -70,9 +70,14 @@ export interface MediaAsset {
 }
 
 export interface MediaAttachment {
-  file: File
+  file?: File
   type: MediaType
   preview?: string
+  // For location type
+  latitude?: number
+  longitude?: number
+  address?: string
+  name?: string
 }
 
 // Filter types
@@ -99,6 +104,12 @@ export interface MessageWithRelations extends Message {
     name: string | null
     phone_number: string
   }
+  // Media fields from Message table
+  media_url?: string | null
+  media_type?: MediaType | null
+  media_filename?: string | null
+  media_size?: number | null
+  media_mime_type?: string | null
 }
 
 // Response window status

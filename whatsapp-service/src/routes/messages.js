@@ -15,8 +15,6 @@ router.post('/send', async (req, res) => {
       })
     }
 
-    console.log('Sending message:', { sessionId, to })
-
     const result = await whatsappService.sendMessage(sessionId, to, message)
     
     res.json({ 
@@ -44,8 +42,6 @@ router.post('/send-bulk', async (req, res) => {
         message: 'Missing required fields or invalid recipients array'
       })
     }
-
-    console.log('Sending bulk messages:', { sessionId, count: recipients.length })
 
     const results = []
     
@@ -86,8 +82,6 @@ router.post('/send-bulk', async (req, res) => {
 router.post('/reconnect/:sessionId', async (req, res) => {
   try {
     const { sessionId } = req.params
-
-    console.log('Reconnecting session:', sessionId)
 
     // Check if session already exists
     const status = whatsappService.getSessionStatus(sessionId)
@@ -137,26 +131,26 @@ router.get('/status/:sessionId', async (req, res) => {
   }
 })
 
-// Get message status
-router.get('/message-status/:sessionId/:messageId', async (req, res) => {
-  try {
-    const { sessionId, messageId } = req.params
-    
-    console.log('Checking message status:', { sessionId, messageId })
-    
-    const info = await whatsappService.getMessageInfo(sessionId, messageId)
-    
-    res.json({
-      success: true,
-      ...info
-    })
-  } catch (error) {
-    console.error('Message status check error:', error)
-    res.status(500).json({
-      success: false,
-      error: error.message
-    })
-  }
-})
+// Get message status - TODO: Implement for Baileys
+// router.get('/message-status/:sessionId/:messageId', async (req, res) => {
+//   try {
+//     const { sessionId, messageId } = req.params
+//     
+//     console.log('Checking message status:', { sessionId, messageId })
+//     
+//     const info = await whatsappService.getMessageInfo(sessionId, messageId)
+//     
+//     res.json({
+//       success: true,
+//       ...info
+//     })
+//   } catch (error) {
+//     console.error('Message status check error:', error)
+//     res.status(500).json({
+//       success: false,
+//       error: error.message
+//     })
+//   }
+// })
 
 export default router

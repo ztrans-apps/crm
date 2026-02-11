@@ -5,6 +5,8 @@ import cors from 'cors'
 import dotenv from 'dotenv'
 import authRoutes from './routes/auth.js'
 import messageRoutes from './routes/messages.js'
+import mediaRoutes from './routes/media.js'
+import locationRoutes from './routes/location.js'
 import whatsappService from './services/whatsapp.js'
 import { supabase } from './config/supabase.js'
 
@@ -32,6 +34,8 @@ app.set('io', io)
 // Routes
 app.use('/api/whatsapp', authRoutes)
 app.use('/api/whatsapp', messageRoutes)
+app.use('/api/whatsapp', mediaRoutes)
+app.use('/api/whatsapp', locationRoutes)
 
 // Health check endpoints
 app.get('/health', (req, res) => {
@@ -53,10 +57,7 @@ app.get('/api/whatsapp/health', (req, res) => {
 
 // Socket.IO connection
 io.on('connection', (socket) => {
-  console.log('Client connected:', socket.id)
-  
   socket.on('disconnect', () => {
-    console.log('Client disconnected:', socket.id)
   })
 })
 
@@ -130,13 +131,10 @@ async function autoSyncMessageStatus() {
 // Auto-load and reconnect active sessions on startup
 async function loadActiveSessions() {
   if (!supabase) {
-    console.log('Supabase not configured, skipping session auto-load')
     return
   }
 
   try {
-    console.log('Loading active WhatsApp sessions...')
-    
     const { data: sessions, error } = await supabase
       .from('whatsapp_sessions')
       .select('id, session_name, phone_number, status')
@@ -148,38 +146,26 @@ async function loadActiveSessions() {
     }
 
     if (!sessions || sessions.length === 0) {
-      console.log('No active sessions to load')
       return
     }
 
-    console.log(`Found ${sessions.length} active session(s), reconnecting...`)
-
     for (const session of sessions) {
-      try {
-        console.log(`Reconnecting session: ${session.session_name} (${session.phone_number})`)
         await whatsappService.initializeClient(session.id)
       } catch (error) {
         console.error(`Failed to reconnect session ${session.id}:`, error.message)
       }
     }
-
-    console.log('✓ Session auto-load complete')
   } catch (error) {
     console.error('Error in loadActiveSessions:', error)
   }
 }
 
 httpServer.listen(PORT, async () => {
-  console.log(`✓ WhatsApp Service running on port ${PORT}`)
-  console.log(`✓ Socket.IO initialized`)
-  console.log(`✓ Auto-sync status enabled (interval: ${STATUS_SYNC_INTERVAL / 1000}s)`)
-  
   // Load active sessions after server starts
   setTimeout(loadActiveSessions, 2000) // Wait 2 seconds for server to be fully ready
   
   // Start auto-sync after sessions are loaded
   setTimeout(() => {
-    console.log('🔄 Starting auto-sync message status...')
     // Initial sync
     autoSyncMessageStatus()
     // Periodic sync

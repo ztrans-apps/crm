@@ -1,62 +1,141 @@
+// Location Map component - WhatsApp style with Leaflet
 'use client'
 
-import { useEffect } from 'react'
-import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet'
-import L from 'leaflet'
-import 'leaflet/dist/leaflet.css'
-
-// Fix for default marker icon
-delete (L.Icon.Default.prototype as any)._getIconUrl
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
-  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
-  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png',
-})
+import { useEffect, useRef, useState } from 'react'
+import { MapPin, ExternalLink } from 'lucide-react'
 
 interface LocationMapProps {
   latitude: number
   longitude: number
-  locationName?: string
+  address?: string
+  name?: string
+  isFromMe?: boolean
 }
 
-// Component to handle map center updates
-function MapUpdater({ latitude, longitude }: { latitude: number; longitude: number }) {
-  const map = useMap()
-  
+export function LocationMap({ 
+  latitude, 
+  longitude, 
+  address, 
+  name,
+  isFromMe = false 
+}: LocationMapProps) {
+  const mapRef = useRef<any>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
+  const [isClient, setIsClient] = useState(false)
+
+  // Ensure we're on client side
   useEffect(() => {
-    // Fly to new position with smooth animation
-    map.flyTo([latitude, longitude], 15, {
-      duration: 1.5 // Animation duration in seconds
-    })
-  }, [latitude, longitude, map])
-  
-  return null
-}
+    setIsClient(true)
+  }, [])
 
-export function LocationMap({ latitude, longitude, locationName }: LocationMapProps) {
+  useEffect(() => {
+    if (!isClient || !containerRef.current || mapRef.current) return
+
+    // Dynamically import Leaflet only on client side
+    import('leaflet').then((L) => {
+      // Import CSS
+      import('leaflet/dist/leaflet.css')
+
+      // Fix Leaflet default marker icon issue in Next.js
+      delete (L.Icon.Default.prototype as any)._getIconUrl
+      L.Icon.Default.mergeOptions({
+        iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
+        iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
+        shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
+      })
+
+      // Initialize map
+      const map = L.map(containerRef.current!, {
+        center: [latitude, longitude],
+        zoom: 15,
+        zoomControl: true,
+        scrollWheelZoom: false,
+        dragging: true,
+        touchZoom: true,
+        doubleClickZoom: true,
+      })
+
+      // Add OpenStreetMap tiles
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap contributors',
+        maxZoom: 19,
+      }).addTo(map)
+
+      // Add marker
+      const marker = L.marker([latitude, longitude]).addTo(map)
+      
+      // Add popup if name or address exists
+      if (name || address) {
+        const popupContent = `
+          <div style="font-family: system-ui, -apple-system, sans-serif;">
+            ${name ? `<strong style="display: block; margin-bottom: 4px;">${name}</strong>` : ''}
+            ${address ? `<span style="font-size: 12px; color: #666;">${address}</span>` : ''}
+          </div>
+        `
+        marker.bindPopup(popupContent)
+      }
+
+      mapRef.current = map
+    })
+
+    // Cleanup
+    return () => {
+      if (mapRef.current) {
+        mapRef.current.remove()
+        mapRef.current = null
+      }
+    }
+  }, [isClient, latitude, longitude, name, address])
+
+  // Generate Google Maps link
+  const getGoogleMapsLink = () => {
+    return `https://www.google.com/maps?q=${latitude},${longitude}`
+  }
+
   return (
-    <div className="w-full h-48 rounded-lg overflow-hidden border">
-      <MapContainer
-        center={[latitude, longitude]}
-        zoom={15}
-        style={{ height: '100%', width: '100%' }}
-        scrollWheelZoom={true}
-      >
-        <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+    <div className="w-full max-w-[300px]">
+      <div className="bg-gray-100 rounded-lg overflow-hidden border border-gray-200">
+        {/* Leaflet Map */}
+        <div 
+          ref={containerRef}
+          className="w-full h-[200px] relative z-0"
+          style={{ background: '#f0f0f0' }}
         />
-        <Marker position={[latitude, longitude]}>
-          <Popup>
-            {locationName || 'Selected Location'}
-            <br />
-            <small>
-              {latitude.toFixed(6)}, {longitude.toFixed(6)}
-            </small>
-          </Popup>
-        </Marker>
-        <MapUpdater latitude={latitude} longitude={longitude} />
-      </MapContainer>
+
+        {/* Location Info */}
+        <div className="p-3">
+          <div className="flex items-start gap-2 mb-2">
+            <MapPin className="h-4 w-4 text-red-500 shrink-0 mt-0.5" />
+            <div className="flex-1 min-w-0">
+              {name && (
+                <p className="text-sm font-medium text-gray-900 truncate mb-1">
+                  {name}
+                </p>
+              )}
+              {address ? (
+                <p className="text-xs text-gray-600 line-clamp-2">
+                  {address}
+                </p>
+              ) : (
+                <p className="text-xs text-gray-500 font-mono">
+                  {latitude.toFixed(6)}, {longitude.toFixed(6)}
+                </p>
+              )}
+            </div>
+          </div>
+          
+          {/* Open in Google Maps button */}
+          <a
+            href={getGoogleMapsLink()}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center justify-center gap-2 w-full py-2 px-3 bg-green-600 hover:bg-green-700 text-white text-xs font-medium rounded transition-colors"
+          >
+            <ExternalLink className="h-3.5 w-3.5" />
+            Open in Google Maps
+          </a>
+        </div>
+      </div>
     </div>
   )
 }

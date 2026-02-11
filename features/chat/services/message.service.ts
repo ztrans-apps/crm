@@ -61,6 +61,46 @@ export class MessageService extends BaseService {
   }
 
   /**
+   * Get single message with relations (for realtime updates)
+   */
+  async getMessage(messageId: string): Promise<any> {
+    try {
+      this.log('MessageService', 'Getting single message', { messageId })
+
+      // Get message with sender info
+      const { data: message, error } = await this.supabase
+        .from('messages')
+        .select(`
+          *,
+          sent_by_user:profiles!messages_sender_id_fkey(id, full_name, email, avatar_url)
+        `)
+        .eq('id', messageId)
+        .single()
+
+      if (error) {
+        this.handleError(error, 'MessageService.getMessage')
+        return null
+      }
+
+      // Get conversation to get contact info
+      const { data: conversation } = await this.supabase
+        .from('conversations')
+        .select('contact:contacts(*)')
+        .eq('id', message.conversation_id)
+        .single()
+
+      // Add contact info to message
+      return {
+        ...message,
+        contact: conversation?.contact || null
+      }
+    } catch (error) {
+      this.handleError(error, 'MessageService.getMessage')
+      return null
+    }
+  }
+
+  /**
    * Send message via WhatsApp
    */
   async sendMessage(params: SendMessageParams) {
