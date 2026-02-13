@@ -50,8 +50,10 @@ export function MessageBubble({
     try {
       await navigator.clipboard.writeText(message.content || '')
       setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
       setShowMenu(false)
+      setTimeout(() => {
+        setCopied(false)
+      }, 2000)
     } catch (error) {
       console.error('Failed to copy:', error)
     }
@@ -129,6 +131,25 @@ export function MessageBubble({
             }`}
             style={{ maxWidth: '450px', minWidth: '60px' }}
           >
+            {/* Quoted message preview */}
+            {message.quoted_message && (
+              <div className={`mb-2 p-2 rounded border-l-4 ${
+                message.is_from_me 
+                  ? 'bg-white/50 border-green-600' 
+                  : 'bg-gray-50 border-gray-400'
+              }`}>
+                <div className="text-[11px] font-semibold mb-0.5 text-gray-700">
+                  {message.quoted_message.is_from_me 
+                    ? (message.quoted_message.sent_by_user?.full_name || 'Agent')
+                    : (message.quoted_message.contact?.name || message.quoted_message.contact?.phone_number || 'Customer')
+                  }
+                </div>
+                <div className="text-[12px] text-gray-600 line-clamp-2">
+                  {message.quoted_message.content || '[Media]'}
+                </div>
+              </div>
+            )}
+
             {/* Media content - image, video, document */}
             {message.media_url && message.media_type && (
               <div className="mb-1">
@@ -263,7 +284,7 @@ export function MessageBubble({
             {/* Translation */}
             {showTranslation && translation && (
               <div className="mt-2 pt-2 border-t border-gray-200">
-                <p className="text-xs text-gray-500 mb-1">Translation:</p>
+                <p className="text-xs text-gray-500 mb-1">Terjemahan:</p>
                 <p className="text-[13px] leading-[1.4] break-words whitespace-pre-wrap">
                   {translation}
                 </p>
@@ -284,20 +305,25 @@ export function MessageBubble({
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align={message.is_from_me ? 'end' : 'start'} className="w-48">
-                {!message.is_from_me && onTranslate && (
+                {!message.is_from_me && onTranslate && message.content && (
                   <DropdownMenuItem onClick={handleTranslateClick} disabled={translating}>
                     <Languages className="h-4 w-4 mr-2" />
-                    {translating ? 'Translating...' : translation ? 'Show translation' : 'Translate'}
+                    {translating ? 'Menerjemahkan...' : showTranslation && translation ? 'Sembunyikan terjemahan' : 'Terjemahkan'}
                   </DropdownMenuItem>
                 )}
-                <DropdownMenuItem onClick={handleCopy}>
-                  <span className="mr-2">📋</span>
-                  {copied ? 'Copied!' : 'Copy'}
-                </DropdownMenuItem>
+                {message.content && (
+                  <DropdownMenuItem 
+                    onClick={handleCopy} 
+                    disabled={copied}
+                  >
+                    <span className="mr-2">{copied ? '✓' : '📋'}</span>
+                    {copied ? 'Tersalin!' : 'Salin'}
+                  </DropdownMenuItem>
+                )}
                 {onReply && (
                   <DropdownMenuItem onClick={handleReply}>
                     <span className="mr-2">↩️</span>
-                    Reply
+                    Balas
                   </DropdownMenuItem>
                 )}
               </DropdownMenuContent>

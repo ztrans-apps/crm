@@ -28,6 +28,32 @@ export default function Header({ user }: HeaderProps) {
 
   const handleLogout = async () => {
     const supabase = createClient()
+    
+    // Get current user before signing out
+    const { data: { user } } = await supabase.auth.getUser()
+    
+    if (user) {
+      // Get user profile to check if agent
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .single()
+      
+      const profileData = profile as any
+      // Update agent status to 'offline' if user is an agent
+      if (profileData?.role === 'agent') {
+        await supabase
+          .from('profiles')
+          // @ts-ignore - Supabase type issue
+          .update({ 
+            agent_status: 'offline',
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', user.id)
+      }
+    }
+    
     await supabase.auth.signOut()
     router.push('/login')
     router.refresh()

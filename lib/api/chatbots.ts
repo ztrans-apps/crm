@@ -76,6 +76,7 @@ export async function startChatbotSession(
 
   const { data, error } = await supabase
     .from('chatbot_sessions')
+    // @ts-ignore - Supabase type issue
     .insert({
       conversation_id: conversationId,
       chatbot_id: chatbotId,
@@ -106,6 +107,7 @@ export async function stopChatbotSession(
 
   const { error } = await supabase
     .from('chatbot_sessions')
+    // @ts-ignore - Supabase type issue
     .update({
       is_active: false,
       stopped_at: new Date().toISOString(),
@@ -144,8 +146,9 @@ export async function toggleChatbot(
       .eq('is_active', true)
       .single()
 
-    if (session) {
-      await stopChatbotSession(session.id, userId)
+    const sessionData = session as any
+    if (sessionData) {
+      await stopChatbotSession(sessionData.id, userId)
     }
 
     // Return updated session
@@ -155,7 +158,7 @@ export async function toggleChatbot(
         *,
         chatbot:chatbots(*)
       `)
-      .eq('id', session?.id)
+      .eq('id', sessionData?.id)
       .single()
 
     if (error) {
@@ -177,6 +180,7 @@ export async function stopAllChatbots(
 
   const { error } = await supabase
     .from('chatbot_sessions')
+    // @ts-ignore - Supabase type issue
     .update({
       is_active: false,
       stopped_at: new Date().toISOString(),

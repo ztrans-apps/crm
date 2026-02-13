@@ -54,7 +54,7 @@ export async function sendMessage(
     }
 
     // Add media if provided
-    if (media) {
+    if (media && media.file) {
       // Upload media first
       const uploadResult = await uploadMedia(media.file, conversationId)
       if (!uploadResult.success || !uploadResult.url) {
@@ -101,9 +101,9 @@ export async function sendMessage(
         content: content || '',
         media_url: media && result.mediaUrl ? result.mediaUrl : null,
         media_type: media?.type || null,
-        media_filename: media?.file.name || null,
-        media_size: media?.file.size || null,
-        media_mime_type: media?.file.type || null,
+        media_filename: media?.file?.name || null,
+        media_size: media?.file?.size || null,
+        media_mime_type: media?.file?.type || null,
         status: 'sent', // Use 'sent' as initial status (database constraint doesn't allow 'sending')
         is_from_me: true,
         whatsapp_message_id: result.messageId || null,

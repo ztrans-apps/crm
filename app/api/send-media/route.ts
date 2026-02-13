@@ -112,14 +112,34 @@ export async function POST(request: NextRequest) {
       })
       .eq('id', savedMessage.id)
 
-    // Update conversation last_message
+    // Update conversation last_message and first_response_at
+    const updateData: any = {
+      last_message: caption || '[Media]',
+      last_message_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    }
+    
+    // Check if this is the first agent response
+    const { data: conv } = await supabase
+      .from('conversations')
+      .select('first_response_at, workflow_status')
+      .eq('id', conversationId)
+      .single()
+    
+    if (conv && !conv.first_response_at) {
+      // This is the first agent response - set first_response_at
+      updateData.first_response_at = new Date().toISOString()
+      
+      // Auto-change workflow status from 'waiting' to 'in_progress'
+      if (conv.workflow_status === 'waiting' || conv.workflow_status === 'incoming') {
+        updateData.workflow_status = 'in_progress'
+        updateData.workflow_started_at = new Date().toISOString()
+      }
+    }
+    
     await supabase
       .from('conversations')
-      .update({
-        last_message: caption || '[Media]',
-        last_message_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      })
+      .update(updateData)
       .eq('id', conversationId)
 
     return NextResponse.json({

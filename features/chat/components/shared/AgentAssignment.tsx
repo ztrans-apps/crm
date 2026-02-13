@@ -2,7 +2,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { UserCircle, X, ChevronDown } from 'lucide-react'
+import { UserCircle, X, ChevronDown, Zap } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
 interface AgentAssignmentProps {
@@ -12,6 +12,7 @@ interface AgentAssignmentProps {
   currentAgentEmail?: string
   onHandover?: (conversationId: string, agentId: string) => Promise<void>
   onAssign?: (agentId: string) => Promise<void>
+  onAutoAssign?: (conversationId: string) => Promise<void>
   canHandover?: boolean
   canAssign?: boolean
   userRole?: 'owner' | 'agent' | 'supervisor'
@@ -31,6 +32,7 @@ export function AgentAssignment({
   currentAgentEmail,
   onHandover,
   onAssign,
+  onAutoAssign,
   canHandover = false,
   canAssign = false,
   userRole = 'agent'
@@ -52,12 +54,27 @@ export function AgentAssignment({
       const { createClient } = await import('@/lib/supabase/client')
       const supabase = createClient()
 
-      const { data, error } = await supabase
+      // Build query to get agents - only show truly online agents
+      // Agent is considered online if:
+      // 1. agent_status is 'available' or 'busy'
+      // 2. last_activity is within last 2 minutes
+      const twoMinutesAgo = new Date(Date.now() - 2 * 60 * 1000).toISOString()
+      
+      let query = supabase
         .from('profiles')
-        .select('id, full_name, email, agent_status')
+        .select('id, full_name, email, agent_status, last_activity')
         .eq('role', 'agent')
-        .neq('id', currentAgentId || '')
+        .in('agent_status', ['available', 'busy'])
+        .not('last_activity', 'is', null)
+        .gte('last_activity', twoMinutesAgo)
         .order('full_name')
+
+      // Exclude current agent if exists
+      if (currentAgentId) {
+        query = query.neq('id', currentAgentId)
+      }
+
+      const { data, error } = await query
 
       if (error) throw error
       setAvailableAgents(data || [])
@@ -90,6 +107,19 @@ export function AgentAssignment({
     }
   }
 
+  const handleAutoAssign = async () => {
+    if (!onAutoAssign) return
+
+    if (!confirm('Auto-assign conversation ke agent yang tersedia?')) return
+
+    try {
+      await onAutoAssign(conversationId)
+      alert('Berhasil auto-assign agent!')
+    } catch (error: any) {
+      alert('Gagal auto-assign: ' + error.message)
+    }
+  }
+
   const handleRemoveAgent = async () => {
     if (!currentAgentId || !onAssign) return
     
@@ -108,6 +138,9 @@ export function AgentAssignment({
       {/* Current Agent Display */}
       {currentAgentId ? (
         <div className="relative">
+          <label className="text-xs font-medium text-gray-600 mb-1 block">
+            Agent Saat Ini
+          </label>
           <div className="flex items-center gap-2 p-2 bg-gray-50 rounded-lg border border-gray-200">
             <div className="w-6 h-6 rounded-full bg-green-500 flex items-center justify-center text-white text-[10px] font-semibold">
               {currentAgentName?.charAt(0).toUpperCase() || 'A'}
@@ -116,6 +149,11 @@ export function AgentAssignment({
               <p className="text-xs font-medium text-gray-900 truncate">
                 {currentAgentName || 'Unknown Agent'}
               </p>
+              {currentAgentEmail && (
+                <p className="text-[10px] text-gray-500 truncate">
+                  {currentAgentEmail}
+                </p>
+              )}
             </div>
             {canHandover && userRole === 'owner' && (
               <button
@@ -142,8 +180,31 @@ export function AgentAssignment({
         <div className="space-y-2">
           <label className="text-xs font-medium text-green-600 flex items-center gap-1">
             <UserCircle className="h-3.5 w-3.5" />
-            Agents
+            {currentAgentId ? 'Handover ke Agent Lain' : 'Pilih Agent'}
           </label>
+
+          {/* Auto-assign button (only for owner when no agent assigned) */}
+          {!currentAgentId && userRole === 'owner' && onAutoAssign && (
+            <Button
+              onClick={handleAutoAssign}
+              className="w-full h-9 bg-purple-600 hover:bg-purple-700 text-white flex items-center justify-center gap-2"
+            >
+              <Zap className="h-4 w-4" />
+              Auto-Assign (Round-Robin)
+            </Button>
+          )}
+
+          {/* Manual assignment label */}
+          {!currentAgentId && userRole === 'owner' && onAutoAssign && (
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-gray-200"></div>
+              </div>
+              <div className="relative flex justify-center text-xs">
+                <span className="bg-gray-50 px-2 text-gray-500">atau pilih manual</span>
+              </div>
+            </div>
+          )}
           
           {/* Dropdown to select agent */}
           <div className="relative">
@@ -151,12 +212,10 @@ export function AgentAssignment({
               onClick={() => setShowDropdown(!showDropdown)}
               className="w-full p-3 text-left border-2 border-green-500 rounded-lg hover:bg-green-50 transition-colors flex items-center justify-between"
             >
-              <span className="text-sm text-gray-500">
+              <span className="text-sm font-medium text-gray-700">
                 {selectedAgent 
                   ? availableAgents.find(a => a.id === selectedAgent)?.full_name 
-                  : currentAgentId 
-                    ? 'Handover ke agent lain...'
-                    : 'Assign agent...'
+                  : 'Pilih agent...'
                 }
               </span>
               <ChevronDown className={`h-4 w-4 text-gray-400 transition-transform ${
@@ -173,7 +232,7 @@ export function AgentAssignment({
                   </div>
                 ) : availableAgents.length === 0 ? (
                   <div className="p-3 text-center text-xs text-gray-500">
-                    Tidak ada agent tersedia
+                    Tidak ada agent online saat ini
                   </div>
                 ) : (
                   availableAgents.map((agent) => (
@@ -197,13 +256,15 @@ export function AgentAssignment({
                             {agent.email}
                           </p>
                         </div>
-                        <span className={`text-xs px-2 py-0.5 rounded-full ${
-                          agent.agent_status === 'available' 
-                            ? 'bg-green-100 text-green-700'
-                            : 'bg-yellow-100 text-yellow-700'
-                        }`}>
-                          {agent.agent_status}
-                        </span>
+                        {agent.agent_status && (
+                          <span className={`text-xs px-2 py-0.5 rounded-full ${
+                            agent.agent_status === 'available' 
+                              ? 'bg-green-100 text-green-700'
+                              : 'bg-yellow-100 text-yellow-700'
+                          }`}>
+                            {agent.agent_status}
+                          </span>
+                        )}
                       </div>
                     </button>
                   ))

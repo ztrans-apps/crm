@@ -41,7 +41,6 @@ export function useNotification({ conversations, selectedConversationId }: UseNo
       // Play sound
       if (notificationSound.current) {
         notificationSound.current.play().catch(err => {
-          console.log('Could not play notification sound:', err)
         })
       }
 

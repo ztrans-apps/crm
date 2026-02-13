@@ -143,8 +143,19 @@ class BaileysWhatsAppService {
           // Skip if message is from me or status broadcast
           if (msg.key.fromMe || msg.key.remoteJid === 'status@broadcast') continue
 
+          console.log('📨 New message received:', {
+            from: msg.key.remoteJid,
+            messageId: msg.key.id,
+            hasMessage: !!msg.message,
+            messageKeys: msg.message ? Object.keys(msg.message) : []
+          })
+
           // Save to database
-          await this.saveIncomingMessage(sessionId, msg)
+          try {
+            await this.saveIncomingMessage(sessionId, msg)
+          } catch (error) {
+            console.error('❌ Error processing message:', error)
+          }
 
           // Emit via Socket.IO
           const io = global.io
@@ -197,7 +208,7 @@ class BaileysWhatsAppService {
   /**
    * Send text message
    */
-  async sendMessage(sessionId, to, message) {
+  async sendMessage(sessionId, to, message, quotedMessageId = null) {
     const session = this.sessions.get(sessionId)
     
     if (!session) {
@@ -218,8 +229,47 @@ class BaileysWhatsAppService {
       // Baileys format: number@s.whatsapp.net
       const jid = `${phoneNumber}@s.whatsapp.net`
 
+      // Prepare message content
+      const messageContent = { text: message }
+
+      // Add quoted message if provided
+      if (quotedMessageId && supabase) {
+        try {
+          // Get the original message from database to get the raw message object
+          const { data: quotedMsg } = await supabase
+            .from('messages')
+            .select('metadata, content, is_from_me, whatsapp_message_id, message_type')
+            .eq('whatsapp_message_id', quotedMessageId)
+            .single()
+          
+          if (quotedMsg && quotedMsg.metadata?.raw_message) {
+            // Use the stored raw message for proper quoting
+            const rawMsg = quotedMsg.metadata.raw_message
+            
+            // For Baileys, we need to pass the message as contextInfo
+            // This is the proper way to quote messages in Baileys
+            messageContent.contextInfo = {
+              stanzaId: rawMsg.key.id,
+              participant: rawMsg.key.fromMe ? undefined : rawMsg.key.remoteJid,
+              quotedMessage: rawMsg.message
+            }
+          } else if (quotedMsg) {
+            // Fallback: create a simple quoted message using contextInfo
+            messageContent.contextInfo = {
+              stanzaId: quotedMessageId,
+              participant: quotedMsg.is_from_me ? undefined : jid,
+              quotedMessage: {
+                conversation: quotedMsg.content || ''
+              }
+            }
+          }
+        } catch (err) {
+          // Silent fail - just send without quote if error
+        }
+      }
+
       // Send message
-      const result = await sock.sendMessage(jid, { text: message })
+      const result = await sock.sendMessage(jid, messageContent)
 
       return {
         success: true,
@@ -232,6 +282,8 @@ class BaileysWhatsAppService {
   }
 
   /**
+   * Send media message
+   */  /**
    * Send media message
    */
   async sendMedia(sessionId, to, mediaBuffer, options = {}) {
@@ -267,6 +319,8 @@ class BaileysWhatsAppService {
           mimetype
         }
       } else {
+        // For documents, caption is not directly supported by WhatsApp
+        // We'll send the document first, then send caption as a separate message if provided
         messageContent = {
           document: mediaBuffer,
           mimetype,
@@ -275,6 +329,15 @@ class BaileysWhatsAppService {
       }
 
       const result = await sock.sendMessage(jid, messageContent)
+
+      // If it's a document and has caption, send caption as separate message
+      if (!mimetype.startsWith('image/') && 
+          !mimetype.startsWith('video/') && 
+          !mimetype.startsWith('audio/') && 
+          caption && caption.trim()) {
+        // Send caption as a separate text message
+        await sock.sendMessage(jid, { text: caption })
+      }
 
       return {
         success: true,
@@ -493,8 +556,18 @@ class BaileysWhatsAppService {
 
       // Extract message content
       const messageText = msg.message?.conversation || 
-                         msg.message?.extendedTextMessage?.text || 
+                         msg.message?.extendedTextMessage?.text ||
+                         msg.message?.imageMessage?.caption ||
+                         msg.message?.videoMessage?.caption ||
+                         msg.message?.documentMessage?.caption ||
+                         msg.message?.documentWithCaptionMessage?.message?.documentMessage?.caption ||
                          null
+
+      // Extract quoted message ID if this is a reply
+      let quotedMessageId = null
+      if (msg.message?.extendedTextMessage?.contextInfo?.stanzaId) {
+        quotedMessageId = msg.message.extendedTextMessage.contextInfo.stanzaId
+      }
 
       if (!conversation) {
         const { data: newConv } = await supabase
@@ -549,6 +622,11 @@ class BaileysWhatsAppService {
       let messageType = 'text'
       let locationContent = null // For storing lat,lng
 
+      // Log message structure for debugging
+      if (msg.message) {
+        console.log('  📋 Message structure:', Object.keys(msg.message))
+      }
+
       // Check for media and download
       const session_sock = this.sessions.get(sessionId)
       
@@ -571,7 +649,17 @@ class BaileysWhatsAppService {
             // Generate filename if not provided
             const timestamp = Date.now()
             const ext = mimetype.split('/')[1]?.split(';')[0] || 'bin'
-            const generatedFilename = filename || `${type}_${timestamp}.${ext}`
+            
+            // If filename is provided, add timestamp to make it unique
+            let generatedFilename
+            if (filename) {
+              const nameParts = filename.split('.')
+              const extension = nameParts.pop()
+              const baseName = nameParts.join('.')
+              generatedFilename = `${baseName}_${timestamp}.${extension}`
+            } else {
+              generatedFilename = `${type}_${timestamp}.${ext}`
+            }
             
             // Upload to Supabase Storage
             const filePath = `${userId}/${conversation.id}/${generatedFilename}`
@@ -643,16 +731,54 @@ class BaileysWhatsAppService {
         }
       } 
       else if (msg.message?.documentMessage) {
+        console.log('  📄 Processing document message...')
         messageType = 'document'
         mediaType = 'document'
         mediaMimeType = msg.message.documentMessage.mimetype || 'application/octet-stream'
         const docFilename = msg.message.documentMessage.fileName || null
+        
+        console.log('  📄 Document info:', { mimetype: mediaMimeType, filename: docFilename })
         
         const result = await downloadAndUploadMedia(msg, 'document', mediaMimeType, docFilename)
         if (result) {
           mediaUrl = result.url
           mediaFilename = result.filename
           mediaSize = result.size
+          console.log('  ✅ Document uploaded:', { url: mediaUrl, filename: mediaFilename, size: mediaSize })
+        } else {
+          console.log('  ❌ Document upload failed')
+        }
+      }
+      else if (msg.message?.documentWithCaptionMessage) {
+        console.log('  📄 Processing documentWithCaptionMessage...')
+        messageType = 'document'
+        mediaType = 'document'
+        const docMsg = msg.message.documentWithCaptionMessage.message?.documentMessage
+        if (docMsg) {
+          mediaMimeType = docMsg.mimetype || 'application/octet-stream'
+          const docFilename = docMsg.fileName || null
+          
+          console.log('  📄 Document with caption info:', { mimetype: mediaMimeType, filename: docFilename, caption: messageText })
+          
+          // For documentWithCaptionMessage, we need to download using the original message
+          // but Baileys expects the documentMessage to be at the top level
+          // So we create a modified message structure
+          const modifiedMsg = {
+            ...msg,
+            message: msg.message.documentWithCaptionMessage.message
+          }
+          
+          const result = await downloadAndUploadMedia(modifiedMsg, 'document', mediaMimeType, docFilename)
+          if (result) {
+            mediaUrl = result.url
+            mediaFilename = result.filename
+            mediaSize = result.size
+            console.log('  ✅ Document with caption uploaded:', { url: mediaUrl, filename: mediaFilename, size: mediaSize })
+          } else {
+            console.log('  ❌ Document with caption upload failed')
+          }
+        } else {
+          console.log('  ❌ No documentMessage found in documentWithCaptionMessage')
         }
       }
       else if (msg.message?.stickerMessage) {
@@ -701,12 +827,28 @@ class BaileysWhatsAppService {
         media_size: mediaSize,
         media_mime_type: mediaMimeType,
         whatsapp_message_id: msg.key.id,
-        created_at: new Date(msg.messageTimestamp * 1000).toISOString()
+        quoted_message_id: quotedMessageId,
+        created_at: new Date(msg.messageTimestamp * 1000).toISOString(),
+        // Store the raw message object in metadata for quoting later
+        metadata: {
+          raw_message: {
+            key: msg.key,
+            message: msg.message,
+            messageTimestamp: msg.messageTimestamp
+          }
+        }
       }
       
       await supabase
         .from('messages')
         .insert(messageData)
+      
+      console.log('  ✅ Message saved to database:', {
+        id: messageData.whatsapp_message_id,
+        type: messageType,
+        hasMedia: !!mediaUrl,
+        content: messageText || '[no text]'
+      })
 
       if (mediaUrl) {
       }

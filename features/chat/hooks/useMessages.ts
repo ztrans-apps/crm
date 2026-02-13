@@ -25,22 +25,48 @@ export function useMessages({
   const [translating, setTranslating] = useState<Record<string, boolean>>({})
   const [sending, setSending] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [hasMore, setHasMore] = useState(true)
+  const [offset, setOffset] = useState(0)
+  const MESSAGES_PER_PAGE = 20
 
-  // Load messages for conversation
-  const loadMessages = useCallback(async (convId: string) => {
+  // Load messages for conversation (initial load)
+  const loadMessages = useCallback(async (convId: string, reset = true) => {
     try {
-      setLoading(true)
-      const data = await chatService.messages.getMessages(convId)
-      const hasChanged = JSON.stringify(data) !== JSON.stringify(messages)
-      if (hasChanged) {
-        setMessages(data)
+      if (reset) {
+        setLoading(true)
+        setOffset(0)
+        setHasMore(true)
+      } else {
+        setLoadingMore(true)
       }
+      
+      const currentOffset = reset ? 0 : offset
+      const data = await chatService.messages.getMessages(convId, MESSAGES_PER_PAGE, currentOffset)
+      
+      if (reset) {
+        setMessages(data)
+      } else {
+        setMessages(prev => [...data, ...prev])
+      }
+      
+      // Check if there are more messages
+      setHasMore(data.length === MESSAGES_PER_PAGE)
+      setOffset(currentOffset + data.length)
+      
     } catch (error) {
       console.error('Error loading messages:', error)
     } finally {
       setLoading(false)
+      setLoadingMore(false)
     }
-  }, [messages])
+  }, [offset])
+
+  // Load more messages
+  const loadMoreMessages = useCallback(async () => {
+    if (!conversationId || loadingMore || !hasMore) return
+    await loadMessages(conversationId, false)
+  }, [conversationId, loadingMore, hasMore, loadMessages])
 
   // Mark conversation as read
   const markAsRead = useCallback(async (convId: string) => {
@@ -55,7 +81,8 @@ export function useMessages({
   // Send message
   const handleSendMessage = useCallback(async (
     conversation: any,
-    media?: MediaAttachment
+    media?: MediaAttachment,
+    replyTo?: any
   ) => {
     if (!messageInput.trim() && !media) return
 
@@ -70,7 +97,14 @@ export function useMessages({
     }
 
     if (!userId || !sessionId) {
-      alert('Session tidak ditemukan')
+      // Check if it's because conversation is not assigned to agent
+      if (!conversation.assigned_to) {
+        alert('Conversation belum di-assign. Silakan ambil conversation terlebih dahulu.')
+      } else if (conversation.assigned_to !== userId) {
+        alert('Anda tidak memiliki akses untuk mengirim pesan ke conversation ini.')
+      } else {
+        alert('Session tidak ditemukan. Pastikan WhatsApp sudah terhubung.')
+      }
       return
     }
 
@@ -187,7 +221,7 @@ export function useMessages({
         const formData = new FormData()
         formData.append('sessionId', sessionId)
         formData.append('to', whatsappNumber)
-        formData.append('caption', tempMessage || '')
+        formData.append('caption', media.caption || tempMessage || '') // Use media caption if provided, otherwise use message input
         formData.append('media', mediaBlob, mediaFilename!)
         formData.append('mimetype', mediaMimeType!)
         formData.append('conversationId', conversation.id)
@@ -221,6 +255,7 @@ export function useMessages({
             message: tempMessage,
             conversationId: conversation.id,
             userId: userId,
+            quotedMessageId: replyTo?.whatsapp_message_id || undefined,
           }),
         })
 
@@ -263,10 +298,12 @@ export function useMessages({
   // Load messages when conversation changes
   useEffect(() => {
     if (conversationId) {
-      loadMessages(conversationId)
+      loadMessages(conversationId, true)
       markAsRead(conversationId)
     } else {
       setMessages([])
+      setOffset(0)
+      setHasMore(true)
     }
   }, [conversationId])
 
@@ -288,6 +325,14 @@ export function useMessages({
         async (payload) => {
           // Fetch the complete message with relations
           const newMessage = await messageService.getMessage(payload.new.id)
+          
+          console.log('📨 New message received:', {
+            id: newMessage?.id,
+            content: newMessage?.content,
+            sender_id: newMessage?.sender_id,
+            sent_by_user: newMessage?.sent_by_user,
+            is_from_me: newMessage?.is_from_me
+          })
           
           if (newMessage) {
             setMessages(prev => {
@@ -338,9 +383,12 @@ export function useMessages({
     translating,
     sending,
     loading,
+    loadingMore,
+    hasMore,
     handleSendMessage,
     handleTranslate,
     markAsRead,
     refreshMessages: loadMessages,
+    loadMoreMessages,
   }
 }

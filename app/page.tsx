@@ -2,6 +2,6 @@
 import { redirect } from 'next/navigation'
 
 export default function Home() {
-  // Let middleware handle the redirect
-  redirect('/login')
+  // Redirect to dashboard (will be handled by middleware for auth)
+  redirect('/dashboard')
 }

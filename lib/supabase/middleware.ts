@@ -39,19 +39,21 @@ export async function updateSession(request: NextRequest) {
   } = await supabase.auth.getUser()
 
   // Protected routes - redirect to login if not authenticated
-  const protectedRoutes = ['/owner', '/agent']
-  const isProtectedRoute = protectedRoutes.some(route => 
-    request.nextUrl.pathname.startsWith(route)
-  )
+  const publicRoutes = ['/login', '/']
+  const isPublicRoute = publicRoutes.includes(request.nextUrl.pathname)
 
-  if (isProtectedRoute && !user) {
+  if (!isPublicRoute && !user) {
     const url = request.nextUrl.clone()
     url.pathname = '/login'
     return NextResponse.redirect(url)
   }
 
-  // Don't redirect from login if already logged in - let the page handle it
-  // This prevents redirect loops
+  // Redirect to dashboard if logged in and trying to access login
+  if (request.nextUrl.pathname === '/login' && user) {
+    const url = request.nextUrl.clone()
+    url.pathname = '/dashboard'
+    return NextResponse.redirect(url)
+  }
 
   return supabaseResponse
 }

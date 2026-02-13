@@ -29,8 +29,13 @@ function MessagesList({
         const showDateSeparator = !prevMsg || 
           new Date(msg.created_at).toDateString() !== new Date(prevMsg.created_at).toDateString()
         
-        // Message grouping logic
-        const isSameSender = prevMsg && prevMsg.is_from_me === msg.is_from_me
+        // Message grouping logic - FIXED to check sender_id for agent messages
+        const isSameSender = prevMsg && (
+          prevMsg.is_from_me === msg.is_from_me &&
+          // For agent messages, also check if same sender_id
+          (!msg.is_from_me || prevMsg.sender_id === msg.sender_id)
+        )
+        
         const isWithin5Minutes = prevMsg && 
           (new Date(msg.created_at).getTime() - new Date(prevMsg.created_at).getTime()) < 5 * 60 * 1000
         

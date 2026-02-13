@@ -1,0 +1,120 @@
+// app/owner/agents/components/AgentListTab.tsx
+'use client'
+
+import { useState, useEffect } from 'react'
+import { createClient } from '@/lib/supabase/client'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { RefreshCw, Mail, User } from 'lucide-react'
+
+interface Agent {
+  id: string
+  email: string
+  full_name: string
+  agent_status: string
+  active_chats_count: number
+  max_concurrent_chats: number
+  created_at: string
+}
+
+export default function AgentListTab() {
+  const [agents, setAgents] = useState<Agent[]>([])
+  const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    loadAgents()
+  }, [])
+
+  const loadAgents = async () => {
+    setLoading(true)
+    try {
+      const supabase = createClient()
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, email, full_name, agent_status, active_chats_count, max_concurrent_chats, created_at')
+        .eq('role', 'agent')
+        .order('full_name')
+
+      if (error) throw error
+      setAgents(data || [])
+    } catch (error) {
+      console.error('Error loading agents:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'available':
+        return 'bg-green-100 text-green-700'
+      case 'busy':
+        return 'bg-yellow-100 text-yellow-700'
+      case 'offline':
+        return 'bg-gray-100 text-gray-700'
+      default:
+        return 'bg-gray-100 text-gray-700'
+    }
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle>All Agents</CardTitle>
+            <CardDescription>
+              List of all agents in the system
+            </CardDescription>
+          </div>
+          <Button
+            onClick={loadAgents}
+            disabled={loading}
+            variant="outline"
+            size="sm"
+          >
+            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-3">
+          {agents.map((agent) => (
+            <div
+              key={agent.id}
+              className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 transition-colors"
+            >
+              <div className="flex items-center gap-4 flex-1">
+                <div className="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center text-white font-semibold">
+                  {agent.full_name.charAt(0).toUpperCase()}
+                </div>
+                <div className="flex-1">
+                  <div className="flex items-center gap-2">
+                    <p className="font-medium text-gray-900">{agent.full_name}</p>
+                    <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${getStatusColor(agent.agent_status)}`}>
+                      {agent.agent_status || 'offline'}
+                    </span>
+                  </div>
+                  <p className="text-sm text-gray-500 flex items-center gap-1">
+                    <Mail className="h-3 w-3" />
+                    {agent.email}
+                  </p>
+                </div>
+              </div>
+              <div className="text-right">
+                <p className="text-sm font-medium text-gray-900">
+                  {agent.active_chats_count || 0} / {agent.max_concurrent_chats || 5}
+                </p>
+                <p className="text-xs text-gray-500">Active Chats</p>
+              </div>
+            </div>
+          ))}
+          {agents.length === 0 && !loading && (
+            <p className="text-center text-gray-500 py-8">No agents found</p>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  )
+}

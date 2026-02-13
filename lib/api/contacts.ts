@@ -26,9 +26,9 @@ export async function updateContact(
     updateData.metadata = customFields
   }
 
-  // @ts-ignore
   const { error } = await supabase
     .from('contacts')
+    // @ts-ignore - Supabase type issue
     .update(updateData)
     .eq('id', contactId)
 

@@ -6,7 +6,7 @@ const router = express.Router()
 // Send single message
 router.post('/send', async (req, res) => {
   try {
-    const { sessionId, to, message } = req.body
+    const { sessionId, to, message, quotedMessageId } = req.body
 
     if (!sessionId || !to || !message) {
       return res.status(400).json({
@@ -15,12 +15,12 @@ router.post('/send', async (req, res) => {
       })
     }
 
-    const result = await whatsappService.sendMessage(sessionId, to, message)
+    const result = await whatsappService.sendMessage(sessionId, to, message, quotedMessageId)
     
     res.json({ 
       success: true,
       message: 'Message sent successfully',
-      messageId: result.messageId // Return messageId for status tracking
+      messageId: result.messageId
     })
   } catch (error) {
     console.error('Send message error:', error)

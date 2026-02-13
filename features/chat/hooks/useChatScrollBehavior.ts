@@ -1,6 +1,6 @@
 // Custom hook for chat scroll behavior with back-to-bottom button
 // Logic: Detect if user is at BOTTOM, not at TOP
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react'
 
 interface UseChatScrollBehaviorProps {
   messagesContainerRef: React.RefObject<HTMLDivElement | null> | React.RefObject<HTMLDivElement>
@@ -94,8 +94,7 @@ export function useChatScrollBehavior({
     const currentLength = messages.length
     const prevLength = prevMessagesLengthRef.current
 
-    // Skip initial load - DON'T set isInitialLoadRef to false here!
-    // Let the scroll effect handle it
+    // Skip initial load
     if (prevLength === 0) {
       prevMessagesLengthRef.current = currentLength
       return
@@ -109,43 +108,32 @@ export function useChatScrollBehavior({
       const latestMessage = messages[messages.length - 1]
       const isMyMessage = latestMessage?.is_from_me === true
       
-      console.log('📬 New message detected:', {
-        total: currentLength,
-        added: newMessagesAdded,
-        latestMessage: latestMessage?.content?.substring(0, 20),
-        is_from_me: latestMessage?.is_from_me,
-        isMyMessage,
-        showBackToBottom
-      })
-      
       if (isMyMessage) {
         // User sent the message - ALWAYS auto scroll
-        console.log('📤 My message sent - auto scrolling')
         scrollToBottom('smooth')
         setNewMessageCount(0)
         setShowBackToBottom(false)
       } else {
         // Message from other person
-        // CRITICAL: Check if button is currently showing
-        if (showBackToBottom) {
-          // Button is visible = user scrolled up
-          // DON'T auto scroll, just increment badge
-          console.log('📨 New message while scrolled up - incrementing badge')
-          setNewMessageCount(prev => prev + newMessagesAdded)
-        } else {
-          // Button is hidden = user is at bottom
-          // Auto scroll to show new message
-          console.log('📨 New message at bottom - auto scrolling')
+        // Check if user is currently at bottom
+        const atBottom = checkIsAtBottom()
+        
+        if (atBottom) {
+          // User is at bottom - auto scroll to show new message
           scrollToBottom('smooth')
           setNewMessageCount(0)
+        } else {
+          // User scrolled up - DON'T auto scroll, just show badge
+          setNewMessageCount(prev => prev + newMessagesAdded)
+          setShowBackToBottom(true)
         }
       }
     }
 
     prevMessagesLengthRef.current = currentLength
-  }, [messages.length, showBackToBottom, scrollToBottom, enabled, messages])
+  }, [messages.length, scrollToBottom, enabled, messages, checkIsAtBottom])
 
-  // AUTO SCROLL when chat is first opened
+  // AUTO SCROLL when conversation changes
   useEffect(() => {
     if (!enabled || !conversationId) return
     
@@ -159,55 +147,19 @@ export function useChatScrollBehavior({
     return () => {}
   }, [conversationId, enabled])
 
-  // Instant scroll to bottom when messages first load (no animation)
-  useEffect(() => {
-    if (!enabled || !conversationId || !messagesContainerRef.current) return
+  // Scroll to bottom when messages load for new conversation
+  // Use useLayoutEffect to run synchronously after DOM updates but before paint
+  useLayoutEffect(() => {
+    if (!enabled || !conversationId || messages.length === 0) return
     
-    // Only for initial load
-    if (isInitialLoadRef.current && messages.length > 0) {
-      console.log('🔄 Initial scroll triggered - messages:', messages.length)
-      
-      // INSTANT scroll - no animation, no delay
+    // Only for initial load of a conversation
+    if (isInitialLoadRef.current) {
       const container = messagesContainerRef.current
-      
       if (container) {
-        console.log('📏 Container height:', container.scrollHeight, 'Current scroll:', container.scrollTop)
-        
-        // Immediate attempt
+        // Scroll instantly to bottom - no animation, no delay
         container.scrollTop = container.scrollHeight
-        console.log('✅ Scroll set to:', container.scrollTop)
-        
-        // Use requestAnimationFrame to ensure DOM is painted
-        requestAnimationFrame(() => {
-          if (container) {
-            container.scrollTop = container.scrollHeight
-            console.log('✅ RAF scroll set to:', container.scrollTop)
-          }
-        })
-        
-        // Backup: Try again after delays
-        setTimeout(() => {
-          if (container) {
-            container.scrollTop = container.scrollHeight
-            console.log('✅ Timeout 50ms scroll set to:', container.scrollTop)
-          }
-        }, 50)
-        
-        setTimeout(() => {
-          if (container) {
-            container.scrollTop = container.scrollHeight
-            console.log('✅ Timeout 150ms scroll set to:', container.scrollTop)
-            
-            // Mark initial load as complete AFTER scroll
-            isInitialLoadRef.current = false
-            console.log('✅ Initial load complete')
-          }
-        }, 150)
-      } else {
-        console.error('❌ Container not found!')
+        isInitialLoadRef.current = false
       }
-    } else {
-      console.log('⏭️ Skip scroll - initial:', isInitialLoadRef.current, 'messages:', messages.length)
     }
   }, [conversationId, messages.length, enabled, messagesContainerRef])
 

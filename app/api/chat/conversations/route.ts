@@ -1,5 +1,4 @@
 // Example API route using middleware pattern
-import { NextRequest } from 'next/server'
 import { withAuth, withRole } from '@/core/auth/middleware'
 import { requirePermission } from '@/core/permissions/middleware'
 import { chatService } from '@/features/chat/services'
@@ -9,7 +8,7 @@ import { chatService } from '@/features/chat/services'
  * Get conversations for current user
  * Requires authentication
  */
-export const GET = withAuth(async (req: NextRequest, context) => {
+export const GET = withAuth(async (req: Request, context) => {
   try {
     // Check permission
     requirePermission(context, 'canViewAllConversations')
@@ -58,7 +57,7 @@ export const GET = withAuth(async (req: NextRequest, context) => {
  * Create new conversation
  * Requires owner role
  */
-export const POST = withRole(['owner', 'supervisor'], async (req: NextRequest, context) => {
+export const POST = withRole(['owner', 'supervisor'], async (req: Request, context) => {
   try {
     const body = await req.json()
     const { phoneNumber, name, message } = body

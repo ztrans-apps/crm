@@ -94,7 +94,7 @@ export function useChat() {
     } catch (error) {
       console.error('Error loading conversations:', error)
     }
-  }, [userId, userRole]) // Remove conversations from deps
+  }, [userId, userRole])
 
   // Setup socket connection and Supabase Realtime
   useEffect(() => {
@@ -117,15 +117,11 @@ export function useChat() {
           })
 
           socketRef.current.on('message', () => {
-            console.log('📨 Socket: New message received')
-            // Debounce refresh
             clearTimeout(debounceTimer)
             debounceTimer = setTimeout(() => loadConversations(), 500)
           })
 
           socketRef.current.on('message_status', () => {
-            console.log('📨 Socket: Message status updated')
-            // Debounce refresh
             clearTimeout(debounceTimer)
             debounceTimer = setTimeout(() => loadConversations(), 500)
           })
@@ -147,21 +143,12 @@ export function useChat() {
           schema: 'public',
           table: 'conversations'
         },
-        (payload) => {
-          console.log('🔄 Supabase Realtime: Conversation changed', payload.eventType)
-          // Debounce refresh
+        () => {
           clearTimeout(debounceTimer)
           debounceTimer = setTimeout(() => loadConversations(), 300)
         }
       )
-      // REMOVED: Don't refresh all conversations on every message change!
-      // Messages are handled by useMessages hook per conversation
-      .subscribe((status) => {
-        console.log('📡 Supabase Realtime status:', status)
-      })
-
-    // NO POLLING - Realtime only!
-    // Polling removed for smooth experience
+      .subscribe()
 
     return () => {
       clearTimeout(debounceTimer)
@@ -173,7 +160,14 @@ export function useChat() {
   // Initialize on mount
   useEffect(() => {
     initializeChat()
-  }, [initializeChat])
+  }, []) // Remove initializeChat from deps to prevent infinite loop
+
+  // Refresh conversations when userId or userRole changes
+  useEffect(() => {
+    if (userId && userRole) {
+      loadConversations(userId, userRole)
+    }
+  }, [userId, userRole])
 
   return {
     conversations,

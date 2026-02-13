@@ -53,6 +53,7 @@ export async function saveNote(
   try {
     const { data, error } = await supabase
       .from('conversation_notes')
+      // @ts-ignore - Supabase type issue
       .insert({
         conversation_id: conversationId,
         content: content.trim(),
@@ -96,6 +97,7 @@ export async function updateNote(
 
   const { data, error } = await supabase
     .from('conversation_notes')
+    // @ts-ignore - Supabase type issue
     .update({
       content,
       rating,

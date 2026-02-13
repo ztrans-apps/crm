@@ -4,7 +4,7 @@ import { createClient } from '@supabase/supabase-js'
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { sessionId, to, message, conversationId, userId } = body
+    const { sessionId, to, message, conversationId, userId, quotedMessageId } = body
 
     if (!sessionId || !to || !message) {
       return NextResponse.json(
@@ -28,18 +28,25 @@ export async function POST(request: NextRequest) {
     // Save message to database first (if conversationId and userId provided)
     let savedMessage = null
     if (conversationId && userId) {
+      const messageData: any = {
+        conversation_id: conversationId,
+        sender_type: 'agent',
+        sender_id: userId,
+        content: message,
+        is_from_me: true,
+        status: 'sent',
+        message_type: 'text',
+        created_at: new Date().toISOString(),
+      }
+
+      // Add quoted_message_id if provided
+      if (quotedMessageId) {
+        messageData.quoted_message_id = quotedMessageId
+      }
+
       const { data, error: dbError } = await supabase
         .from('messages')
-        .insert({
-          conversation_id: conversationId,
-          sender_type: 'agent',
-          sender_id: userId,
-          content: message,
-          is_from_me: true,
-          status: 'sent', // Changed from 'sending' to 'sent'
-          message_type: 'text',
-          created_at: new Date().toISOString(),
-        })
+        .insert(messageData)
         .select()
         .single()
 
@@ -66,6 +73,7 @@ export async function POST(request: NextRequest) {
         sessionId,
         to,
         message,
+        quotedMessageId: quotedMessageId || undefined,
       }),
     })
 
@@ -97,14 +105,34 @@ export async function POST(request: NextRequest) {
         })
         .eq('id', savedMessage.id)
 
-      // Update conversation last_message
+      // Update conversation last_message and first_response_at
+      const updateData: any = {
+        last_message: message,
+        last_message_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      }
+      
+      // Check if this is the first agent response
+      const { data: conv } = await supabase
+        .from('conversations')
+        .select('first_response_at, workflow_status')
+        .eq('id', conversationId)
+        .single()
+      
+      if (conv && !conv.first_response_at) {
+        // This is the first agent response - set first_response_at
+        updateData.first_response_at = new Date().toISOString()
+        
+        // Auto-change workflow status from 'waiting' to 'in_progress'
+        if (conv.workflow_status === 'waiting' || conv.workflow_status === 'incoming') {
+          updateData.workflow_status = 'in_progress'
+          updateData.workflow_started_at = new Date().toISOString()
+        }
+      }
+      
       await supabase
         .from('conversations')
-        .update({
-          last_message: message,
-          last_message_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        })
+        .update(updateData)
         .eq('id', conversationId)
     }
 

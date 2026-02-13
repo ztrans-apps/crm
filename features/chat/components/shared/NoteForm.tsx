@@ -136,7 +136,7 @@ export function NoteCard({ note, defaultExpanded = false }: NoteCardProps) {
         {/* Author Header */}
         <div className="mb-1.5">
           <p className="text-xs font-semibold text-gray-900">
-            {authorName} {authorEmail && `(${authorEmail})`}:
+            {authorName}:
           </p>
         </div>
 

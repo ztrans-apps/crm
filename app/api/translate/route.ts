@@ -12,15 +12,55 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // For now, return a mock translation
-    // In production, integrate with Google Translate API or similar
-    const mockTranslation = `[Translated to ${targetLang}] ${text}`
+    // Use Google Translate via translate.googleapis.com (no API key needed for basic usage)
+    try {
+      const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl=${targetLang}&dt=t&q=${encodeURIComponent(text)}`
+      
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'User-Agent': 'Mozilla/5.0',
+        },
+      })
 
-    return NextResponse.json({
-      translatedText: mockTranslation,
-      sourceLang: 'auto',
-      targetLang,
-    })
+      if (!response.ok) {
+        throw new Error('Translation service error')
+      }
+
+      const data = await response.json()
+
+      // Parse Google Translate response
+      // Format: [[[translated_text, original_text, null, null, 0]], null, source_lang]
+      let translatedText = ''
+      if (data && data[0]) {
+        for (const item of data[0]) {
+          if (item[0]) {
+            translatedText += item[0]
+          }
+        }
+      }
+
+      if (!translatedText) {
+        throw new Error('No translation result')
+      }
+
+      return NextResponse.json({
+        translatedText,
+        sourceLang: data[2] || 'auto',
+        targetLang,
+      })
+    } catch (translationError: any) {
+      console.error('Translation service error:', translationError)
+      
+      // Return error instead of fallback
+      return NextResponse.json(
+        { 
+          error: 'Translation service unavailable',
+          translatedText: text 
+        },
+        { status: 503 }
+      )
+    }
   } catch (error) {
     console.error('Translation error:', error)
     return NextResponse.json(

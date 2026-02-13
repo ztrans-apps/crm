@@ -34,6 +34,7 @@ export function LocationMap({
     // Dynamically import Leaflet only on client side
     import('leaflet').then((L) => {
       // Import CSS
+      // @ts-ignore - CSS import
       import('leaflet/dist/leaflet.css')
 
       // Fix Leaflet default marker icon issue in Next.js
@@ -55,8 +56,8 @@ export function LocationMap({
         doubleClickZoom: true,
       })
 
-      // Add OpenStreetMap tiles
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      // Add tile layer - using alternative tile server to avoid Cloudflare cookie warnings
+      L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '© OpenStreetMap contributors',
         maxZoom: 19,
       }).addTo(map)

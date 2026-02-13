@@ -46,13 +46,14 @@ export async function getAuthUser(): Promise<AuthUser | null> {
       return null
     }
 
+    const profileData = profile as any
     return {
-      id: profile.id,
-      email: profile.email,
-      role: profile.role as UserRole,
-      full_name: profile.full_name,
-      avatar_url: profile.avatar_url,
-      is_active: profile.is_active,
+      id: profileData.id,
+      email: profileData.email,
+      role: profileData.role as UserRole,
+      full_name: profileData.full_name,
+      avatar_url: profileData.avatar_url,
+      is_active: profileData.is_active,
     }
   } catch (error) {
     console.error('getAuthUser error:', error)
@@ -144,11 +145,12 @@ export async function getAgentOwner(agentId: string) {
       throw new Error('Agent not found')
     }
 
+    const agentData = agent as any
     // Get owner info
     const { data: owner, error: ownerError } = await supabase
       .from('profiles')
       .select('*')
-      .eq('id', agent.owner_id)
+      .eq('id', agentData.owner_id)
       .single()
 
     if (ownerError || !owner) {

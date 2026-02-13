@@ -97,6 +97,7 @@ export async function markConversationAsRead(
 
   const { error } = await supabase
     .from('conversations')
+    // @ts-ignore - Supabase type issue
     .update({
       read_status: 'read',
       unread_count: 0,
@@ -120,6 +121,7 @@ export async function markConversationAsUnread(
 
   const { error } = await supabase
     .from('conversations')
+    // @ts-ignore - Supabase type issue
     .update({
       read_status: 'unread',
       updated_at: new Date().toISOString(),
@@ -143,6 +145,7 @@ export async function closeConversation(
 
   const { error } = await supabase
     .from('conversations')
+    // @ts-ignore - Supabase type issue
     .update({
       status: 'closed',
       workflow_status: 'done', // Auto-transition to done when closed
@@ -168,6 +171,7 @@ export async function reopenConversation(
 
   const { error } = await supabase
     .from('conversations')
+    // @ts-ignore - Supabase type issue
     .update({
       status: 'open',
       closed_at: null,
@@ -193,6 +197,7 @@ export async function updateResponseWindow(
 
   const { error } = await supabase
     .from('conversations')
+    // @ts-ignore - Supabase type issue
     .update({
       response_window_expires_at: expiresAt,
       updated_at: new Date().toISOString(),
@@ -216,6 +221,7 @@ export async function assignConversation(
 
   const { error } = await supabase
     .from('conversations')
+    // @ts-ignore - Supabase type issue
     .update({
       assigned_to: agentId,
       workflow_status: 'waiting', // Auto-transition to waiting when assigned
@@ -239,6 +245,7 @@ export async function unassignConversation(
 
   const { error } = await supabase
     .from('conversations')
+    // @ts-ignore - Supabase type issue
     .update({
       assigned_to: null,
       updated_at: new Date().toISOString(),

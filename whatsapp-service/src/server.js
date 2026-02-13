@@ -150,6 +150,7 @@ async function loadActiveSessions() {
     }
 
     for (const session of sessions) {
+      try {
         await whatsappService.initializeClient(session.id)
       } catch (error) {
         console.error(`Failed to reconnect session ${session.id}:`, error.message)
@@ -161,11 +162,15 @@ async function loadActiveSessions() {
 }
 
 httpServer.listen(PORT, async () => {
+  console.log(`🚀 WhatsApp Service running on ${serviceUrl}`)
+  console.log(`📱 Ready to handle WhatsApp messages`)
+  
   // Load active sessions after server starts
   setTimeout(loadActiveSessions, 2000) // Wait 2 seconds for server to be fully ready
   
   // Start auto-sync after sessions are loaded
   setTimeout(() => {
+    console.log('✅ Auto-sync message status started')
     // Initial sync
     autoSyncMessageStatus()
     // Periodic sync
