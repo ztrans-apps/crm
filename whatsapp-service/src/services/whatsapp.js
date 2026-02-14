@@ -1,4 +1,3 @@
-// WhatsApp service using Baileys
 import makeWASocket, {
   DisconnectReason,
   useMultiFileAuthState,
@@ -13,11 +12,13 @@ import QRCode from 'qrcode'
 import fs from 'fs'
 import path from 'path'
 import { supabase } from '../config/supabase.js'
+import reconnectManager from './reconnect-manager.js'
+import sessionManager from './session-manager.js'
 
 class BaileysWhatsAppService {
   constructor() {
-    this.sessions = new Map() // sessionId -> { sock, store, state }
-    this.qrCodes = new Map() // sessionId -> qrCode
+    this.sessions = new Map() // sessionKey (tenantId:sessionId) -> { sock, store, state, tenantId }
+    this.qrCodes = new Map() // sessionKey -> qrCode
     this.authDir = '.baileys_auth'
     
     // Create auth directory if not exists
@@ -27,18 +28,81 @@ class BaileysWhatsAppService {
   }
 
   /**
-   * Initialize a WhatsApp session
+   * Get session key
    */
-  async initializeClient(sessionId) {
-    if (this.sessions.has(sessionId)) {
-      return this.sessions.get(sessionId)
+  getSessionKey(tenantId, sessionId) {
+    return `${tenantId}:${sessionId}`
+  }
+
+  /**
+   * Initialize a WhatsApp session with tenant support
+   */
+  async initializeClient(sessionId, forceNew = false, tenantId = null) {
+    // Get tenant_id from database if not provided
+    if (!tenantId) {
+      if (!supabase) {
+        console.warn(`⚠️  Supabase not configured, using default tenant_id`)
+        tenantId = process.env.DEFAULT_TENANT_ID || '00000000-0000-0000-0000-000000000001'
+      } else {
+        try {
+          const { data, error } = await supabase
+            .from('whatsapp_sessions')
+            .select('tenant_id')
+            .eq('id', sessionId)
+            .single()
+          
+          if (error) {
+            console.warn(`⚠️  Failed to get tenant_id from database, using default:`, error.message)
+            tenantId = process.env.DEFAULT_TENANT_ID || '00000000-0000-0000-0000-000000000001'
+          } else {
+            tenantId = data.tenant_id
+          }
+        } catch (error) {
+          console.warn(`⚠️  Error querying tenant_id, using default:`, error.message)
+          tenantId = process.env.DEFAULT_TENANT_ID || '00000000-0000-0000-0000-000000000001'
+        }
+      }
+    }
+
+    const sessionKey = this.getSessionKey(tenantId, sessionId)
+
+    // If forcing new, delete existing session first
+    if (forceNew && this.sessions.has(sessionKey)) {
+      console.log(`🗑️ Deleting existing session from memory: ${sessionKey}`)
+      const existingSession = this.sessions.get(sessionKey)
+      try {
+        await existingSession.sock.logout()
+      } catch (err) {
+        console.log(`⚠️  Logout error (ignoring): ${err.message}`)
+      }
+      this.sessions.delete(sessionKey)
+      this.qrCodes.delete(sessionKey)
+      this.qrCodes.delete(sessionId)
+    }
+
+    // If session already exists and not forcing new, return it
+    if (this.sessions.has(sessionKey) && !forceNew) {
+      console.log(`⚠️ Session ${sessionKey} already exists, returning existing session`)
+      return this.sessions.get(sessionKey)
     }
 
     try {
+      console.log(`🚀 Initializing ${forceNew ? 'NEW' : ''} session: ${sessionKey}`)
+      
       // Create session auth directory
       const authPath = path.join(this.authDir, sessionId)
+      
+      // If forcing new session, delete old auth files
+      if (forceNew && fs.existsSync(authPath)) {
+        console.log(`🗑️ Deleting old auth files for: ${sessionId}`)
+        fs.rmSync(authPath, { recursive: true, force: true })
+      }
+      
       if (!fs.existsSync(authPath)) {
         fs.mkdirSync(authPath, { recursive: true })
+        console.log(`📁 Created auth directory: ${authPath}`)
+      } else {
+        console.log(`📁 Auth directory already exists: ${authPath}`)
       }
 
       // Load auth state
@@ -59,26 +123,57 @@ class BaileysWhatsAppService {
         browser: Browsers.ubuntu('Chrome')
       })
 
-      // Store session
-      this.sessions.set(sessionId, { sock, state, saveCreds })
+      console.log(`🔌 Socket created for ${sessionKey}`)
+      console.log(`🔌 Has existing creds: ${!!state.creds?.me}`)
+      console.log(`🔌 Registered phone: ${state.creds?.me?.id || 'none'}`)
+
+      // Store session with tenant info
+      const sessionData = { sock, state, saveCreds, tenantId, sessionId }
+      this.sessions.set(sessionKey, sessionData)
+
+      // Register with session manager
+      sessionManager.registerSession(tenantId, sessionId, {
+        sock,
+        phoneNumber: null, // Will be updated on connection
+        status: 'initializing'
+      })
+
+      console.log(`📡 Attaching event listeners for ${sessionKey}`)
 
       // Handle connection updates
       sock.ev.on('connection.update', async (update) => {
         const { connection, lastDisconnect, qr } = update
+        
+        console.log(`🔄 Connection update for ${sessionKey}:`, {
+          connection,
+          hasQR: !!qr,
+          hasLastDisconnect: !!lastDisconnect
+        })
 
         // Handle QR code
         if (qr) {
+          console.log(`📱 QR code generated for session: ${sessionKey}`)
+          console.log(`📱 Current time: ${new Date().toISOString()}`)
+          console.log(`📱 QR will expire in ~40 seconds`)
+          
           // Show in terminal
           qrcodeTerminal.generate(qr, { small: true })
           
           // Convert to base64 for browser
           const qrImage = await QRCode.toDataURL(qr)
-          this.qrCodes.set(sessionId, qrImage)
+          
+          // Store with BOTH sessionKey and sessionId for compatibility
+          this.qrCodes.set(sessionKey, qrImage)
+          this.qrCodes.set(sessionId, qrImage) // Also store with sessionId only
+          
+          console.log(`✅ QR code stored in memory for session: ${sessionKey}`)
+          console.log(`✅ QR code also stored with sessionId: ${sessionId}`)
+          console.log(`✅ Total QR codes in memory: ${this.qrCodes.size}`)
           
           // Emit via Socket.IO
           const io = global.io
           if (io) {
-            io.emit('qr', { sessionId, qr: qrImage })
+            io.emit('qr', { sessionId, tenantId, qr: qrImage })
           }
         }
 
@@ -88,47 +183,146 @@ class BaileysWhatsAppService {
             ? lastDisconnect.error.output.statusCode !== DisconnectReason.loggedOut
             : true
 
+          const statusCode = lastDisconnect?.error instanceof Boom 
+            ? lastDisconnect.error.output.statusCode 
+            : null
+
+          console.log(`❌ Connection closed for ${sessionKey}, status: ${statusCode}, shouldReconnect: ${shouldReconnect}`)
+
+          // Update session manager
+          sessionManager.updateStatus(tenantId, sessionId, 'disconnected')
+
           // Update database
           if (supabase) {
             await supabase
               .from('whatsapp_sessions')
-              .update({ status: 'disconnected' })
+              .update({ 
+                status: shouldReconnect ? 'reconnecting' : 'disconnected',
+                metadata: { lastDisconnect: statusCode }
+              })
               .eq('id', sessionId)
+              .eq('tenant_id', tenantId)
           }
 
           // Emit via Socket.IO
           const io = global.io
           if (io) {
-            io.emit('disconnected', { sessionId })
+            io.emit('disconnected', { sessionId, tenantId, shouldReconnect })
           }
 
           // Remove from sessions
-          this.sessions.delete(sessionId)
-          this.qrCodes.delete(sessionId)
+          this.sessions.delete(sessionKey)
+          
+          // IMPORTANT: Don't delete QR code on connection close!
+          // QR code should persist to allow user to scan even after connection closes
+          // QR will be deleted when:
+          // 1. User successfully scans and connects
+          // 2. User manually cancels
+          // 3. Session is force deleted
+          console.log(`⏳ Keeping QR code after connection close for: ${sessionKey}`)
+          console.log(`⏳ QR codes in memory: ${this.qrCodes.size}`)
+          
+          sessionManager.unregisterSession(tenantId, sessionId)
 
           // Reconnect if not logged out
           if (shouldReconnect) {
-            setTimeout(() => {
-              this.initializeClient(sessionId).catch(console.error)
-            }, 5000)
+            console.log(`🔄 Scheduling auto-reconnect for session: ${sessionKey}`)
+            
+            // Use reconnect manager with exponential backoff
+            reconnectManager.scheduleReconnect(
+              sessionId,
+              async (sid) => {
+                try {
+                  await this.initializeClient(sid, false, tenantId)
+                  return true // Success
+                } catch (error) {
+                  console.error(`❌ Reconnect attempt failed for ${sid}:`, error)
+                  return false // Failed, will retry
+                }
+              },
+              async (sid) => {
+                // Max attempts reached
+                console.error(`❌ Max reconnect attempts reached for session: ${sid}`)
+                
+                // Update database
+                if (supabase) {
+                  await supabase
+                    .from('whatsapp_sessions')
+                    .update({ 
+                      status: 'failed',
+                      metadata: { error: 'Max reconnect attempts reached' }
+                    })
+                    .eq('id', sid)
+                    .eq('tenant_id', tenantId)
+                }
+                
+                // Emit via Socket.IO
+                const io = global.io
+                if (io) {
+                  io.emit('reconnect-failed', { sessionId: sid, tenantId })
+                }
+              }
+            )
+          } else {
+            console.log(`🚫 Not reconnecting session ${sessionKey} (logged out)`)
           }
         } else if (connection === 'open') {
-          // Clear QR code
-          this.qrCodes.delete(sessionId)
-
-          // Update database
+          console.log(`✅ Session connected: ${sessionKey}`)
+          console.log(`📊 Updating database for session: ${sessionId}, tenant: ${tenantId}`)
+          
+          // Reset reconnect attempts on successful connection
+          reconnectManager.resetAttempts(sessionId)
+          
+          // Get phone number from Baileys
+          const phoneNumber = sock.user?.id?.split(':')[0] || null
+          console.log(`📱 Phone number detected: ${phoneNumber}`)
+          console.log(`📱 Formatted phone: +${phoneNumber}`)
+          
+          // Update session manager
+          sessionManager.updateStatus(tenantId, sessionId, 'active')
+          
+          // Update database with phone number
           if (supabase) {
-            await supabase
+            console.log(`💾 Attempting to update database...`)
+            const updateResult = await supabase
               .from('whatsapp_sessions')
-              .update({ status: 'connected' })
+              .update({ 
+                status: 'connected',
+                phone_number: phoneNumber ? `+${phoneNumber}` : null,
+                metadata: { lastConnected: new Date().toISOString() }
+              })
               .eq('id', sessionId)
+              .eq('tenant_id', tenantId)
+            
+            if (updateResult.error) {
+              console.error(`❌ Failed to update phone number in database:`, updateResult.error)
+              console.error(`❌ Error details:`, JSON.stringify(updateResult.error, null, 2))
+            } else {
+              console.log(`✅ Phone number updated in database: +${phoneNumber}`)
+              console.log(`✅ Status updated to: connected`)
+              console.log(`✅ Update result:`, updateResult)
+            }
+          } else {
+            console.warn(`⚠️  Supabase not configured, phone number not saved to database`)
           }
-
+          
           // Emit via Socket.IO
           const io = global.io
           if (io) {
-            io.emit('ready', { sessionId })
+            io.emit('connected', { sessionId, tenantId, phoneNumber })
           }
+          
+          // Clear QR code AFTER updating database
+          // This ensures frontend can detect the connection first
+          // Increased delay to ensure UI has time to process
+          setTimeout(() => {
+            this.qrCodes.delete(sessionKey)
+            this.qrCodes.delete(sessionId) // Also delete sessionId key
+            console.log(`🗑️ QR code cleared for session: ${sessionKey} and ${sessionId}`)
+          }, 5000) // Increased from 2s to 5s
+        } else if (connection === 'connecting') {
+          console.log(`🔄 Session connecting: ${sessionKey}`)
+          sessionManager.updateStatus(tenantId, sessionId, 'connecting')
         }
       })
 
@@ -150,11 +344,15 @@ class BaileysWhatsAppService {
             messageKeys: msg.message ? Object.keys(msg.message) : []
           })
 
+          // Update session activity
+          sessionManager.updateActivity(tenantId, sessionId, 'message')
+
           // Save to database
           try {
-            await this.saveIncomingMessage(sessionId, msg)
+            await this.saveIncomingMessage(sessionId, msg, tenantId)
           } catch (error) {
             console.error('❌ Error processing message:', error)
+            sessionManager.updateActivity(tenantId, sessionId, 'error')
           }
 
           // Emit via Socket.IO
@@ -162,6 +360,7 @@ class BaileysWhatsAppService {
           if (io) {
             io.emit('message', {
               sessionId,
+              tenantId,
               from: msg.key.remoteJid,
               message: msg
             })
@@ -208,10 +407,39 @@ class BaileysWhatsAppService {
   /**
    * Send text message
    */
-  async sendMessage(sessionId, to, message, quotedMessageId = null) {
-    const session = this.sessions.get(sessionId)
+  async sendMessage(sessionId, to, message, quotedMessageId = null, tenantId = null) {
+    // Get tenant_id from parameter or database
+    if (!tenantId) {
+      if (!supabase) {
+        console.warn(`⚠️  Supabase not configured, using default tenant_id`)
+        tenantId = process.env.DEFAULT_TENANT_ID || '00000000-0000-0000-0000-000000000001'
+      } else {
+        try {
+          const { data, error } = await supabase
+            .from('whatsapp_sessions')
+            .select('tenant_id')
+            .eq('id', sessionId)
+            .single()
+          
+          if (error) {
+            console.warn(`⚠️  Failed to get tenant_id from database, using default:`, error.message)
+            tenantId = process.env.DEFAULT_TENANT_ID || '00000000-0000-0000-0000-000000000001'
+          } else {
+            tenantId = data.tenant_id
+          }
+        } catch (error) {
+          console.warn(`⚠️  Error querying tenant_id, using default:`, error.message)
+          tenantId = process.env.DEFAULT_TENANT_ID || '00000000-0000-0000-0000-000000000001'
+        }
+      }
+    }
+
+    const sessionKey = this.getSessionKey(tenantId, sessionId)
+    const session = this.sessions.get(sessionKey)
     
     if (!session) {
+      console.error(`❌ Session not found: ${sessionKey}`)
+      console.log(`📋 Available sessions:`, Array.from(this.sessions.keys()))
       throw new Error('Session not found: ' + sessionId)
     }
 
@@ -286,8 +514,35 @@ class BaileysWhatsAppService {
    */  /**
    * Send media message
    */
-  async sendMedia(sessionId, to, mediaBuffer, options = {}) {
-    const session = this.sessions.get(sessionId)
+  async sendMedia(sessionId, to, mediaBuffer, options = {}, tenantId = null) {
+    // Get tenant_id from parameter or database
+    if (!tenantId) {
+      if (!supabase) {
+        console.warn(`⚠️  Supabase not configured, using default tenant_id`)
+        tenantId = process.env.DEFAULT_TENANT_ID || '00000000-0000-0000-0000-000000000001'
+      } else {
+        try {
+          const { data, error } = await supabase
+            .from('whatsapp_sessions')
+            .select('tenant_id')
+            .eq('id', sessionId)
+            .single()
+          
+          if (error) {
+            console.warn(`⚠️  Failed to get tenant_id from database, using default:`, error.message)
+            tenantId = process.env.DEFAULT_TENANT_ID || '00000000-0000-0000-0000-000000000001'
+          } else {
+            tenantId = data.tenant_id
+          }
+        } catch (error) {
+          console.warn(`⚠️  Error querying tenant_id, using default:`, error.message)
+          tenantId = process.env.DEFAULT_TENANT_ID || '00000000-0000-0000-0000-000000000001'
+        }
+      }
+    }
+
+    const sessionKey = this.getSessionKey(tenantId, sessionId)
+    const session = this.sessions.get(sessionKey)
     
     if (!session) {
       throw new Error('Session not found: ' + sessionId)
@@ -352,8 +607,35 @@ class BaileysWhatsAppService {
   /**
    * Send location message
    */
-  async sendLocation(sessionId, to, latitude, longitude, options = {}) {
-    const session = this.sessions.get(sessionId)
+  async sendLocation(sessionId, to, latitude, longitude, options = {}, tenantId = null) {
+    // Get tenant_id from parameter or database
+    if (!tenantId) {
+      if (!supabase) {
+        console.warn(`⚠️  Supabase not configured, using default tenant_id`)
+        tenantId = process.env.DEFAULT_TENANT_ID || '00000000-0000-0000-0000-000000000001'
+      } else {
+        try {
+          const { data, error } = await supabase
+            .from('whatsapp_sessions')
+            .select('tenant_id')
+            .eq('id', sessionId)
+            .single()
+          
+          if (error) {
+            console.warn(`⚠️  Failed to get tenant_id from database, using default:`, error.message)
+            tenantId = process.env.DEFAULT_TENANT_ID || '00000000-0000-0000-0000-000000000001'
+          } else {
+            tenantId = data.tenant_id
+          }
+        } catch (error) {
+          console.warn(`⚠️  Error querying tenant_id, using default:`, error.message)
+          tenantId = process.env.DEFAULT_TENANT_ID || '00000000-0000-0000-0000-000000000001'
+        }
+      }
+    }
+
+    const sessionKey = this.getSessionKey(tenantId, sessionId)
+    const session = this.sessions.get(sessionKey)
     
     if (!session) {
       throw new Error('Session not found: ' + sessionId)
@@ -392,7 +674,27 @@ class BaileysWhatsAppService {
    * Disconnect session
    */
   async disconnectSession(sessionId) {
-    const session = this.sessions.get(sessionId)
+    // Get tenant_id from database if needed
+    let tenantId = null
+    if (supabase) {
+      try {
+        const { data, error } = await supabase
+          .from('whatsapp_sessions')
+          .select('tenant_id')
+          .eq('id', sessionId)
+          .single()
+        
+        if (!error && data) {
+          tenantId = data.tenant_id
+        }
+      } catch (error) {
+        // Ignore error, continue with sessionId only
+        console.warn(`⚠️  Could not get tenant_id, continuing anyway:`, error.message)
+      }
+    }
+
+    const sessionKey = tenantId ? this.getSessionKey(tenantId, sessionId) : sessionId
+    const session = this.sessions.get(sessionKey)
     
     if (session) {
       const { sock } = session
@@ -420,15 +722,33 @@ class BaileysWhatsAppService {
    * Force delete session (remove auth files)
    */
   async forceDeleteSession(sessionId) {
+    // Get tenant_id from database if needed
+    let tenantId = null
+    try {
+      const { data, error } = await supabase
+        .from('whatsapp_sessions')
+        .select('tenant_id')
+        .eq('id', sessionId)
+        .single()
+      
+      if (!error && data) {
+        tenantId = data.tenant_id
+      }
+    } catch (error) {
+      // Ignore error, continue with sessionId only
+    }
+
+    const sessionKey = tenantId ? this.getSessionKey(tenantId, sessionId) : sessionId
+
     // Disconnect if connected
-    if (this.sessions.has(sessionId)) {
-      const { sock } = this.sessions.get(sessionId)
+    if (this.sessions.has(sessionKey)) {
+      const { sock } = this.sessions.get(sessionKey)
       try {
         await sock.logout()
       } catch (error) {
         console.log('Error during logout:', error.message)
       }
-      this.sessions.delete(sessionId)
+      this.sessions.delete(sessionKey)
     }
 
     // Delete auth files
@@ -445,7 +765,10 @@ class BaileysWhatsAppService {
         .eq('id', sessionId)
     }
 
+    // Delete QR codes (both keys)
+    this.qrCodes.delete(sessionKey)
     this.qrCodes.delete(sessionId)
+    console.log(`🗑️ QR codes deleted for: ${sessionKey} and ${sessionId}`)
 
     return { success: true }
   }
@@ -453,15 +776,101 @@ class BaileysWhatsAppService {
   /**
    * Get session status
    */
-  getSessionStatus(sessionId) {
+  async getSessionStatus(sessionId) {
+    // IMPORTANT: Always get status from database first
+    // Memory status might be stale or from old session
+    if (supabase) {
+      try {
+        const { data, error } = await supabase
+          .from('whatsapp_sessions')
+          .select('status, tenant_id')
+          .eq('id', sessionId)
+          .single()
+        
+        if (!error && data) {
+          console.log(`📊 Session status from DB: ${data.status}`)
+          return data.status
+        }
+      } catch (error) {
+        console.warn(`⚠️  Failed to get status from DB, checking memory`)
+      }
+    }
+
+    // Fallback: check memory (only if DB query failed)
+    let tenantId = null
+    try {
+      const { data, error } = await supabase
+        .from('whatsapp_sessions')
+        .select('tenant_id')
+        .eq('id', sessionId)
+        .single()
+      
+      if (!error && data) {
+        tenantId = data.tenant_id
+      }
+    } catch (error) {
+      // Ignore error
+    }
+
+    // Try with sessionKey first
+    const sessionKey = tenantId ? this.getSessionKey(tenantId, sessionId) : null
+    
+    if (sessionKey && this.sessions.has(sessionKey)) {
+      return 'connected'
+    }
+    
+    // Fallback: try with sessionId only
     return this.sessions.has(sessionId) ? 'connected' : 'disconnected'
   }
 
   /**
    * Get QR code for session
    */
-  getQRCode(sessionId) {
-    return this.qrCodes.get(sessionId) || null
+  async getQRCode(sessionId) {
+    // Try to get tenant_id from database
+    let tenantId = null
+    if (supabase) {
+      try {
+        const { data, error } = await supabase
+          .from('whatsapp_sessions')
+          .select('tenant_id')
+          .eq('id', sessionId)
+          .single()
+        
+        if (!error && data) {
+          tenantId = data.tenant_id
+        }
+      } catch (error) {
+        // Ignore error, try with sessionId only
+      }
+    }
+
+    // Try with sessionKey first, then fallback to sessionId
+    const sessionKey = tenantId ? this.getSessionKey(tenantId, sessionId) : null
+    
+    console.log(`🔍 Looking for QR code:`, {
+      sessionId,
+      tenantId,
+      sessionKey,
+      hasQRWithKey: sessionKey ? this.qrCodes.has(sessionKey) : false,
+      hasQRWithId: this.qrCodes.has(sessionId),
+      totalQRs: this.qrCodes.size,
+      allKeys: Array.from(this.qrCodes.keys())
+    })
+    
+    if (sessionKey && this.qrCodes.has(sessionKey)) {
+      console.log(`✅ QR code found with sessionKey: ${sessionKey}`)
+      return this.qrCodes.get(sessionKey)
+    }
+    
+    // Fallback: try with sessionId only (for backward compatibility)
+    if (this.qrCodes.has(sessionId)) {
+      console.log(`✅ QR code found with sessionId: ${sessionId}`)
+      return this.qrCodes.get(sessionId)
+    }
+    
+    console.log(`❌ No QR code found for session: ${sessionId}`)
+    return null
   }
 
   /**
@@ -469,6 +878,17 @@ class BaileysWhatsAppService {
    */
   getAllSessions() {
     return Array.from(this.sessions.keys())
+  }
+
+  /**
+   * Get all stored QR codes (for debugging)
+   */
+  getAllQRCodes() {
+    const qrCodes = {}
+    for (const [key, qr] of this.qrCodes.entries()) {
+      qrCodes[key] = qr ? 'QR_EXISTS' : 'NULL'
+    }
+    return qrCodes
   }
 
   /**
@@ -499,15 +919,19 @@ class BaileysWhatsAppService {
 
     try {
       // Get session user_id
-      const { data: session } = await supabase
+      const { data: session, error: sessionError } = await supabase
         .from('whatsapp_sessions')
         .select('user_id')
         .eq('id', sessionId)
         .single()
 
-      if (!session) return
+      if (sessionError || !session) {
+        console.error('  ❌ Session not found in database:', sessionId, sessionError)
+        return
+      }
 
       const userId = session.user_id
+      console.log(`  👤 User ID: ${userId}`)
 
       // Extract phone number from JID (format: 6285xxx@s.whatsapp.net)
       const phoneNumber = msg.key.remoteJid.split('@')[0]
@@ -525,12 +949,16 @@ class BaileysWhatsAppService {
         .single()
 
       if (!contact) {
+        // Get default tenant ID from environment
+        const defaultTenantId = process.env.DEFAULT_TENANT_ID || '00000000-0000-0000-0000-000000000001';
+        
         const { data: newContact } = await supabase
           .from('contacts')
           .insert({
             user_id: userId,
             phone_number: formattedPhone,
-            name: pushname
+            name: pushname,
+            tenant_id: defaultTenantId
           })
           .select()
           .single()
@@ -570,11 +998,15 @@ class BaileysWhatsAppService {
       }
 
       if (!conversation) {
-        const { data: newConv } = await supabase
+        // Get default tenant ID from environment
+        const defaultTenantId = process.env.DEFAULT_TENANT_ID || '00000000-0000-0000-0000-000000000001';
+        
+        const { data: newConv, error: convError } = await supabase
           .from('conversations')
           .insert({
             whatsapp_session_id: sessionId,
             contact_id: contact.id,
+            tenant_id: defaultTenantId,
             status: 'open',
             read_status: 'unread',
             unread_count: 1,
@@ -583,6 +1015,12 @@ class BaileysWhatsAppService {
           })
           .select()
           .single()
+        
+        if (convError || !newConv) {
+          console.error('  ❌ Failed to create conversation:', convError)
+          return
+        }
+        
         conversation = newConv
       } else {
         // Update conversation
@@ -814,6 +1252,14 @@ class BaileysWhatsAppService {
       }
 
       // Save message
+      if (!conversation || !conversation.id) {
+        console.error('  ❌ Cannot save message: conversation is null or has no ID')
+        return
+      }
+      
+      // Get default tenant ID from environment
+      const defaultTenantId = process.env.DEFAULT_TENANT_ID || '00000000-0000-0000-0000-000000000001';
+      
       const messageData = {
         conversation_id: conversation.id,
         sender_type: 'customer',
@@ -828,6 +1274,7 @@ class BaileysWhatsAppService {
         media_mime_type: mediaMimeType,
         whatsapp_message_id: msg.key.id,
         quoted_message_id: quotedMessageId,
+        tenant_id: defaultTenantId,
         created_at: new Date(msg.messageTimestamp * 1000).toISOString(),
         // Store the raw message object in metadata for quoting later
         metadata: {

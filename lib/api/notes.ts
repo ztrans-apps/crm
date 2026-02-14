@@ -49,6 +49,7 @@ export async function saveNote(
   }
 
   const supabase = createClient()
+  const defaultTenantId = process.env.NEXT_PUBLIC_DEFAULT_TENANT_ID || '00000000-0000-0000-0000-000000000001'
 
   try {
     const { data, error } = await supabase
@@ -59,6 +60,7 @@ export async function saveNote(
         content: content.trim(),
         rating,
         created_by: userId,
+        tenant_id: defaultTenantId,
       })
       .select()
       .single()

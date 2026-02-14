@@ -271,6 +271,7 @@ export class ConversationService extends BaseService {
           to_agent_id: toAgentId,
           reason: reason || null,
           handover_at: new Date().toISOString(),
+          tenant_id: this.defaultTenantId,
         })
 
       if (logError) {

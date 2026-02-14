@@ -595,21 +595,40 @@ export function InputBar({
     if (!locationSearch.trim()) return
 
     setSearching(true)
+    setSearchResults([])
+    
     try {
-      // Using Nominatim API (OpenStreetMap geocoding service - FREE)
-      const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(locationSearch)}&limit=5`,
-        {
-          headers: {
-            'User-Agent': 'ChatApp/1.0' // Required by Nominatim
-          }
-        }
-      )
+      console.log('[Location Search] Searching for:', locationSearch)
+      
+      // Use our API route as proxy to avoid CORS issues
+      const url = `/api/geocode/search?q=${encodeURIComponent(locationSearch)}`
+      console.log('[Location Search] Calling API:', url)
+      
+      const response = await fetch(url)
+      console.log('[Location Search] Response status:', response.status, response.statusText)
+      
       const data = await response.json()
-      setSearchResults(data)
-    } catch (error) {
-      console.error('Error searching location:', error)
-      alert('Failed to search location. Please try again.')
+      console.log('[Location Search] Response data:', data)
+      
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to search location')
+      }
+      
+      // Check if data is an array (successful search results)
+      if (Array.isArray(data)) {
+        console.log('[Location Search] Found', data.length, 'results')
+        setSearchResults(data)
+        
+        if (data.length === 0) {
+          alert('No locations found. Try a different search term.')
+        }
+      } else {
+        throw new Error('Invalid response format')
+      }
+    } catch (error: any) {
+      console.error('[Location Search] Error:', error)
+      alert(error.message || 'Failed to search location. Please try again.')
+      setSearchResults([])
     } finally {
       setSearching(false)
     }

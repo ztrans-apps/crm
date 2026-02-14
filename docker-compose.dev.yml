@@ -1,0 +1,44 @@
+# Development override for docker-compose
+version: '3.8'
+
+services:
+  redis:
+    ports:
+      - "6379:6379"
+
+  whatsapp-service:
+    build:
+      context: ./whatsapp-service
+      dockerfile: Dockerfile
+    volumes:
+      - ./whatsapp-service:/app
+      - /app/node_modules
+      - whatsapp-auth:/app/.baileys_auth
+    command: npm run dev
+    environment:
+      - NODE_ENV=development
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: builder
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - /app/.next
+    command: npm run dev
+    environment:
+      - NODE_ENV=development
+
+  workers:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: builder
+    volumes:
+      - .:/app
+      - /app/node_modules
+    command: npm run workers
+    environment:
+      - NODE_ENV=development

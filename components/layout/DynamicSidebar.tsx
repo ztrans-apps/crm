@@ -49,8 +49,8 @@ export default function DynamicSidebar({ userRole }: DynamicSidebarProps) {
     { 
       icon: QrCode, 
       label: 'WhatsApp', 
-      href: '/whatsapp',
-      permission: 'whatsapp.manage'
+      href: '/whatsapp'
+      // Removed permission requirement - accessible to all
     },
     { 
       icon: MessageSquare, 

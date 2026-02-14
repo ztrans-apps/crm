@@ -31,6 +31,7 @@ export async function createLabel(
   color: string
 ): Promise<Label> {
   const supabase = createClient()
+  const defaultTenantId = process.env.NEXT_PUBLIC_DEFAULT_TENANT_ID || '00000000-0000-0000-0000-000000000001'
 
   const { data, error } = await supabase
     .from('labels')
@@ -39,6 +40,7 @@ export async function createLabel(
       user_id: userId,
       name,
       color,
+      tenant_id: defaultTenantId,
     })
     .select()
     .single()
@@ -153,6 +155,7 @@ export async function applyLabel(
   }
 
   // Apply label
+  const defaultTenantId = process.env.NEXT_PUBLIC_DEFAULT_TENANT_ID || '00000000-0000-0000-0000-000000000001'
   const { data, error } = await supabase
     .from('conversation_labels')
     // @ts-ignore - Supabase type issue
@@ -160,6 +163,7 @@ export async function applyLabel(
       conversation_id: conversationId,
       label_id: labelId,
       created_by: userId,
+      tenant_id: defaultTenantId,
     })
     .select(`
       *,

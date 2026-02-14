@@ -1,0 +1,53 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: whatsapp-crm-app
+  labels:
+    app: whatsapp-crm
+    component: app
+spec:
+  type: ClusterIP
+  ports:
+  - port: 3000
+    targetPort: 3000
+    protocol: TCP
+    name: http
+  selector:
+    app: whatsapp-crm
+    component: app
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: whatsapp-crm-service
+  labels:
+    app: whatsapp-crm
+    component: whatsapp-service
+spec:
+  type: ClusterIP
+  ports:
+  - port: 3001
+    targetPort: 3001
+    protocol: TCP
+    name: http
+  selector:
+    app: whatsapp-crm
+    component: whatsapp-service
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis
+  labels:
+    app: whatsapp-crm
+    component: redis
+spec:
+  type: ClusterIP
+  ports:
+  - port: 6379
+    targetPort: 6379
+    protocol: TCP
+    name: redis
+  selector:
+    app: whatsapp-crm
+    component: redis

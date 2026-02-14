@@ -36,6 +36,9 @@ export async function POST(request: NextRequest) {
       }
     )
 
+    // Get default tenant ID
+    const defaultTenantId = process.env.DEFAULT_TENANT_ID || '00000000-0000-0000-0000-000000000001'
+
     // Prepare message data
     const messageData = {
       conversation_id: conversationId,
@@ -50,6 +53,7 @@ export async function POST(request: NextRequest) {
       media_filename: mediaFilename,
       media_size: parseInt(mediaSize),
       media_mime_type: mimetype,
+      tenant_id: defaultTenantId,
       created_at: new Date().toISOString(),
     }
 

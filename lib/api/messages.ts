@@ -90,6 +90,7 @@ export async function sendMessage(
 
     // Save message to database
     const supabase = createClient()
+    const defaultTenantId = process.env.NEXT_PUBLIC_DEFAULT_TENANT_ID || '00000000-0000-0000-0000-000000000001'
     const { data: messageData, error: dbError } = await supabase
       .from('messages')
       // @ts-ignore - Bypass Supabase type checking for RLS
@@ -107,6 +108,7 @@ export async function sendMessage(
         status: 'sent', // Use 'sent' as initial status (database constraint doesn't allow 'sending')
         is_from_me: true,
         whatsapp_message_id: result.messageId || null,
+        tenant_id: defaultTenantId,
       })
       .select()
       .single()

@@ -55,6 +55,7 @@ export async function createQuickReply(
   category?: string
 ): Promise<QuickReply> {
   const supabase = createClient()
+  const defaultTenantId = process.env.NEXT_PUBLIC_DEFAULT_TENANT_ID || '00000000-0000-0000-0000-000000000001'
 
   const { data, error } = await supabase
     .from('quick_replies')
@@ -65,6 +66,7 @@ export async function createQuickReply(
       content,
       variables: variables || {},
       category: category || null,
+      tenant_id: defaultTenantId,
     })
     .select()
     .single()

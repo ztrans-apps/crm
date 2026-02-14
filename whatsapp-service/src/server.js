@@ -7,8 +7,10 @@ import authRoutes from './routes/auth.js'
 import messageRoutes from './routes/messages.js'
 import mediaRoutes from './routes/media.js'
 import locationRoutes from './routes/location.js'
+import sessionsRoutes from './routes/sessions.js'
 import whatsappService from './services/whatsapp.js'
 import { supabase } from './config/supabase.js'
+import { startSessionStatusSync } from './jobs/sync-session-status.js'
 
 dotenv.config()
 
@@ -36,6 +38,7 @@ app.use('/api/whatsapp', authRoutes)
 app.use('/api/whatsapp', messageRoutes)
 app.use('/api/whatsapp', mediaRoutes)
 app.use('/api/whatsapp', locationRoutes)
+app.use('/api/sessions', sessionsRoutes)
 
 // Health check endpoints
 app.get('/health', (req, res) => {
@@ -167,6 +170,12 @@ httpServer.listen(PORT, async () => {
   
   // Load active sessions after server starts
   setTimeout(loadActiveSessions, 2000) // Wait 2 seconds for server to be fully ready
+  
+  // Start session status sync job
+  setTimeout(() => {
+    console.log('🔄 Starting session status sync job')
+    startSessionStatusSync(whatsappService)
+  }, 3000) // Wait 3 seconds for sessions to initialize
   
   // Start auto-sync after sessions are loaded
   setTimeout(() => {

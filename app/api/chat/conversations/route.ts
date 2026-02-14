@@ -1,6 +1,7 @@
 // Example API route using middleware pattern
 import { withAuth, withRole } from '@/core/auth/middleware'
 import { requirePermission } from '@/core/permissions/middleware'
+import { requireTenantIdFromHeaders } from '@core/tenant'
 import { chatService } from '@/features/chat/services'
 
 /**
@@ -10,6 +11,9 @@ import { chatService } from '@/features/chat/services'
  */
 export const GET = withAuth(async (req: Request, context) => {
   try {
+    // Get tenant ID
+    const tenantId = requireTenantIdFromHeaders(req.headers)
+    
     // Check permission
     requirePermission(context, 'canViewAllConversations')
 
@@ -18,13 +22,14 @@ export const GET = withAuth(async (req: Request, context) => {
     const status = searchParams.get('status') as 'open' | 'closed' | null
     const searchQuery = searchParams.get('q')
 
-    // Get conversations using service
+    // Get conversations using service (with tenant filter)
     const conversations = await chatService.conversations.getConversations(
       context.user.id,
       context.user.role,
       {
         status: status || undefined,
         searchQuery: searchQuery || undefined,
+        tenantId, // Add tenant filter
       }
     )
 
@@ -45,7 +50,7 @@ export const GET = withAuth(async (req: Request, context) => {
         error: error.message || 'Failed to get conversations',
       }),
       {
-        status: 500,
+        status: error.message === 'Tenant ID is required' ? 400 : 500,
         headers: { 'Content-Type': 'application/json' },
       }
     )
@@ -59,6 +64,9 @@ export const GET = withAuth(async (req: Request, context) => {
  */
 export const POST = withRole(['owner', 'supervisor'], async (req: Request, context) => {
   try {
+    // Get tenant ID
+    const tenantId = requireTenantIdFromHeaders(req.headers)
+    
     const body = await req.json()
     const { phoneNumber, name, message } = body
 
@@ -66,8 +74,12 @@ export const POST = withRole(['owner', 'supervisor'], async (req: Request, conte
       throw new Error('Phone number is required')
     }
 
-    // Create contact
-    const contact = await chatService.contacts.getOrCreateContact(phoneNumber, name)
+    // Create contact (with tenant)
+    const contact = await chatService.contacts.getOrCreateContact(
+      phoneNumber, 
+      name,
+      tenantId
+    )
 
     // Create conversation
     // ... implementation
@@ -89,7 +101,7 @@ export const POST = withRole(['owner', 'supervisor'], async (req: Request, conte
         error: error.message || 'Failed to create conversation',
       }),
       {
-        status: 500,
+        status: error.message === 'Tenant ID is required' ? 400 : 500,
         headers: { 'Content-Type': 'application/json' },
       }
     )

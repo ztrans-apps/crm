@@ -19,7 +19,15 @@
       }
     ],
     "paths": {
-      "@/*": ["./*"]
+      "@/*": ["./*"],
+      "@core/*": ["./core/*"],
+      "@modules/*": ["./modules/*"],
+      "@packages/*": ["./packages/*"],
+      "@apps/*": ["./apps/*"],
+      "@features/*": ["./features/*"],
+      "@lib/*": ["./lib/*"],
+      "@components/*": ["./components/*"],
+      "@types/*": ["./types/*"]
     }
   },
   "include": [

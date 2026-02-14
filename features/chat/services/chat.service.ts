@@ -318,6 +318,7 @@ export class ChatService extends BaseService {
           created_by: userId,
           note_type: finalNoteType,
           is_visible_to_customer: finalNoteType === 'review',
+          tenant_id: this.defaultTenantId,
         })
         .select()
         .single()
@@ -481,6 +482,7 @@ export class ChatService extends BaseService {
           conversation_id: conversationId,
           label_id: labelId,
           created_by: userId,
+          tenant_id: this.defaultTenantId,
         })
         .select(`
           *,

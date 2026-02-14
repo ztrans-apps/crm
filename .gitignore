@@ -32,10 +32,25 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+!.env.example
 
 # WhatsApp session cache
 .wwebjs_auth/
 .wwebjs_cache/
+.baileys_auth/
+
+# Temporary documentation (fixes, troubleshooting)
+FIX-*.md
+TROUBLESHOOT-*.md
+QUICK-*.md
+TESTING-*.md
+SUMMARY-*.md
+SETUP-*.md
+
+# Migration scripts (keep in scripts/ folder instead)
+scripts/*-migration.sql
+scripts/fix-*.sql
+scripts/check-*.sql
 
 # vercel
 .vercel

@@ -206,6 +206,7 @@ export class MessageService extends BaseService {
         content: params.content,
         is_from_me: true,
         status: 'sent',
+        tenant_id: this.defaultTenantId,
         created_at: new Date().toISOString(),
       }
 
@@ -224,9 +225,7 @@ export class MessageService extends BaseService {
       try {
         const response = await fetch(`${this.serviceUrl}/api/send-message`, {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
+          headers: this.getDefaultHeaders(),
           body: JSON.stringify({
             sessionId: params.sessionId,
             to: params.whatsappNumber,
@@ -297,9 +296,7 @@ export class MessageService extends BaseService {
       // Call translation API
       const response = await fetch('/api/translate', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: this.getDefaultHeaders(),
         body: JSON.stringify({
           text: content,
           targetLang: targetLanguage,
