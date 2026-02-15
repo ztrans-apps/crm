@@ -186,3 +186,82 @@ httpServer.listen(PORT, async () => {
     setInterval(autoSyncMessageStatus, STATUS_SYNC_INTERVAL)
   }, 5000) // Wait 5 seconds for sessions to initialize
 })
+
+// Global error handlers to prevent crashes
+process.on('uncaughtException', (error) => {
+  console.error('❌ Uncaught Exception:', error)
+  
+  // Don't exit on timeout errors - they're recoverable
+  if (error.message?.includes('Timed Out') || error.message?.includes('timeout')) {
+    console.log('⏱️ Timeout error caught, service will continue running')
+    return
+  }
+  
+  // For other critical errors, log but don't exit immediately
+  console.error('❌ Critical error, but service will attempt to continue')
+})
+
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('❌ Unhandled Rejection at:', promise, 'reason:', reason)
+  
+  // Don't exit on timeout errors
+  if (reason?.message?.includes('Timed Out') || reason?.message?.includes('timeout')) {
+    console.log('⏱️ Timeout rejection caught, service will continue running')
+    return
+  }
+  
+  console.error('❌ Unhandled rejection, but service will attempt to continue')
+})
+
+// Graceful shutdown
+process.on('SIGTERM', async () => {
+  console.log('📴 SIGTERM received, shutting down gracefully...')
+  
+  // Close all WhatsApp sessions
+  for (const [sessionKey, session] of whatsappService.sessions.entries()) {
+    try {
+      console.log(`📴 Closing session: ${sessionKey}`)
+      await session.sock.logout()
+    } catch (error) {
+      console.error(`❌ Error closing session ${sessionKey}:`, error.message)
+    }
+  }
+  
+  // Close HTTP server
+  httpServer.close(() => {
+    console.log('✅ HTTP server closed')
+    process.exit(0)
+  })
+  
+  // Force exit after 10 seconds
+  setTimeout(() => {
+    console.error('❌ Forced shutdown after timeout')
+    process.exit(1)
+  }, 10000)
+})
+
+process.on('SIGINT', async () => {
+  console.log('📴 SIGINT received, shutting down gracefully...')
+  
+  // Close all WhatsApp sessions
+  for (const [sessionKey, session] of whatsappService.sessions.entries()) {
+    try {
+      console.log(`📴 Closing session: ${sessionKey}`)
+      await session.sock.logout()
+    } catch (error) {
+      console.error(`❌ Error closing session ${sessionKey}:`, error.message)
+    }
+  }
+  
+  // Close HTTP server
+  httpServer.close(() => {
+    console.log('✅ HTTP server closed')
+    process.exit(0)
+  })
+  
+  // Force exit after 10 seconds
+  setTimeout(() => {
+    console.error('❌ Forced shutdown after timeout')
+    process.exit(1)
+  }, 10000)
+})

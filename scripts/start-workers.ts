@@ -5,6 +5,7 @@
  */
 
 import { startAllWorkers, stopAllWorkers } from '../lib/queue/workers';
+import { startAutoRetry, stopAutoRetry } from '../lib/queue/failed-job-retry';
 
 console.log('🚀 Starting queue workers...');
 console.log('📋 Workers:');
@@ -18,6 +19,16 @@ try {
   startAllWorkers();
   console.log('✅ All workers started successfully');
   console.log('');
+  
+  // Start auto-retry for failed jobs
+  startAutoRetry({
+    maxRetries: 3,           // Retry failed jobs 3 more times
+    retryDelay: 5 * 60 * 1000, // Wait 5 minutes before retry
+    checkInterval: 60 * 1000,  // Check every 1 minute
+  });
+  console.log('✅ Auto-retry for failed jobs started');
+  console.log('');
+  
   console.log('Press Ctrl+C to stop workers');
 } catch (error) {
   console.error('❌ Failed to start workers:', error);
@@ -28,6 +39,7 @@ try {
 process.on('SIGTERM', async () => {
   console.log('\n🛑 Stopping workers...');
   try {
+    stopAutoRetry();
     await stopAllWorkers();
     console.log('✅ All workers stopped');
     process.exit(0);
@@ -40,6 +52,7 @@ process.on('SIGTERM', async () => {
 process.on('SIGINT', async () => {
   console.log('\n🛑 Stopping workers...');
   try {
+    stopAutoRetry();
     await stopAllWorkers();
     console.log('✅ All workers stopped');
     process.exit(0);

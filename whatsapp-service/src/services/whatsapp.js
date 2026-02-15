@@ -111,7 +111,7 @@ class BaileysWhatsAppService {
       // Get latest Baileys version
       const { version } = await fetchLatestBaileysVersion()
 
-      // Create socket connection
+      // Create socket connection with timeout handling
       const sock = makeWASocket({
         version,
         auth: {
@@ -120,7 +120,12 @@ class BaileysWhatsAppService {
         },
         printQRInTerminal: false,
         logger: pino({ level: 'silent' }),
-        browser: Browsers.ubuntu('Chrome')
+        browser: Browsers.ubuntu('Chrome'),
+        connectTimeoutMs: 60000, // 60 seconds timeout
+        defaultQueryTimeoutMs: 60000, // 60 seconds for queries
+        retryRequestDelayMs: 250, // Retry delay
+        maxMsgRetryCount: 3, // Max retry for messages
+        keepAliveIntervalMs: 30000, // Keep alive every 30s
       })
 
       console.log(`🔌 Socket created for ${sessionKey}`)
@@ -139,6 +144,17 @@ class BaileysWhatsAppService {
       })
 
       console.log(`📡 Attaching event listeners for ${sessionKey}`)
+
+      // Global error handler for socket
+      sock.ev.on('error', (error) => {
+        console.error(`❌ Socket error for ${sessionKey}:`, error)
+        
+        // Handle timeout errors specifically
+        if (error.message?.includes('Timed Out') || error.message?.includes('timeout')) {
+          console.log(`⏱️ Timeout detected for ${sessionKey}, will auto-reconnect`)
+          // Don't crash, let connection.update handle reconnection
+        }
+      })
 
       // Handle connection updates
       sock.ev.on('connection.update', async (update) => {
