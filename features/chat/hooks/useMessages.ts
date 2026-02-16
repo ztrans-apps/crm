@@ -10,13 +10,15 @@ interface UseMessagesProps {
   sessionId: string | null
   userId: string | null
   onConversationsRefresh: () => void
+  canSendMessage?: boolean // Permission from parent
 }
 
 export function useMessages({ 
   conversationId, 
   sessionId, 
   userId,
-  onConversationsRefresh 
+  onConversationsRefresh,
+  canSendMessage
 }: UseMessagesProps) {
   const supabase = useMemo(() => createClient(), [])
   const [messages, setMessages] = useState<any[]>([])
@@ -101,11 +103,10 @@ export function useMessages({
       return
     }
 
-    // Check if conversation is assigned (skip for Super Admin/Owner)
-    if (!conversation.assigned_to && conversation.assigned_to !== userId) {
-      // Allow if user is Super Admin or Owner (we'll check this in API)
-      // For now, just show warning but allow sending
-      console.warn('Conversation not assigned to current user, but allowing send')
+    // Check permission to send message
+    if (canSendMessage === false) {
+      alert('Anda tidak memiliki akses untuk mengirim pesan ke conversation ini.')
+      return
     }
 
     const tempMessage = messageInput

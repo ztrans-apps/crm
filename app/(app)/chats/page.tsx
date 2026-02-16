@@ -36,6 +36,12 @@ function UnifiedChatsContent() {
     refreshConversations,
   } = useChat()
 
+  const { conversationActions, permissions } = usePermissions({
+    role: userRole,
+    userId,
+    conversation: selectedConversation,
+  })
+
   const {
     messages,
     messageInput,
@@ -55,12 +61,7 @@ function UnifiedChatsContent() {
     sessionId,
     userId,
     onConversationsRefresh: refreshConversations,
-  })
-
-  const { conversationActions, permissions } = usePermissions({
-    role: userRole,
-    userId,
-    conversation: selectedConversation,
+    canSendMessage: conversationActions.canSendMessage,
   })
 
   // Local state
