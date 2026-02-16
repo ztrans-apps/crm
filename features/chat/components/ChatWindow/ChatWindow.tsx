@@ -241,15 +241,6 @@ export function ChatWindow({
           </p>
         </div>
       )}
-      
-      {/* Unassigned conversation notice */}
-      {!conversation.assigned_to && conversation.status !== 'closed' && (
-        <div className="bg-orange-50 border-b border-orange-200 px-3 py-2">
-          <p className="text-xs text-orange-800 text-center">
-            ⚠️ Silakan ambil obrolan ini terlebih dahulu sebelum membalas.
-          </p>
-        </div>
-      )}
 
       {/* Messages Area with smooth scroll - Wrapped with relative positioning */}
       <div className="flex-1 relative min-h-0">

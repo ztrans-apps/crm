@@ -22,6 +22,8 @@ interface SendMessageJob {
   longitude?: number;
   quotedMessageId?: string;
   metadata?: Record<string, any>;
+  conversationId?: string;
+  messageDbId?: string; // Database message ID to update after sending
 }
 
 async function processSendMessage(job: Job<SendMessageJob>) {
@@ -38,7 +40,9 @@ async function processSendMessage(job: Job<SendMessageJob>) {
     latitude, 
     longitude,
     quotedMessageId,
-    metadata 
+    metadata,
+    conversationId,
+    messageDbId
   } = job.data;
 
   console.log(`[WhatsApp:Send] Processing ${type} message for tenant ${tenantId}`);
@@ -134,6 +138,33 @@ async function processSendMessage(job: Job<SendMessageJob>) {
 
       default:
         throw new Error(`Unknown message type: ${type}`);
+    }
+
+    await job.updateProgress(75);
+
+    // Update database with whatsapp_message_id if messageDbId provided
+    if (messageDbId && result.messageId) {
+      try {
+        const { createClient } = await import('@supabase/supabase-js');
+        const supabase = createClient(
+          process.env.NEXT_PUBLIC_SUPABASE_URL!,
+          process.env.SUPABASE_SERVICE_ROLE_KEY!
+        );
+
+        await supabase
+          .from('messages')
+          .update({
+            whatsapp_message_id: result.messageId,
+            status: 'sent',
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', messageDbId);
+
+        console.log(`[WhatsApp:Send] Updated message ${messageDbId} with whatsapp_message_id: ${result.messageId}`);
+      } catch (dbError) {
+        console.error(`[WhatsApp:Send] Failed to update database:`, dbError);
+        // Don't fail the job if database update fails
+      }
     }
 
     await job.updateProgress(100);

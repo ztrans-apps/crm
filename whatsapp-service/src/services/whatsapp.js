@@ -529,12 +529,24 @@ class BaileysWhatsAppService {
       // Add quoted message if provided
       if (quotedMessageId && supabase) {
         try {
-          // Get the original message from database to get the raw message object
-          const { data: quotedMsg } = await supabase
+          // Try to get the original message from database
+          // First try by whatsapp_message_id, then by id (for CRM messages)
+          let { data: quotedMsg } = await supabase
             .from('messages')
-            .select('metadata, content, is_from_me, whatsapp_message_id, message_type')
+            .select('metadata, content, is_from_me, whatsapp_message_id, message_type, id')
             .eq('whatsapp_message_id', quotedMessageId)
             .single()
+          
+          // If not found by whatsapp_message_id, try by id (for CRM messages without whatsapp_message_id)
+          if (!quotedMsg) {
+            const result = await supabase
+              .from('messages')
+              .select('metadata, content, is_from_me, whatsapp_message_id, message_type, id')
+              .eq('id', quotedMessageId)
+              .single()
+            
+            quotedMsg = result.data
+          }
           
           if (quotedMsg && quotedMsg.metadata?.raw_message) {
             // Use the stored raw message for proper quoting
@@ -549,8 +561,11 @@ class BaileysWhatsAppService {
             }
           } else if (quotedMsg) {
             // Fallback: create a simple quoted message using contextInfo
+            // Use whatsapp_message_id if available, otherwise use database id
+            const stanzaId = quotedMsg.whatsapp_message_id || quotedMsg.id
+            
             messageContent.contextInfo = {
-              stanzaId: quotedMessageId,
+              stanzaId: stanzaId,
               participant: quotedMsg.is_from_me ? undefined : jid,
               quotedMessage: {
                 conversation: quotedMsg.content || ''

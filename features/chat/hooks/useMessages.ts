@@ -97,15 +97,15 @@ export function useMessages({
     }
 
     if (!userId || !sessionId) {
-      // Check if it's because conversation is not assigned to agent
-      if (!conversation.assigned_to) {
-        alert('Conversation belum di-assign. Silakan ambil conversation terlebih dahulu.')
-      } else if (conversation.assigned_to !== userId) {
-        alert('Anda tidak memiliki akses untuk mengirim pesan ke conversation ini.')
-      } else {
-        alert('Session tidak ditemukan. Pastikan WhatsApp sudah terhubung.')
-      }
+      alert('Session tidak ditemukan. Pastikan WhatsApp sudah terhubung.')
       return
+    }
+
+    // Check if conversation is assigned (skip for Super Admin/Owner)
+    if (!conversation.assigned_to && conversation.assigned_to !== userId) {
+      // Allow if user is Super Admin or Owner (we'll check this in API)
+      // For now, just show warning but allow sending
+      console.warn('Conversation not assigned to current user, but allowing send')
     }
 
     const tempMessage = messageInput
@@ -255,7 +255,7 @@ export function useMessages({
             message: tempMessage,
             conversationId: conversation.id,
             userId: userId,
-            quotedMessageId: replyTo?.whatsapp_message_id || undefined,
+            quotedMessageId: replyTo?.whatsapp_message_id || replyTo?.id || undefined,
           }),
         })
 
