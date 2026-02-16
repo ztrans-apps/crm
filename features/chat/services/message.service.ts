@@ -92,12 +92,13 @@ export class MessageService extends BaseService {
           
           if (msg.quoted_message_id) {
             // Find quoted message by whatsapp_message_id OR by id
+            // Use maybeSingle() to avoid 406 error when not found
             let { data: quoted } = await this.supabase
               .from('messages')
               .select('id, content, sender_type, is_from_me, sender_id')
               .eq('whatsapp_message_id', msg.quoted_message_id)
               .eq('conversation_id', conversationId)
-              .single()
+              .maybeSingle()
             
             // If not found by whatsapp_message_id, try by id (for CRM messages)
             if (!quoted) {
@@ -106,7 +107,7 @@ export class MessageService extends BaseService {
                 .select('id, content, sender_type, is_from_me, sender_id')
                 .eq('id', msg.quoted_message_id)
                 .eq('conversation_id', conversationId)
-                .single()
+                .maybeSingle()
               
               quoted = result.data
             }
@@ -195,12 +196,13 @@ export class MessageService extends BaseService {
       let quotedMessage = null
       if (message.quoted_message_id) {
         // Find quoted message by whatsapp_message_id OR by id
+        // Use maybeSingle() to avoid 406 error when not found
         let { data: quoted } = await this.supabase
           .from('messages')
           .select('id, content, sender_type, is_from_me, sender_id')
           .eq('whatsapp_message_id', message.quoted_message_id)
           .eq('conversation_id', message.conversation_id)
-          .single()
+          .maybeSingle()
         
         // If not found by whatsapp_message_id, try by id (for CRM messages)
         if (!quoted) {
@@ -209,7 +211,7 @@ export class MessageService extends BaseService {
             .select('id, content, sender_type, is_from_me, sender_id')
             .eq('id', message.quoted_message_id)
             .eq('conversation_id', message.conversation_id)
-            .single()
+            .maybeSingle()
           
           quoted = result.data
         }
@@ -222,7 +224,7 @@ export class MessageService extends BaseService {
               .from('profiles')
               .select('id, full_name')
               .eq('id', quoted.sender_id)
-              .single()
+              .maybeSingle()
             
             quotedSentByUser = profile
           }
@@ -277,6 +279,21 @@ export class MessageService extends BaseService {
         status: 'sent',
         tenant_id: this.defaultTenantId,
         created_at: new Date().toISOString(),
+        // Create temporary raw_message structure for immediate quoting
+        // This will be updated with actual WhatsApp message ID later by worker
+        metadata: {
+          raw_message: {
+            key: {
+              id: `temp_${Date.now()}`, // Temporary ID, will be replaced
+              fromMe: true,
+              remoteJid: params.whatsappNumber
+            },
+            message: {
+              conversation: params.content
+            },
+            messageTimestamp: Math.floor(Date.now() / 1000)
+          }
+        }
       }
 
       // @ts-ignore

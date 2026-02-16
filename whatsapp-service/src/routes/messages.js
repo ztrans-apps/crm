@@ -8,7 +8,8 @@ import healthMonitor from '../services/healthMonitor.js'
 
 const router = express.Router()
 
-// Send single message (with rate limiting, circuit breaker, and deduplication)
+// Send single message (with rate limiting and circuit breaker)
+// Note: Duplicate detection removed - handled by queue layer
 router.post('/send', rateLimiterMiddleware, async (req, res) => {
   try {
     const { sessionId, to, message, quotedMessageId } = req.body
@@ -17,16 +18,6 @@ router.post('/send', rateLimiterMiddleware, async (req, res) => {
       return res.status(400).json({
         success: false,
         message: 'Missing required fields: sessionId, to, message'
-      })
-    }
-
-    // Check for duplicate message
-    const messageHash = messageDeduplicator.generateHash(sessionId, to, message)
-    if (messageDeduplicator.isDuplicate(messageHash)) {
-      return res.status(409).json({
-        success: false,
-        message: 'Duplicate message detected',
-        isDuplicate: true
       })
     }
 
@@ -43,9 +34,6 @@ router.post('/send', rateLimiterMiddleware, async (req, res) => {
             timestamp: Date.now()
           })
         }
-        
-        // Mark message as sent (not duplicate)
-        messageDeduplicator.markAsSent(messageHash)
         
         // Record successful operation
         healthMonitor.recordOperation('send_message', true)
@@ -80,6 +68,7 @@ router.post('/send', rateLimiterMiddleware, async (req, res) => {
 })
 
 // Send bulk messages (with rate limiting and circuit breaker)
+// Note: Duplicate detection removed - handled by queue layer
 router.post('/send-bulk', rateLimiterMiddleware, async (req, res) => {
   try {
     const { sessionId, recipients, message } = req.body
@@ -97,19 +86,6 @@ router.post('/send-bulk', rateLimiterMiddleware, async (req, res) => {
     
     for (const recipient of recipients) {
       try {
-        // Check for duplicate
-        const messageHash = messageDeduplicator.generateHash(sessionId, recipient.phone_number, message)
-        if (messageDeduplicator.isDuplicate(messageHash)) {
-          results.push({ 
-            phone: recipient.phone_number, 
-            success: false,
-            error: 'Duplicate message',
-            isDuplicate: true
-          })
-          failureCount++
-          continue
-        }
-
         // Execute with circuit breaker
         const breaker = getCircuitBreaker(sessionId)
         await breaker.execute(
@@ -125,7 +101,6 @@ router.post('/send-bulk', rateLimiterMiddleware, async (req, res) => {
               })
             }
             
-            messageDeduplicator.markAsSent(messageHash)
             return result
           }
         )

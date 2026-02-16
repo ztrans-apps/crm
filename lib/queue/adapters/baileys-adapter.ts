@@ -45,6 +45,13 @@ export class BaileysQueueAdapter {
       );
     }
 
+    // Validate messageDbId if provided
+    const validMessageDbId = messageDbId && 
+                             messageDbId !== 'undefined' && 
+                             /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(messageDbId)
+                             ? messageDbId 
+                             : undefined;
+
     // Add to queue
     const job = await queueManager.addJob<SendMessageJob>(
       QUEUE_NAMES.WHATSAPP_SEND,
@@ -56,7 +63,7 @@ export class BaileysQueueAdapter {
         message,
         type: 'text',
         quotedMessageId,
-        messageDbId,
+        messageDbId: validMessageDbId,
       }
     );
 

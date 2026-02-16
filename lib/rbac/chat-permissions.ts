@@ -24,14 +24,15 @@ export async function getUserRole(userId: string): Promise<UserRole> {
       .from('user_roles')
       .select('role:roles(role_key, hierarchy_level)')
       .eq('user_id', userId)
-      .order('role(hierarchy_level)', { ascending: false })
       .limit(1)
     
     if (!userRoles || userRoles.length === 0) {
       return 'agent'
     }
     
-    const roleKey = userRoles[0]?.role?.role_key
+    // Type assertion to handle Supabase's complex type inference
+    const firstRole = userRoles[0] as any
+    const roleKey = firstRole?.role?.role_key
     
     if (roleKey === 'owner' || roleKey?.includes('owner')) {
       return 'owner'

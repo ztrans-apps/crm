@@ -320,8 +320,8 @@ export function RightSidebar({
           </div>
         </div>
 
-        {/* Quick Actions - Hidden for owner */}
-        {userRole !== 'owner' && (
+        {/* Quick Actions */}
+        {(onAssignAgent || onCloseConversation) && (
           <div className="mt-3 flex gap-2 max-w-sm mx-auto">
             {onAssignAgent && (
               <Button 

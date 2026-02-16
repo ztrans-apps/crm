@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Plus, AlertCircle } from 'lucide-react';
-import { SessionList, QRCode, AddSessionModal } from '@/modules/whatsapp/components';
+import { SessionList, QRCode, AddSessionModal, SessionMonitor } from '@/modules/whatsapp/components';
 
 export default function WhatsAppPage() {
   const [showQR, setShowQR] = useState(false);
@@ -148,6 +148,9 @@ export default function WhatsAppPage() {
           </div>
         </div>
       )}
+
+      {/* Session Monitor */}
+      <SessionMonitor refreshInterval={5000} />
 
       {/* QR Code */}
       {showQR && currentSessionId && (

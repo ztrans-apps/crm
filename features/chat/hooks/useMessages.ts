@@ -231,6 +231,9 @@ export function useMessages({
         formData.append('mediaType', media.type)
         formData.append('mediaFilename', mediaFilename!)
         formData.append('mediaSize', mediaSize!.toString())
+        if (replyTo?.id) {
+          formData.append('quotedMessageId', replyTo.id) // Use database ID
+        }
         
         const response = await fetch('/api/send-media', {
           method: 'POST',
@@ -245,19 +248,25 @@ export function useMessages({
         result = await response.json()
       } else {
         // Send text message (original flow)
+        const body: any = {
+          sessionId: sessionId,
+          to: whatsappNumber,
+          message: tempMessage,
+          conversationId: conversation.id,
+          userId: userId,
+        }
+        
+        // Only add quotedMessageId if replyTo exists
+        if (replyTo?.id) {
+          body.quotedMessageId = replyTo.id
+        }
+        
         const response = await fetch('/api/send-message', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({
-            sessionId: sessionId,
-            to: whatsappNumber,
-            message: tempMessage,
-            conversationId: conversation.id,
-            userId: userId,
-            quotedMessageId: replyTo?.whatsapp_message_id || replyTo?.id || undefined,
-          }),
+          body: JSON.stringify(body),
         })
 
         result = await response.json()

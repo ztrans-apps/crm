@@ -167,7 +167,7 @@ export async function POST(request: NextRequest) {
         message,
         quotedMessageId,
         defaultTenantId,
-        savedMessage?.id // Pass database message ID
+        savedMessage?.id || undefined // Only pass if valid, otherwise undefined
       )
 
       console.log('[Send Message API] Message queued successfully, job ID:', jobId)

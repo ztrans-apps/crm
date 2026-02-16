@@ -43,7 +43,13 @@ export function usePermissions({ role, userId, conversation }: UsePermissionsPro
   const permissions = useMemo(() => ({
     canViewAllConversations: role === 'owner' || role === 'supervisor',
     canManageAgents: role === 'owner' || role === 'supervisor',
-  }), [role])
+    // Add permissions from conversationActions for easier access
+    canEditContact: conversationActions.canEditContact,
+    canApplyLabel: conversationActions.canApplyLabel,
+    canCreateNote: conversationActions.canCreateNote,
+    canChangeWorkflowStatus: conversationActions.canChangeStatus,
+    canClose: conversationActions.canClose,
+  }), [role, conversationActions])
   
   return {
     permissions,

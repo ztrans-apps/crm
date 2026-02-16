@@ -11,19 +11,46 @@ import qrcodeTerminal from 'qrcode-terminal'
 import QRCode from 'qrcode'
 import fs from 'fs'
 import path from 'path'
+import { fileURLToPath } from 'url'
+import { dirname } from 'path'
 import { supabase } from '../config/supabase.js'
 import reconnectManager from './reconnect-manager.js'
 import sessionManager from './session-manager.js'
+import sessionStateRegistry from './session-state-registry.js'
+
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = dirname(__filename)
 
 class BaileysWhatsAppService {
   constructor() {
     this.sessions = new Map() // sessionKey (tenantId:sessionId) -> { sock, store, state, tenantId }
     this.qrCodes = new Map() // sessionKey -> qrCode
-    this.authDir = '.baileys_auth'
     
-    // Create auth directory if not exists
-    if (!fs.existsSync(this.authDir)) {
-      fs.mkdirSync(this.authDir, { recursive: true })
+    // Use dedicated folder for auth sessions
+    // Try /var/wa-sessions first, fallback to project root .baileys_auth
+    const preferredPath = '/var/wa-sessions'
+    // Use __dirname to get whatsapp-service/src/services, then go up 3 levels to project root
+    const projectRoot = path.join(__dirname, '..', '..', '..')
+    const fallbackPath = path.join(projectRoot, '.baileys_auth')
+    
+    console.log('🔍 Using auth directory - fallback:', fallbackPath)
+    
+    try {
+      if (!fs.existsSync(preferredPath)) {
+        fs.mkdirSync(preferredPath, { recursive: true, mode: 0o755 })
+      }
+      // Test write permission
+      const testFile = path.join(preferredPath, '.test')
+      fs.writeFileSync(testFile, 'test')
+      fs.unlinkSync(testFile)
+      this.authDir = preferredPath
+      console.log('✅ Using dedicated auth directory:', preferredPath)
+    } catch (error) {
+      console.warn('⚠️  Cannot use /var/wa-sessions, using fallback:', fallbackPath)
+      this.authDir = fallbackPath
+      if (!fs.existsSync(this.authDir)) {
+        fs.mkdirSync(this.authDir, { recursive: true })
+      }
     }
   }
 
@@ -186,6 +213,10 @@ class BaileysWhatsAppService {
       sock.ev.on('error', (error) => {
         console.error(`❌ Socket error for ${sessionKey}:`, error)
         
+        // Update state registry on error
+        sessionStateRegistry.setState(sessionId, 'ERROR')
+        sessionStateRegistry.incrementErrorCount(sessionId)
+        
         // Handle timeout errors specifically
         if (error.message?.includes('Timed Out') || error.message?.includes('timeout')) {
           console.log(`⏱️ Timeout detected for ${sessionKey}, will auto-reconnect`)
@@ -202,6 +233,11 @@ class BaileysWhatsAppService {
           hasQR: !!qr,
           hasLastDisconnect: !!lastDisconnect
         })
+
+        // Update state registry based on connection status
+        if (connection === 'connecting') {
+          sessionStateRegistry.setState(sessionId, 'CONNECTING')
+        }
 
         // Handle QR code
         if (qr) {
@@ -241,6 +277,16 @@ class BaileysWhatsAppService {
             : null
 
           console.log(`❌ Connection closed for ${sessionKey}, status: ${statusCode}, shouldReconnect: ${shouldReconnect}`)
+
+          // Update state registry based on disconnect reason
+          if (statusCode === DisconnectReason.loggedOut) {
+            sessionStateRegistry.setState(sessionId, 'LOGGED_OUT')
+          } else if (shouldReconnect) {
+            sessionStateRegistry.setState(sessionId, 'DISCONNECTED')
+          } else {
+            sessionStateRegistry.setState(sessionId, 'ERROR')
+            sessionStateRegistry.incrementErrorCount(sessionId)
+          }
 
           // Update session manager
           sessionManager.updateStatus(tenantId, sessionId, 'disconnected')
@@ -322,6 +368,10 @@ class BaileysWhatsAppService {
         } else if (connection === 'open') {
           console.log(`✅ Session connected: ${sessionKey}`)
           console.log(`📊 Updating database for session: ${sessionId}, tenant: ${tenantId}`)
+          
+          // Update state registry to CONNECTED
+          sessionStateRegistry.setState(sessionId, 'CONNECTED')
+          sessionStateRegistry.resetErrorCount(sessionId)
           
           // Reset reconnect attempts on successful connection
           reconnectManager.resetAttempts(sessionId)
@@ -501,12 +551,40 @@ class BaileysWhatsAppService {
     }
 
     const sessionKey = this.getSessionKey(tenantId, sessionId)
-    const session = this.sessions.get(sessionKey)
+    let session = this.sessions.get(sessionKey)
     
+    // If session not found, try to find any active session for this tenant
     if (!session) {
-      console.error(`❌ Session not found: ${sessionKey}`)
+      console.warn(`❌ Session not found: ${sessionKey}`)
       console.log(`📋 Available sessions:`, Array.from(this.sessions.keys()))
-      throw new Error('Session not found: ' + sessionId)
+      
+      // Try to find any active session for this tenant
+      const availableSessions = Array.from(this.sessions.keys()).filter(key => key.startsWith(`${tenantId}:`))
+      
+      if (availableSessions.length > 0) {
+        const fallbackSessionKey = availableSessions[0]
+        console.log(`🔄 Using fallback session: ${fallbackSessionKey}`)
+        session = this.sessions.get(fallbackSessionKey)
+        
+        // Update conversation in database to use the correct session
+        if (supabase) {
+          const fallbackSessionId = fallbackSessionKey.split(':')[1]
+          try {
+            // Find conversation by phone number and update session
+            await supabase
+              .from('conversations')
+              .update({ whatsapp_session_id: fallbackSessionId })
+              .eq('contact_id', supabase.rpc('get_contact_id_by_phone', { phone: to }))
+              .eq('status', 'open')
+            
+            console.log(`✅ Updated conversation to use session: ${fallbackSessionId}`)
+          } catch (err) {
+            console.warn(`⚠️  Failed to update conversation session:`, err.message)
+          }
+        }
+      } else {
+        throw new Error('Session not found: ' + sessionId)
+      }
     }
 
     const { sock } = session
@@ -530,22 +608,53 @@ class BaileysWhatsAppService {
       if (quotedMessageId && supabase) {
         try {
           // Try to get the original message from database
-          // First try by whatsapp_message_id, then by id (for CRM messages)
-          let { data: quotedMsg } = await supabase
+          // Strategy:
+          // 1. Try by whatsapp_message_id (for messages from WhatsApp)
+          // 2. Try by id (for CRM messages using database ID)
+          // 3. Try by raw_message.key.id in metadata (for CRM messages using WhatsApp ID)
+          
+          let quotedMsg = null
+          
+          // Try 1: by whatsapp_message_id
+          let { data } = await supabase
             .from('messages')
             .select('metadata, content, is_from_me, whatsapp_message_id, message_type, id')
             .eq('whatsapp_message_id', quotedMessageId)
-            .single()
+            .maybeSingle()
           
-          // If not found by whatsapp_message_id, try by id (for CRM messages without whatsapp_message_id)
-          if (!quotedMsg) {
+          if (data) {
+            quotedMsg = data
+          }
+          
+          // Try 2: by id (if quotedMessageId is a UUID)
+          if (!quotedMsg && quotedMessageId.includes('-')) {
             const result = await supabase
               .from('messages')
               .select('metadata, content, is_from_me, whatsapp_message_id, message_type, id')
               .eq('id', quotedMessageId)
-              .single()
+              .maybeSingle()
             
             quotedMsg = result.data
+          }
+          
+          // Try 3: by raw_message.key.id in metadata (for CRM messages)
+          if (!quotedMsg) {
+            // Search in metadata->raw_message->key->id
+            const { data: messages } = await supabase
+              .from('messages')
+              .select('metadata, content, is_from_me, whatsapp_message_id, message_type, id')
+              .not('metadata', 'is', null)
+              .limit(100) // Limit to avoid performance issues
+            
+            if (messages) {
+              quotedMsg = messages.find(msg => {
+                try {
+                  return msg.metadata?.raw_message?.key?.id === quotedMessageId
+                } catch {
+                  return false
+                }
+              })
+            }
           }
           
           if (quotedMsg && quotedMsg.metadata?.raw_message) {
@@ -559,20 +668,39 @@ class BaileysWhatsAppService {
               participant: rawMsg.key.fromMe ? undefined : rawMsg.key.remoteJid,
               quotedMessage: rawMsg.message
             }
-          } else if (quotedMsg) {
-            // Fallback: create a simple quoted message using contextInfo
-            // Use whatsapp_message_id if available, otherwise use database id
-            const stanzaId = quotedMsg.whatsapp_message_id || quotedMsg.id
             
-            messageContent.contextInfo = {
-              stanzaId: stanzaId,
-              participant: quotedMsg.is_from_me ? undefined : jid,
-              quotedMessage: {
-                conversation: quotedMsg.content || ''
+            console.log('  📎 Quoting message with raw_message:', {
+              stanzaId: rawMsg.key.id,
+              fromMe: rawMsg.key.fromMe,
+              hasQuotedMessage: !!rawMsg.message
+            })
+          } else if (quotedMsg) {
+            // Fallback: only use if whatsapp_message_id is a valid WhatsApp ID (not UUID)
+            // WhatsApp message IDs are alphanumeric without dashes
+            const stanzaId = quotedMsg.whatsapp_message_id
+            const isValidWhatsAppId = stanzaId && !stanzaId.includes('-')
+            
+            if (isValidWhatsAppId) {
+              console.log('  📎 Quoting message without raw_message (fallback):', {
+                stanzaId,
+                hasWhatsappId: !!quotedMsg.whatsapp_message_id
+              })
+              
+              messageContent.contextInfo = {
+                stanzaId: stanzaId,
+                participant: quotedMsg.is_from_me ? undefined : jid,
+                quotedMessage: {
+                  conversation: quotedMsg.content || ''
+                }
               }
+            } else {
+              console.log('  ⚠️  Cannot quote message: invalid WhatsApp ID (probably CRM message without raw_message):', stanzaId)
             }
+          } else {
+            console.log('  ⚠️  Quoted message not found:', quotedMessageId)
           }
         } catch (err) {
+          console.error('  ❌ Error getting quoted message:', err)
           // Silent fail - just send without quote if error
         }
       }
@@ -582,7 +710,8 @@ class BaileysWhatsAppService {
 
       return {
         success: true,
-        messageId: result.key.id
+        messageId: result.key.id,
+        key: result.key // Return full key for metadata storage
       }
     } catch (error) {
       console.error('❌ Failed to send message:', error)
@@ -1087,7 +1216,24 @@ class BaileysWhatsAppService {
       // Extract quoted message ID if this is a reply
       let quotedMessageId = null
       if (msg.message?.extendedTextMessage?.contextInfo?.stanzaId) {
-        quotedMessageId = msg.message.extendedTextMessage.contextInfo.stanzaId
+        const stanzaId = msg.message.extendedTextMessage.contextInfo.stanzaId
+        console.log('  📎 This is a quoted message!')
+        console.log('  📎 Quoted stanzaId:', stanzaId)
+        
+        // Find the quoted message in database by whatsapp_message_id
+        const { data: quotedMsg } = await supabase
+          .from('messages')
+          .select('id')
+          .eq('whatsapp_message_id', stanzaId)
+          .maybeSingle()
+        
+        if (quotedMsg) {
+          quotedMessageId = quotedMsg.id // Use database ID
+          console.log('  📎 Found quoted message in database:', quotedMessageId)
+        } else {
+          console.log('  ⚠️  Quoted message not found in database, using stanzaId:', stanzaId)
+          quotedMessageId = stanzaId // Fallback to stanzaId
+        }
       }
 
       if (!conversation) {
@@ -1387,7 +1533,8 @@ class BaileysWhatsAppService {
         id: messageData.whatsapp_message_id,
         type: messageType,
         hasMedia: !!mediaUrl,
-        content: messageText || '[no text]'
+        content: messageText || '[no text]',
+        quoted_message_id: quotedMessageId
       })
 
       if (mediaUrl) {

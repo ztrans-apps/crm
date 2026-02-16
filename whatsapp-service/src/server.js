@@ -194,10 +194,8 @@ async function loadActiveSessions() {
 
     for (const session of sessions) {
       try {
-        // Check if auth files exist (in whatsapp-service directory)
-        // __dirname is whatsapp-service/src, so go up one level
-        const serviceRoot = path.join(__dirname, '..')
-        const authPath = path.join(serviceRoot, '.baileys_auth', session.id)
+        // Get auth path from whatsappService (it knows the correct path)
+        const authPath = path.join(whatsappService.authDir, session.id)
         const credsPath = path.join(authPath, 'creds.json')
         
         if (!fs.existsSync(credsPath)) {
