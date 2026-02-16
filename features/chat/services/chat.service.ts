@@ -51,24 +51,20 @@ export class ChatService extends BaseService {
 
   /**
    * Get active WhatsApp session
+   * Returns active session for all authenticated users
+   * Permission to send messages is checked separately per conversation
    */
   async getActiveSession(userId: string, role: UserRole) {
     try {
       this.log('ChatService', 'Getting active session', { userId, role })
 
-      let query = this.supabase
+      // Get active session - all users share the same WhatsApp session
+      const { data, error } = await this.supabase
         .from('whatsapp_sessions')
         .select('id, user_id, session_name, status, phone_number')
         .in('status', ['active', 'connected'])
         .order('created_at', { ascending: false })
         .limit(1)
-
-      // If not owner, filter by user_id
-      if (role !== 'owner') {
-        query = query.eq('user_id', userId)
-      }
-
-      const { data, error } = await query
 
       if (error) {
         this.handleError(error, 'ChatService.getActiveSession')
@@ -289,9 +285,9 @@ export class ChatService extends BaseService {
     }
   }
 
-  async saveNote(conversationId: string, content: string, rating: number | null, userId: string) {
+  async saveNote(conversationId: string, content: string, rating: number | null, userId: string, noteType?: 'internal' | 'review') {
     try {
-      this.log('ChatService', 'Saving note', { conversationId })
+      this.log('ChatService', 'Saving note', { conversationId, noteType })
 
       // Validate
       if (!content || content.trim().length === 0) {
@@ -304,13 +300,25 @@ export class ChatService extends BaseService {
         throw new Error('Rating must be between 0 and 10')
       }
 
+      // Determine note_type if not provided
+      let finalNoteType = noteType
+      if (!finalNoteType) {
+        // Auto-detect: if has rating, it's a review, otherwise internal
+        finalNoteType = (rating && rating > 0) ? 'review' : 'internal'
+      }
+
+      // @ts-ignore - Supabase type issue
       const { data, error } = await this.supabase
         .from('conversation_notes')
+        // @ts-ignore - Supabase type issue
         .insert({
           conversation_id: conversationId,
           content: content.trim(),
           rating,
           created_by: userId,
+          note_type: finalNoteType,
+          is_visible_to_customer: finalNoteType === 'review',
+          tenant_id: this.defaultTenantId,
         })
         .select()
         .single()
@@ -474,6 +482,7 @@ export class ChatService extends BaseService {
           conversation_id: conversationId,
           label_id: labelId,
           created_by: userId,
+          tenant_id: this.defaultTenantId,
         })
         .select(`
           *,
@@ -513,93 +522,27 @@ export class ChatService extends BaseService {
 
   /**
    * Quick Replies operations
+   * All users can view and use all quick replies (no user filtering)
+   * Only owner can manage (create/update/delete) via /quick-replies page
    */
-  async getQuickReplies(userId: string) {
+  async getAllQuickReplies() {
     try {
-      this.log('ChatService', 'Getting quick replies', { userId })
-
-      const { data, error } = await this.supabase
+      // Load ALL quick replies from database (no filtering by user)
+      // All users can use all quick replies
+      const { data: allReplies, error } = await this.supabase
         .from('quick_replies')
         .select('*')
-        .eq('user_id', userId)
-        .order('title', { ascending: true })
+        .order('title')
 
       if (error) {
-        this.handleError(error, 'ChatService.getQuickReplies')
+        this.handleError(error, 'ChatService.getAllQuickReplies')
+        return []
       }
 
-      return data || []
+      return allReplies || []
     } catch (error) {
-      this.handleError(error, 'ChatService.getQuickReplies')
-    }
-  }
-
-  async getOrCreateDefaultQuickReplies(userId: string) {
-    try {
-      // Check if user has quick replies
-      const { data: existingReplies } = await this.supabase
-        .from('quick_replies')
-        .select('*')
-        .eq('user_id', userId)
-
-      if (existingReplies && existingReplies.length > 0) {
-        return existingReplies
-      }
-
-      // Create default quick replies
-      const defaultReplies = [
-        {
-          title: 'Greeting',
-          content: 'Hello {name}! How can I help you today?',
-          category: 'General',
-          variables: { name: 'Customer Name' },
-        },
-        {
-          title: 'Thank You',
-          content: 'Thank you for contacting us! We appreciate your business.',
-          category: 'General',
-          variables: {},
-        },
-        {
-          title: 'Working Hours',
-          content: 'Our working hours are Monday-Friday, 9 AM - 5 PM. We will respond to your message during business hours.',
-          category: 'Information',
-          variables: {},
-        },
-        {
-          title: 'Order Status',
-          content: 'Let me check your order status. Please provide your order number.',
-          category: 'Support',
-          variables: {},
-        },
-        {
-          title: 'Follow Up',
-          content: 'Hi {name}, I am following up on our previous conversation. Is there anything else I can help you with?',
-          category: 'Follow-up',
-          variables: { name: 'Customer Name' },
-        },
-      ]
-
-      const { data, error } = await this.supabase
-        .from('quick_replies')
-        .insert(
-          defaultReplies.map((reply) => ({
-            user_id: userId,
-            title: reply.title,
-            content: reply.content,
-            category: reply.category,
-            variables: reply.variables,
-          }))
-        )
-        .select()
-
-      if (error) {
-        this.handleError(error, 'ChatService.getOrCreateDefaultQuickReplies')
-      }
-
-      return data || []
-    } catch (error) {
-      this.handleError(error, 'ChatService.getOrCreateDefaultQuickReplies')
+      this.handleError(error, 'ChatService.getAllQuickReplies')
+      return []
     }
   }
 }

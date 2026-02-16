@@ -89,18 +89,18 @@ export function useChat() {
           canViewConversation(currentRole, currentUserId, conv)
         )
         
-        const hasChanged = JSON.stringify(filtered) !== JSON.stringify(conversations)
-        if (hasChanged) {
-          setConversations(filtered)
-        }
+        setConversations(filtered)
       }
     } catch (error) {
       console.error('Error loading conversations:', error)
     }
-  }, [userId, userRole, conversations])
+  }, [userId, userRole])
 
-  // Setup socket connection
+  // Setup socket connection and Supabase Realtime
   useEffect(() => {
+    let debounceTimer: NodeJS.Timeout
+    
+    // Socket.IO for WhatsApp messages
     const checkServiceAndConnect = async () => {
       try {
         const response = await fetch(`${serviceUrl}/health`, { 
@@ -117,11 +117,13 @@ export function useChat() {
           })
 
           socketRef.current.on('message', () => {
-            loadConversations()
+            clearTimeout(debounceTimer)
+            debounceTimer = setTimeout(() => loadConversations(), 500)
           })
 
           socketRef.current.on('message_status', () => {
-            loadConversations()
+            clearTimeout(debounceTimer)
+            debounceTimer = setTimeout(() => loadConversations(), 500)
           })
         }
       } catch (error) {
@@ -131,21 +133,41 @@ export function useChat() {
 
     checkServiceAndConnect()
 
-    // Polling fallback
-    const pollInterval = setInterval(() => {
-      loadConversations()
-    }, 5000)
+    // Supabase Realtime for database changes
+    const conversationsChannel = supabase
+      .channel('conversations-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'conversations'
+        },
+        () => {
+          clearTimeout(debounceTimer)
+          debounceTimer = setTimeout(() => loadConversations(), 300)
+        }
+      )
+      .subscribe()
 
     return () => {
+      clearTimeout(debounceTimer)
       socketRef.current?.disconnect()
-      clearInterval(pollInterval)
+      conversationsChannel.unsubscribe()
     }
-  }, [serviceUrl, loadConversations])
+  }, [serviceUrl, loadConversations, supabase])
 
   // Initialize on mount
   useEffect(() => {
     initializeChat()
-  }, [initializeChat])
+  }, []) // Remove initializeChat from deps to prevent infinite loop
+
+  // Refresh conversations when userId or userRole changes
+  useEffect(() => {
+    if (userId && userRole) {
+      loadConversations(userId, userRole)
+    }
+  }, [userId, userRole])
 
   return {
     conversations,

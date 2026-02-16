@@ -3,15 +3,15 @@ import { createClient } from '@/lib/supabase/client'
 import type { QuickReply, QuickReplyVariables } from '@/lib/types/chat'
 
 /**
- * Fetch all quick replies for a user
+ * Fetch ALL quick replies (shared across all users)
+ * All users can view and use all quick replies
  */
-export async function fetchQuickReplies(userId: string): Promise<QuickReply[]> {
+export async function fetchQuickReplies(): Promise<QuickReply[]> {
   const supabase = createClient()
 
   const { data, error } = await supabase
     .from('quick_replies')
     .select('*')
-    .eq('user_id', userId)
     .order('title', { ascending: true })
 
   if (error) {
@@ -23,10 +23,9 @@ export async function fetchQuickReplies(userId: string): Promise<QuickReply[]> {
 }
 
 /**
- * Fetch quick replies by category
+ * Fetch quick replies by category (all users)
  */
 export async function fetchQuickRepliesByCategory(
-  userId: string,
   category: string
 ): Promise<QuickReply[]> {
   const supabase = createClient()
@@ -34,7 +33,6 @@ export async function fetchQuickRepliesByCategory(
   const { data, error } = await supabase
     .from('quick_replies')
     .select('*')
-    .eq('user_id', userId)
     .eq('category', category)
     .order('title', { ascending: true })
 
@@ -57,15 +55,18 @@ export async function createQuickReply(
   category?: string
 ): Promise<QuickReply> {
   const supabase = createClient()
+  const defaultTenantId = process.env.NEXT_PUBLIC_DEFAULT_TENANT_ID || '00000000-0000-0000-0000-000000000001'
 
   const { data, error } = await supabase
     .from('quick_replies')
+    // @ts-ignore - Supabase type issue
     .insert({
       user_id: userId,
       title,
       content,
       variables: variables || {},
       category: category || null,
+      tenant_id: defaultTenantId,
     })
     .select()
     .single()
@@ -94,6 +95,7 @@ export async function updateQuickReply(
 
   const { data, error } = await supabase
     .from('quick_replies')
+    // @ts-ignore - Supabase type issue
     .update({
       ...updates,
       updated_at: new Date().toISOString(),
@@ -161,72 +163,19 @@ export function parseVariables(content: string): string[] {
 }
 
 /**
- * Get or create default quick replies
+ * Get all quick replies (shared across all users)
+ * No need to create defaults - owner manages via /quick-replies page
  */
-export async function getOrCreateDefaultQuickReplies(
-  userId: string
-): Promise<QuickReply[]> {
+export async function getAllQuickReplies(): Promise<QuickReply[]> {
   const supabase = createClient()
-
-  // Check if user has quick replies
-  const { data: existingReplies } = await supabase
-    .from('quick_replies')
-    .select('*')
-    .eq('user_id', userId)
-
-  if (existingReplies && existingReplies.length > 0) {
-    return existingReplies
-  }
-
-  // Create default quick replies
-  const defaultReplies = [
-    {
-      title: 'Greeting',
-      content: 'Hello {name}! How can I help you today?',
-      category: 'General',
-      variables: { name: 'Customer Name' },
-    },
-    {
-      title: 'Thank You',
-      content: 'Thank you for contacting us! We appreciate your business.',
-      category: 'General',
-      variables: {},
-    },
-    {
-      title: 'Working Hours',
-      content: 'Our working hours are Monday-Friday, 9 AM - 5 PM. We will respond to your message during business hours.',
-      category: 'Information',
-      variables: {},
-    },
-    {
-      title: 'Order Status',
-      content: 'Let me check your order status. Please provide your order number.',
-      category: 'Support',
-      variables: {},
-    },
-    {
-      title: 'Follow Up',
-      content: 'Hi {name}, I am following up on our previous conversation. Is there anything else I can help you with?',
-      category: 'Follow-up',
-      variables: { name: 'Customer Name' },
-    },
-  ]
 
   const { data, error } = await supabase
     .from('quick_replies')
-    .insert(
-      defaultReplies.map((reply) => ({
-        user_id: userId,
-        title: reply.title,
-        content: reply.content,
-        category: reply.category,
-        variables: reply.variables,
-      }))
-    )
-    .select()
+    .select('*')
+    .order('title', { ascending: true })
 
   if (error) {
-    console.error('Error creating default quick replies:', error)
+    console.error('Error fetching quick replies:', error)
     throw new Error(error.message)
   }
 

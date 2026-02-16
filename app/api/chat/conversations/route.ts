@@ -1,7 +1,7 @@
 // Example API route using middleware pattern
-import { NextRequest } from 'next/server'
 import { withAuth, withRole } from '@/core/auth/middleware'
 import { requirePermission } from '@/core/permissions/middleware'
+import { requireTenantIdFromHeaders } from '@core/tenant'
 import { chatService } from '@/features/chat/services'
 
 /**
@@ -9,8 +9,11 @@ import { chatService } from '@/features/chat/services'
  * Get conversations for current user
  * Requires authentication
  */
-export const GET = withAuth(async (req: NextRequest, context) => {
+export const GET = withAuth(async (req: Request, context) => {
   try {
+    // Get tenant ID
+    const tenantId = requireTenantIdFromHeaders(req.headers)
+    
     // Check permission
     requirePermission(context, 'canViewAllConversations')
 
@@ -19,13 +22,14 @@ export const GET = withAuth(async (req: NextRequest, context) => {
     const status = searchParams.get('status') as 'open' | 'closed' | null
     const searchQuery = searchParams.get('q')
 
-    // Get conversations using service
+    // Get conversations using service (with tenant filter)
     const conversations = await chatService.conversations.getConversations(
       context.user.id,
       context.user.role,
       {
         status: status || undefined,
         searchQuery: searchQuery || undefined,
+        tenantId, // Add tenant filter
       }
     )
 
@@ -46,7 +50,7 @@ export const GET = withAuth(async (req: NextRequest, context) => {
         error: error.message || 'Failed to get conversations',
       }),
       {
-        status: 500,
+        status: error.message === 'Tenant ID is required' ? 400 : 500,
         headers: { 'Content-Type': 'application/json' },
       }
     )
@@ -58,8 +62,11 @@ export const GET = withAuth(async (req: NextRequest, context) => {
  * Create new conversation
  * Requires owner role
  */
-export const POST = withRole(['owner', 'supervisor'], async (req: NextRequest, context) => {
+export const POST = withRole(['owner', 'supervisor'], async (req: Request, context) => {
   try {
+    // Get tenant ID
+    const tenantId = requireTenantIdFromHeaders(req.headers)
+    
     const body = await req.json()
     const { phoneNumber, name, message } = body
 
@@ -67,8 +74,12 @@ export const POST = withRole(['owner', 'supervisor'], async (req: NextRequest, c
       throw new Error('Phone number is required')
     }
 
-    // Create contact
-    const contact = await chatService.contacts.getOrCreateContact(phoneNumber, name)
+    // Create contact (with tenant)
+    const contact = await chatService.contacts.getOrCreateContact(
+      phoneNumber, 
+      name,
+      tenantId
+    )
 
     // Create conversation
     // ... implementation
@@ -90,7 +101,7 @@ export const POST = withRole(['owner', 'supervisor'], async (req: NextRequest, c
         error: error.message || 'Failed to create conversation',
       }),
       {
-        status: 500,
+        status: error.message === 'Tenant ID is required' ? 400 : 500,
         headers: { 'Content-Type': 'application/json' },
       }
     )

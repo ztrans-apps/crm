@@ -192,6 +192,7 @@ export interface Database {
           status: 'sent' | 'delivered' | 'read' | 'failed'
           is_from_me: boolean
           whatsapp_message_id: string | null
+          quoted_message_id: string | null
           metadata: Json
           created_at: string
           updated_at: string
@@ -211,6 +212,7 @@ export interface Database {
           status?: 'sent' | 'delivered' | 'read' | 'failed'
           is_from_me?: boolean
           whatsapp_message_id?: string | null
+          quoted_message_id?: string | null
           metadata?: Json
           created_at?: string
           updated_at?: string
@@ -230,6 +232,7 @@ export interface Database {
           status?: 'sent' | 'delivered' | 'read' | 'failed'
           is_from_me?: boolean
           whatsapp_message_id?: string | null
+          quoted_message_id?: string | null
           metadata?: Json
           created_at?: string
           updated_at?: string
@@ -544,12 +547,170 @@ export interface Database {
           stopped_by?: string | null
         }
       }
+      roles: {
+        Row: {
+          id: string
+          role_name: string
+          description: string | null
+          is_master_template: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          role_name: string
+          description?: string | null
+          is_master_template?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          role_name?: string
+          description?: string | null
+          is_master_template?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+      }
+      user_roles: {
+        Row: {
+          id: string
+          user_id: string
+          role_id: string
+          assigned_at: string
+          assigned_by: string | null
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          role_id: string
+          assigned_at?: string
+          assigned_by?: string | null
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          role_id?: string
+          assigned_at?: string
+          assigned_by?: string | null
+        }
+      }
+      permissions: {
+        Row: {
+          id: string
+          permission_key: string
+          permission_name: string
+          module: string
+          page: string | null
+          action: string
+          description: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          permission_key: string
+          permission_name: string
+          module: string
+          page?: string | null
+          action: string
+          description?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          permission_key?: string
+          permission_name?: string
+          module?: string
+          page?: string | null
+          action?: string
+          description?: string | null
+          created_at?: string
+        }
+      }
+      role_permissions: {
+        Row: {
+          id: string
+          role_id: string
+          permission_id: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          role_id: string
+          permission_id: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          role_id?: string
+          permission_id?: string
+          created_at?: string
+        }
+      }
+      handover_logs: {
+        Row: {
+          id: string
+          conversation_id: string
+          from_agent_id: string
+          to_agent_id: string
+          reason: string | null
+          handover_at: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          conversation_id: string
+          from_agent_id: string
+          to_agent_id: string
+          reason?: string | null
+          handover_at?: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          conversation_id?: string
+          from_agent_id?: string
+          to_agent_id?: string
+          reason?: string | null
+          handover_at?: string
+          created_at?: string
+        }
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_user_permissions: {
+        Args: {
+          p_user_id: string
+        }
+        Returns: {
+          permission_key: string
+          permission_name: string
+          module: string
+          page: string | null
+          action: string
+        }[]
+      }
+      user_has_permission: {
+        Args: {
+          p_user_id: string
+          p_permission_key: string
+        }
+        Returns: boolean
+      }
+      get_user_roles: {
+        Args: {
+          p_user_id: string
+        }
+        Returns: {
+          role_id: string
+          role_name: string
+          description: string | null
+        }[]
+      }
     }
     Enums: {
       [_ in never]: never

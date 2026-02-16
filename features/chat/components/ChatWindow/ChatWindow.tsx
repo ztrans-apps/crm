@@ -1,18 +1,34 @@
 // Chat window component with messages and input
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
-import { MessageSquare, RefreshCw, X } from 'lucide-react'
+import { useRef, useState, useCallback } from 'react'
+import { MessageSquare, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import type { ConversationWithRelations, MessageWithRelations, MediaAttachment } from '@/lib/types/chat'
-import { MessageBubble, DateSeparator, InputBar } from '@/features/chat/components/shared'
+import { InputBar, MessagesList, BackToBottomButton } from '@/features/chat/components/shared'
+import { useChatScrollBehavior } from '@/features/chat/hooks'
+
+// Helper functions - outside component to avoid re-creation
+const getDisplayName = (contact: any) => {
+  if (contact?.name && contact.name.trim()) {
+    return contact.name
+  }
+  return contact?.phone_number || 'Unknown'
+}
+
+const getAvatarInitial = (contact: any) => {
+  if (contact?.name && contact.name.trim()) {
+    return contact.name.charAt(0).toUpperCase()
+  }
+  return contact?.phone_number?.replace(/\D/g, '').charAt(0) || 'U'
+}
 
 interface ChatWindowProps {
   conversation: ConversationWithRelations | null
   messages: MessageWithRelations[]
   messageInput: string
   onMessageInputChange: (value: string) => void
-  onSendMessage: (media?: MediaAttachment) => void
+  onSendMessage: (media?: MediaAttachment, replyTo?: any) => void
   onQuickReplyClick?: () => void
   onRefresh?: () => void
   onChatWindowClick?: () => void // Callback when user clicks in chat window
@@ -21,6 +37,9 @@ interface ChatWindowProps {
   translating: Record<string, boolean>
   sending: boolean
   loading: boolean
+  loadingMore?: boolean
+  hasMore?: boolean
+  onLoadMore?: () => void
   disabled?: boolean
 }
 
@@ -38,38 +57,97 @@ export function ChatWindow({
   translating,
   sending,
   loading,
+  loadingMore = false,
+  hasMore = false,
+  onLoadMore,
   disabled = false,
 }: ChatWindowProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const messagesContainerRef = useRef<HTMLDivElement>(null)
   const [replyingTo, setReplyingTo] = useState<MessageWithRelations | null>(null)
+  const [isDragging, setIsDragging] = useState(false)
+  const [droppedFile, setDroppedFile] = useState<File | null>(null)
+  const dragCounterRef = useRef(0)
 
-  // Auto-scroll to bottom when messages change
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages])
+  // Use chat scroll behavior hook
+  const {
+    showBackToBottom,
+    newMessageCount,
+    scrollToBottom,
+    handleScroll,
+    resetCounter,
+  } = useChatScrollBehavior({
+    messagesContainerRef: messagesContainerRef as React.RefObject<HTMLDivElement>,
+    messages,
+    conversationId: conversation?.id,
+    enabled: !!conversation,
+  })
 
-  const handleReply = (message: MessageWithRelations) => {
+  // Handle drag and drop
+  const handleDragEnter = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    dragCounterRef.current++
+    if (e.dataTransfer.items && e.dataTransfer.items.length > 0) {
+      setIsDragging(true)
+    }
+  }, [])
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    dragCounterRef.current--
+    if (dragCounterRef.current === 0) {
+      setIsDragging(false)
+    }
+  }, [])
+
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+  }, [])
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDragging(false)
+    dragCounterRef.current = 0
+
+    if (disabled || conversation?.status === 'closed') {
+      return
+    }
+
+    const files = e.dataTransfer.files
+    if (files && files.length > 0) {
+      const file = files[0] // Only take first file
+      setDroppedFile(file) // Set file to show in InputBar preview
+    }
+  }, [disabled, conversation])
+
+  // Handle back to bottom button click
+  const handleBackToBottomClick = useCallback(() => {
+    scrollToBottom('smooth')
+    resetCounter()
+    // Focus back to input
+    if (onChatWindowClick) {
+      onChatWindowClick()
+    }
+  }, [scrollToBottom, resetCounter, onChatWindowClick])
+
+  // Memoize handlers
+  const handleReply = useCallback((message: MessageWithRelations) => {
     setReplyingTo(message)
-    // Focus on input (will be handled by InputBar)
-  }
+  }, [])
 
-  const handleCancelReply = () => {
+  const handleCancelReply = useCallback(() => {
     setReplyingTo(null)
-  }
+  }, [])
 
-  const getDisplayName = (contact: any) => {
-    if (contact?.name && contact.name.trim()) {
-      return contact.name
-    }
-    return contact?.phone_number || 'Unknown'
-  }
-
-  const getAvatarInitial = (contact: any) => {
-    if (contact?.name && contact.name.trim()) {
-      return contact.name.charAt(0).toUpperCase()
-    }
-    return contact?.phone_number?.replace(/\D/g, '').charAt(0) || 'U'
-  }
+  // Wrapper for send message with reply context
+  const handleSendWithReply = useCallback((media?: MediaAttachment) => {
+    onSendMessage(media, replyingTo)
+    setReplyingTo(null) // Clear reply after sending
+  }, [onSendMessage, replyingTo])
 
   if (!conversation) {
     return (
@@ -84,9 +162,27 @@ export function ChatWindow({
 
   return (
     <div 
-      className="flex-1 flex flex-col bg-gray-50"
+      className="flex-1 flex flex-col bg-gray-50 relative"
       onClick={onChatWindowClick}
+      onDragEnter={handleDragEnter}
+      onDragLeave={handleDragLeave}
+      onDragOver={handleDragOver}
+      onDrop={handleDrop}
     >
+      {/* Drag and Drop Overlay */}
+      {isDragging && (
+        <div className="absolute inset-0 z-50 bg-blue-500/10 backdrop-blur-sm flex items-center justify-center border-4 border-dashed border-blue-500">
+          <div className="bg-white rounded-lg shadow-xl p-8 text-center">
+            <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-blue-100 flex items-center justify-center">
+              <svg className="w-10 h-10 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+              </svg>
+            </div>
+            <h3 className="text-xl font-semibold text-gray-900 mb-2">Drop file here</h3>
+            <p className="text-sm text-gray-500">Release to send the file</p>
+          </div>
+        </div>
+      )}
       {/* Chat Header */}
       <div className="bg-white p-3 border-b">
         <div className="flex items-center justify-between">
@@ -98,11 +194,11 @@ export function ChatWindow({
               <h3 className="font-semibold text-base">{getDisplayName(conversation.contact)}</h3>
               <div className="flex items-center space-x-2 text-xs text-gray-500">
                 <span>{conversation.contact?.phone_number}</span>
-                {conversation.assigned_to_user && (
+                {conversation.assigned_to && (
                   <>
                     <span>•</span>
                     <span className="text-blue-600">
-                      Agent: {conversation.assigned_to_user.full_name || conversation.assigned_to_user.email}
+                      Assigned
                     </span>
                   </>
                 )}
@@ -128,7 +224,7 @@ export function ChatWindow({
                 Unread
               </span>
             )}
-            {(conversation.status === 'closed' || conversation.workflow_status === 'done') && (
+            {conversation.status === 'closed' && (
               <span className="px-2 py-1 bg-gray-100 text-gray-700 text-xs rounded-full">
                 Selesai
               </span>
@@ -138,16 +234,16 @@ export function ChatWindow({
       </div>
 
       {/* Closed conversation notice */}
-      {(conversation.status === 'closed' || conversation.workflow_status === 'done') && (
+      {conversation.status === 'closed' && (
         <div className="bg-yellow-50 border-b border-yellow-200 px-3 py-2">
           <p className="text-xs text-yellow-800 text-center">
-            ⚠️ Chat sudah berakhir. Tidak bisa membalas lagi kecuali customer mengirim pesan baru.
+            ⚠️ Chat sudah berakhir. Tidak bisa membalas lagi.
           </p>
         </div>
       )}
       
       {/* Unassigned conversation notice */}
-      {!conversation.assigned_to && conversation.status !== 'closed' && conversation.workflow_status !== 'done' && (
+      {!conversation.assigned_to && conversation.status !== 'closed' && (
         <div className="bg-orange-50 border-b border-orange-200 px-3 py-2">
           <p className="text-xs text-orange-800 text-center">
             ⚠️ Silakan ambil obrolan ini terlebih dahulu sebelum membalas.
@@ -155,99 +251,83 @@ export function ChatWindow({
         </div>
       )}
 
-      {/* Messages Area with smooth scroll */}
-      <div className="flex-1 overflow-y-auto p-3 scroll-smooth min-h-0">
-        {loading ? (
-          <div className="flex items-center justify-center h-full">
-            <div className="text-center text-gray-500">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-500 mx-auto mb-2"></div>
-              <p className="text-sm">Loading messages...</p>
+      {/* Messages Area with smooth scroll - Wrapped with relative positioning */}
+      <div className="flex-1 relative min-h-0">
+        <div 
+          ref={messagesContainerRef}
+          className="absolute inset-0 overflow-y-auto p-3 scroll-smooth"
+          onScroll={handleScroll}
+        >
+          {loading ? (
+            <div className="flex items-center justify-center h-full">
+              <div className="text-center text-gray-500">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-500 mx-auto mb-2"></div>
+                <p className="text-sm">Loading messages...</p>
+              </div>
             </div>
-          </div>
-        ) : messages.length === 0 ? (
-          <div className="flex items-center justify-center h-full text-gray-500">
-            <p>No messages yet</p>
-          </div>
-        ) : (
-          <>
-            {messages.map((msg, index) => {
-              const prevMsg = index > 0 ? messages[index - 1] : null
-              const nextMsg = index < messages.length - 1 ? messages[index + 1] : null
-              
-              // Check if we need a date separator
-              const showDateSeparator = !prevMsg || 
-                new Date(msg.created_at).toDateString() !== new Date(prevMsg.created_at).toDateString()
-              
-              // Message grouping logic
-              const isSameSender = prevMsg && prevMsg.is_from_me === msg.is_from_me
-              const isWithin5Minutes = prevMsg && 
-                (new Date(msg.created_at).getTime() - new Date(prevMsg.created_at).getTime()) < 5 * 60 * 1000
-              
-              const isGrouped = isSameSender && isWithin5Minutes
-              const showAvatar = !isGrouped || !prevMsg
-              const showSender = !isGrouped || !prevMsg
-              
-              return (
-                <div key={msg.id}>
-                  {showDateSeparator && (
-                    <DateSeparator date={new Date(msg.created_at)} />
-                  )}
-                  <MessageBubble
-                    message={msg}
-                    translation={translations[msg.id]}
-                    onTranslate={!msg.is_from_me ? () => onTranslate(msg.id) : undefined}
-                    translating={translating[msg.id]}
-                    showAvatar={showAvatar}
-                    showSender={showSender}
-                    onReply={handleReply}
-                  />
+          ) : messages.length === 0 ? (
+            <div className="flex items-center justify-center h-full text-gray-500">
+              <p>No messages yet</p>
+            </div>
+          ) : (
+            <>
+              {/* Load More Button */}
+              {hasMore && onLoadMore && (
+                <div className="flex justify-center mb-4">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={onLoadMore}
+                    disabled={loadingMore}
+                    className="text-xs"
+                  >
+                    {loadingMore ? (
+                      <>
+                        <RefreshCw className="h-3 w-3 mr-2 animate-spin" />
+                        Loading...
+                      </>
+                    ) : (
+                      'Load More Messages'
+                    )}
+                  </Button>
                 </div>
-              )
-            })}
-            <div ref={messagesEndRef} />
-          </>
-        )}
+              )}
+              
+              <MessagesList
+                messages={messages}
+                translations={translations}
+                translating={translating}
+                onTranslate={onTranslate}
+                onReply={handleReply}
+              />
+              <div ref={messagesEndRef} />
+            </>
+          )}
+        </div>
+
+        {/* Back to Bottom Button - Fixed position relative to messages area */}
+        <BackToBottomButton
+          show={showBackToBottom}
+          newMessageCount={newMessageCount}
+          onClick={handleBackToBottomClick}
+        />
       </div>
 
       {/* Input Area */}
       <div className="bg-white border-t">
-        {/* Reply Preview */}
-        {replyingTo && (
-          <div className="px-3 pt-3 pb-2 border-b bg-gray-50">
-            <div className="flex items-start justify-between gap-2">
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="text-xs font-medium text-blue-600">
-                    Replying to {replyingTo.is_from_me 
-                      ? (replyingTo.sent_by_user?.full_name || 'You')
-                      : (replyingTo.contact?.name || 'Customer')
-                    }
-                  </span>
-                </div>
-                <p className="text-xs text-gray-600 truncate">
-                  {replyingTo.content}
-                </p>
-              </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleCancelReply}
-                className="h-6 w-6 p-0 shrink-0"
-              >
-                <X className="h-3.5 w-3.5" />
-              </Button>
-            </div>
-          </div>
-        )}
-        
         <InputBar
           value={messageInput}
           onChange={onMessageInputChange}
-          onSend={onSendMessage}
+          onSend={handleSendWithReply}
           onQuickReplyClick={onQuickReplyClick}
           onFocus={onChatWindowClick}
           disabled={disabled || conversation.status === 'closed'}
           sending={sending}
+          replyingTo={replyingTo}
+          onCancelReply={handleCancelReply}
+          conversation={conversation}
+          droppedFile={droppedFile}
+          onDroppedFileChange={setDroppedFile}
         />
       </div>
     </div>

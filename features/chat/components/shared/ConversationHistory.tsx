@@ -9,6 +9,8 @@ interface ConversationHistoryProps {
   contactId: string
   currentConversationId: string
   onSelectConversation?: (conversationId: string) => void
+  onViewInModal?: (conversationId: string) => void
+  userRole?: 'owner' | 'agent' | 'supervisor'
 }
 
 interface HistoryItem {
@@ -23,7 +25,9 @@ interface HistoryItem {
 export function ConversationHistory({
   contactId,
   currentConversationId,
-  onSelectConversation
+  onSelectConversation,
+  onViewInModal,
+  userRole = 'agent'
 }: ConversationHistoryProps) {
   const [history, setHistory] = useState<HistoryItem[]>([])
   const [loading, setLoading] = useState(true)
@@ -101,6 +105,20 @@ export function ConversationHistory({
     )
   }
 
+  const handleConversationClick = (conversationId: string, status: string, workflowStatus: string) => {
+    // For agents: if conversation is closed/resolved, open in modal (read-only)
+    // For owner/supervisor: can jump directly to conversation
+    const isResolved = status === 'closed' || workflowStatus === 'resolved'
+    
+    if (userRole === 'agent' && isResolved) {
+      // Agent viewing closed conversation - open in modal
+      onViewInModal?.(conversationId)
+    } else {
+      // Owner/supervisor or open conversation - jump directly
+      onSelectConversation?.(conversationId)
+    }
+  }
+
   const displayedHistory = showAll ? history : history.slice(0, 3)
 
   if (loading) {
@@ -126,7 +144,7 @@ export function ConversationHistory({
       {displayedHistory.map((item) => (
         <button
           key={item.id}
-          onClick={() => onSelectConversation?.(item.id)}
+          onClick={() => handleConversationClick(item.id, item.status, item.workflow_status)}
           className="w-full text-left p-3 rounded-lg border border-gray-200 hover:border-blue-300 hover:bg-blue-50 transition-all group"
         >
           <div className="flex items-start justify-between mb-2">

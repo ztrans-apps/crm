@@ -31,7 +31,7 @@ export async function fetchMediaAssets(
   }
 
   // Transform to MediaAsset format
-  const assets: MediaAsset[] = (data || []).map((msg) => ({
+  const assets: MediaAsset[] = ((data || []) as any[]).map((msg: any) => ({
     id: msg.id,
     message_id: msg.id,
     type: msg.media_type as MediaType,
@@ -66,7 +66,8 @@ export async function getMediaCountByType(
 
   // Count by type
   const counts: Record<string, number> = {}
-  data?.forEach((msg) => {
+  const messages = (data || []) as any[]
+  messages.forEach((msg: any) => {
     const type = msg.media_type
     if (type) {
       counts[type] = (counts[type] || 0) + 1
@@ -96,15 +97,16 @@ export async function deleteMediaAsset(messageId: string): Promise<void> {
     .eq('id', messageId)
     .single()
 
-  if (!message || !message.media_url) {
+  const messageData = message as any
+  if (!messageData || !messageData.media_url) {
     throw new Error('Media not found')
   }
 
   // Delete from storage if it's in Supabase storage
-  if (message.media_url.includes('supabase')) {
+  if (messageData.media_url.includes('supabase')) {
     try {
       // Extract file path from URL
-      const urlParts = message.media_url.split('/storage/v1/object/public/chat-media/')
+      const urlParts = messageData.media_url.split('/storage/v1/object/public/chat-media/')
       if (urlParts.length > 1) {
         const filePath = urlParts[1]
         await supabase.storage.from('chat-media').remove([filePath])
@@ -118,6 +120,7 @@ export async function deleteMediaAsset(messageId: string): Promise<void> {
   // Clear media fields in message
   const { error } = await supabase
     .from('messages')
+    // @ts-ignore - Supabase type issue
     .update({
       media_type: null,
       media_url: null,
@@ -151,7 +154,8 @@ export async function getTotalMediaSize(conversationId: string): Promise<number>
     throw new Error(error.message)
   }
 
-  const totalSize = data?.reduce((sum, msg) => sum + (msg.media_size || 0), 0) || 0
+  const messages = (data || []) as any[]
+  const totalSize = messages.reduce((sum, msg: any) => sum + (msg.media_size || 0), 0)
   return totalSize
 }
 

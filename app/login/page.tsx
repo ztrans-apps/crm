@@ -31,24 +31,8 @@ export default function LoginPage() {
 
       if (error) throw error
 
-      // Get user profile to check role
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('role')
-        .eq('id', data.user.id)
-        .single()
-
-      // Redirect based on role
-      // @ts-ignore - Supabase type issue
-      if (profile?.role === 'owner') {
-        router.push('/owner/dashboard')
-      // @ts-ignore - Supabase type issue
-      } else if (profile?.role === 'agent') {
-        router.push('/agent/dashboard')
-      } else {
-        router.push('/dashboard')
-      }
-      
+      // Redirect to universal dashboard
+      router.push('/dashboard')
       router.refresh()
     } catch (error: any) {
       setError(error.message || 'Failed to login')

@@ -1,0 +1,1106 @@
+# WhatsApp CRM System
+
+> Multi-tenant WhatsApp Business CRM with advanced features including RBAC, broadcasting, queue management, and real-time messaging.
+
+## 📋 Table of Contents
+
+- [Overview](#overview)
+- [Architecture](#architecture)
+- [Features](#features)
+- [Tech Stack](#tech-stack)
+- [Project Structure](#project-structure)
+- [Getting Started](#getting-started)
+- [Configuration](#configuration)
+- [Running the Application](#running-the-application)
+- [WhatsApp Service](#whatsapp-service)
+- [Queue System](#queue-system)
+- [RBAC System](#rbac-system)
+- [Development](#development)
+- [Deployment](#deployment)
+- [Troubleshooting](#troubleshooting)
+
+## 🎯 Overview
+
+WhatsApp CRM adalah sistem Customer Relationship Management berbasis WhatsApp Business API yang dirancang untuk:
+- Mengelola multiple WhatsApp business numbers
+- Multi-tenant architecture untuk isolasi data
+- Role-based access control (RBAC) untuk keamanan
+- Broadcasting messages ke multiple contacts
+- Queue system untuk message processing
+- Real-time messaging dengan Socket.IO
+- Chatbot integration
+- Analytics dan reporting
+
+## 🏗️ Architecture
+
+### System Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                     Client Layer                             │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐      │
+│  │   Web App    │  │  Mobile App  │  │   WhatsApp   │      │
+│  │  (Next.js)   │  │   (Future)   │  │   Business   │      │
+│  └──────────────┘  └──────────────┘  └──────────────┘      │
+└─────────────────────────────────────────────────────────────┘
+                            │
+                            ▼
+┌─────────────────────────────────────────────────────────────┐
+│                   Application Layer                          │
+│  ┌──────────────────────────────────────────────────────┐   │
+│  │              Next.js Application                      │   │
+│  │  ┌────────────┐  ┌────────────┐  ┌────────────┐    │   │
+│  │  │   Pages    │  │    API     │  │ Components │    │   │
+│  │  │  Routes    │  │   Routes   │  │   & UI     │    │   │
+│  │  └────────────┘  └────────────┘  └────────────┘    │   │
+│  └──────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────┘
+                            │
+                            ▼
+┌─────────────────────────────────────────────────────────────┐
+│                    Service Layer                             │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐      │
+│  │   WhatsApp   │  │    Queue     │  │    RBAC      │      │
+│  │   Service    │  │   Workers    │  │   Service    │      │
+│  │  (Node.js)   │  │  (BullMQ)    │  │              │      │
+│  └──────────────┘  └──────────────┘  └──────────────┘      │
+└─────────────────────────────────────────────────────────────┘
+                            │
+                            ▼
+┌─────────────────────────────────────────────────────────────┐
+│                     Data Layer                               │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐      │
+│  │   Supabase   │  │    Redis     │  │    Files     │      │
+│  │  (Postgres)  │  │   (Queue)    │  │  (.baileys)  │      │
+│  └──────────────┘  └──────────────┘  └──────────────┘      │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Component Architecture
+
+```
+app/
+├── Frontend (Next.js)
+│   ├── Pages & Routing
+│   ├── Components (UI)
+│   └── API Routes
+│
+├── Core Modules
+│   ├── Billing System
+│   ├── Module Management
+│   └── Queue Management
+│
+├── Feature Modules
+│   ├── WhatsApp Module
+│   ├── Broadcast Module
+│   ├── CRM Module
+│   └── Chatbot Module
+│
+└── Services
+    ├── WhatsApp Service (Separate Node.js)
+    ├── Queue Workers (BullMQ)
+    └── RBAC Service
+```
+
+
+## ✨ Features
+
+### Core Features
+- **Multi-Tenant Architecture**: Complete data isolation per tenant
+- **WhatsApp Integration**: Multiple WhatsApp Business numbers per tenant
+- **Real-time Messaging**: Socket.IO for instant message updates
+- **Message Queue**: BullMQ + Redis for reliable message processing
+- **Broadcasting**: Send messages to multiple contacts simultaneously
+- **Contact Management**: Organize and manage customer contacts
+- **Conversation Management**: Track and manage customer conversations
+
+### Advanced Features
+- **RBAC (Role-Based Access Control)**: 
+  - 10 predefined roles (Super Admin, Admin, Manager, etc.)
+  - 80+ granular permissions
+  - Role hierarchy and inheritance
+  - Permission templates
+- **Chatbot Integration**: Automated responses and workflows
+- **Analytics & Reporting**: Track messages, conversations, and performance
+- **Audit Logging**: Complete audit trail for all actions
+- **Module System**: Enable/disable features per tenant
+- **Billing System**: Track usage and billing per tenant
+
+### WhatsApp Features
+- **Session Management**: Auto-reconnect, health monitoring
+- **Media Support**: Images, videos, documents, audio
+- **Location Sharing**: Send and receive location data
+- **Message Status**: Sent, delivered, read tracking
+- **Delivery Tracking**: Monitor message delivery rates
+- **Circuit Breaker**: Automatic failure recovery
+- **Message Deduplication**: Prevent duplicate messages
+
+## 🛠️ Tech Stack
+
+### Frontend
+- **Framework**: Next.js 16 (App Router)
+- **UI Library**: React 19
+- **Styling**: Tailwind CSS 4
+- **State Management**: Zustand
+- **UI Components**: Radix UI, Lucide Icons
+- **Real-time**: Socket.IO Client
+
+### Backend
+- **Runtime**: Node.js
+- **Framework**: Next.js API Routes + Express (WhatsApp Service)
+- **Database**: Supabase (PostgreSQL)
+- **Queue**: BullMQ + Redis (IORedis)
+- **WhatsApp**: Baileys (WhatsApp Web API)
+- **Real-time**: Socket.IO
+
+### Infrastructure
+- **Database**: PostgreSQL (via Supabase)
+- **Cache/Queue**: Redis
+- **File Storage**: Local filesystem (.baileys_auth)
+- **Monitoring**: Sentry (optional)
+
+## 📁 Project Structure
+
+```
+whatsapp-crm-nextjs/
+├── app/                          # Next.js App Router
+│   ├── (app)/                    # Main application routes
+│   │   ├── admin/                # Admin pages
+│   │   │   ├── monitoring/       # System monitoring
+│   │   │   └── rbac/             # RBAC management
+│   │   ├── agents/               # Agent management
+│   │   ├── broadcasts/           # Broadcasting
+│   │   ├── chats/                # Chat interface
+│   │   ├── contacts/             # Contact management
+│   │   ├── dashboard/            # Dashboard
+│   │   ├── settings/             # Settings
+│   │   │   ├── billing/          # Billing settings
+│   │   │   └── modules/          # Module management
+│   │   └── whatsapp/             # WhatsApp connections
+│   ├── api/                      # API Routes
+│   │   ├── billing/              # Billing API
+│   │   ├── broadcast/            # Broadcast API
+│   │   ├── conversations/        # Conversations API
+│   │   ├── crm/                  # CRM API
+│   │   ├── health/               # Health check
+│   │   ├── modules/              # Module API
+│   │   ├── queue/                # Queue API
+│   │   ├── rbac/                 # RBAC API
+│   │   └── whatsapp/             # WhatsApp API proxy
+│   └── layout.tsx                # Root layout
+│
+├── components/                   # Shared components
+│   ├── layout/                   # Layout components
+│   └── ui/                       # UI components
+│
+├── core/                         # Core modules
+│   ├── billing/                  # Billing system
+│   ├── modules/                  # Module management
+│   └── index.ts                  # Core exports
+│
+├── features/                     # Feature modules
+│   ├── chat/                     # Chat feature
+│   │   ├── components/           # Chat components
+│   │   ├── hooks/                # Chat hooks
+│   │   └── services/             # Chat services
+│   └── ...
+│
+├── lib/                          # Shared libraries
+│   ├── api/                      # API clients
+│   ├── queue/                    # Queue management
+│   │   ├── config.ts             # Queue config
+│   │   ├── queue-manager.ts      # Queue manager
+│   │   ├── services/             # Queue services
+│   │   └── workers/              # Queue workers
+│   ├── rbac/                     # RBAC system
+│   │   ├── middleware.ts         # RBAC middleware
+│   │   ├── permission-service.ts # Permission service
+│   │   ├── hooks/                # RBAC hooks
+│   │   └── types.ts              # RBAC types
+│   ├── supabase/                 # Supabase clients
+│   │   ├── client.ts             # Browser client
+│   │   └── server.ts             # Server client
+│   └── types/                    # TypeScript types
+│
+├── modules/                      # Feature modules (modular)
+│   ├── broadcast/                # Broadcast module
+│   │   ├── components/           # Module components
+│   │   └── module.ts             # Module definition
+│   ├── chatbot/                  # Chatbot module
+│   ├── crm/                      # CRM module
+│   └── whatsapp/                 # WhatsApp module
+│       ├── components/           # WhatsApp components
+│       ├── services/             # WhatsApp services
+│       └── module.ts             # Module definition
+│
+├── whatsapp-service/             # Separate WhatsApp Service
+│   ├── src/
+│   │   ├── config/               # Service config
+│   │   │   └── supabase.js       # Supabase config
+│   │   ├── jobs/                 # Background jobs
+│   │   │   └── sync-session-status.js
+│   │   ├── middleware/           # Express middleware
+│   │   ├── routes/               # API routes
+│   │   │   ├── auth.js           # Auth routes
+│   │   │   ├── health.js         # Health check
+│   │   │   ├── messages.js       # Message routes
+│   │   │   ├── media.js          # Media routes
+│   │   │   ├── location.js       # Location routes
+│   │   │   └── sessions.js       # Session routes
+│   │   ├── services/             # Services
+│   │   │   ├── whatsapp.js       # WhatsApp service
+│   │   │   ├── circuitBreaker.js # Circuit breaker
+│   │   │   ├── deliveryTracker.js# Delivery tracking
+│   │   │   ├── healthMonitor.js  # Health monitoring
+│   │   │   ├── messageDeduplicator.js
+│   │   │   ├── reconnect-manager.js
+│   │   │   └── session-manager.js
+│   │   └── server.js             # Main server
+│   └── .baileys_auth/            # WhatsApp credentials
+│
+├── scripts/                      # Utility scripts
+│   ├── create-agent-user.js      # Create agent
+│   ├── start-workers.ts          # Start queue workers
+│   ├── retry-failed-jobs.ts      # Retry failed jobs
+│   ├── check-queue.ts            # Check queue status
+│   └── whatsapp-service.sh       # Service management
+│
+├── supabase/                     # Database
+│   ├── migrations/               # Database migrations
+│   └── database-schema.sql       # Complete schema
+│
+├── tests/                        # Tests
+│   ├── unit/                     # Unit tests
+│   ├── service/                  # Service tests
+│   └── integration/              # Integration tests
+│
+├── .env.local                    # Environment variables
+├── .env.example                  # Example env file
+├── package.json                  # Dependencies
+├── tsconfig.json                 # TypeScript config
+├── tailwind.config.ts            # Tailwind config
+├── next.config.js                # Next.js config
+└── README.md                     # This file
+```
+
+
+## 🚀 Getting Started
+
+### Prerequisites
+
+- Node.js 18+ 
+- npm or yarn
+- Redis server
+- PostgreSQL (via Supabase)
+- WhatsApp Business account
+
+### Installation
+
+1. **Clone the repository**
+```bash
+git clone <repository-url>
+cd whatsapp-crm-nextjs
+```
+
+2. **Install dependencies**
+```bash
+npm install
+```
+
+3. **Setup environment variables**
+```bash
+cp .env.example .env.local
+```
+
+Edit `.env.local` with your configuration:
+```env
+# Supabase
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_anon_key
+SUPABASE_SERVICE_ROLE_KEY=your_service_role_key
+
+# Redis
+REDIS_HOST=localhost
+REDIS_PORT=6379
+REDIS_PASSWORD=
+
+# WhatsApp Service
+WHATSAPP_SERVICE_URL=http://localhost:3001
+
+# App
+NEXT_PUBLIC_APP_URL=http://localhost:3000
+DEFAULT_TENANT_ID=00000000-0000-0000-0000-000000000001
+
+# Optional: Sentry
+SENTRY_DSN=
+```
+
+4. **Setup database**
+```bash
+# Run migrations in Supabase dashboard or using CLI
+# Import supabase/database-schema.sql
+```
+
+5. **Start Redis**
+```bash
+redis-server
+```
+
+## ⚙️ Configuration
+
+### Database Setup
+
+1. Create a Supabase project
+2. Run migrations from `supabase/migrations/` in order:
+   - `20260216000000_create_billing_tables.sql`
+   - `20260216000001_create_crm_broadcast_tables.sql`
+   - `20260216100000_rbac_system_complete.sql`
+   - `20260216110000_rbac_hierarchy_and_templates.sql`
+   - `20260216120000_rbac_update_existing.sql`
+
+3. Enable Row Level Security (RLS) on all tables
+4. Enable Realtime for:
+   - messages
+   - conversations
+   - contacts
+   - conversation_notes
+   - conversation_labels
+
+### Redis Setup
+
+For local development:
+```bash
+# Install Redis
+brew install redis  # macOS
+# or
+apt-get install redis-server  # Ubuntu
+
+# Start Redis
+redis-server
+```
+
+For production, use managed Redis (Redis Cloud, AWS ElastiCache, etc.)
+
+### WhatsApp Service Setup
+
+The WhatsApp service runs separately from the main Next.js app:
+
+1. Credentials are stored in `whatsapp-service/.baileys_auth/`
+2. Service runs on port 3001 by default
+3. Communicates with main app via HTTP and Socket.IO
+
+
+## 🏃 Running the Application
+
+### Development Mode
+
+**1. Start the main Next.js application:**
+```bash
+npm run dev
+```
+Application will run on `http://localhost:3000`
+
+**2. Start the WhatsApp service:**
+```bash
+./scripts/whatsapp-service.sh start
+```
+Service will run on `http://localhost:3001`
+
+**3. Start queue workers:**
+```bash
+npm run workers
+```
+
+### Production Mode
+
+**1. Build the application:**
+```bash
+npm run build
+```
+
+**2. Start the application:**
+```bash
+npm run start
+```
+
+**3. Start WhatsApp service:**
+```bash
+./scripts/whatsapp-service.sh start
+```
+
+**4. Start queue workers:**
+```bash
+npm run workers
+```
+
+### Using Process Manager (PM2)
+
+For production, use PM2 to manage processes:
+
+```bash
+# Install PM2
+npm install -g pm2
+
+# Start Next.js app
+pm2 start npm --name "whatsapp-crm" -- start
+
+# Start WhatsApp service
+pm2 start whatsapp-service/src/server.js --name "whatsapp-service"
+
+# Start workers
+pm2 start npm --name "queue-workers" -- run workers
+
+# Save configuration
+pm2 save
+
+# Setup auto-start on boot
+pm2 startup
+```
+
+## 📱 WhatsApp Service
+
+### Service Management
+
+Use the provided script for easy management:
+
+```bash
+# Start service
+./scripts/whatsapp-service.sh start
+
+# Stop service
+./scripts/whatsapp-service.sh stop
+
+# Restart service
+./scripts/whatsapp-service.sh restart
+
+# Check status
+./scripts/whatsapp-service.sh status
+
+# View logs
+./scripts/whatsapp-service.sh logs
+```
+
+### Connecting WhatsApp
+
+1. Open web app: `http://localhost:3000/whatsapp`
+2. Click "Add WhatsApp Number" or "Connect"
+3. Scan QR code with your WhatsApp Business app
+4. Wait for "Connected" status
+
+### Session Persistence
+
+- Sessions auto-reconnect after service restart
+- Credentials stored in `.baileys_auth/[session-id]/`
+- No QR scan needed after first connection
+- Session stays active as long as device is linked in phone
+
+### Troubleshooting WhatsApp
+
+**QR Code appears again after restart:**
+- Check phone: WhatsApp > Settings > Linked Devices
+- If device not listed, scan QR again
+- Avoid frequent restarts (wait 30+ seconds between restarts)
+
+**Session disconnected:**
+- Service will auto-reconnect within 30 seconds
+- Check logs: `./scripts/whatsapp-service.sh logs`
+- Restart if needed: `./scripts/whatsapp-service.sh restart`
+
+**Port 3001 already in use:**
+```bash
+# Kill process on port
+lsof -ti:3001 | xargs kill -9
+
+# Or use script
+./scripts/whatsapp-service.sh stop
+./scripts/whatsapp-service.sh start
+```
+
+
+## 🔄 Queue System
+
+### Architecture
+
+The queue system uses BullMQ + Redis for reliable message processing:
+
+```
+Message Request → API → Queue → Worker → WhatsApp Service → WhatsApp
+                                  ↓
+                            Retry Logic
+                                  ↓
+                          Dead Letter Queue
+```
+
+### Queue Workers
+
+**Start workers:**
+```bash
+npm run workers
+```
+
+**Available workers:**
+- `whatsapp-send`: Send WhatsApp messages
+- `broadcast`: Process broadcast campaigns
+- `message-status`: Update message status
+- `delivery-tracking`: Track delivery metrics
+
+### Queue Management
+
+**Check queue status:**
+```bash
+npm run check-queue
+```
+
+**Retry failed jobs:**
+```bash
+npm run retry-failed
+```
+
+**Queue metrics:**
+- Active jobs
+- Completed jobs
+- Failed jobs
+- Waiting jobs
+- Delayed jobs
+
+### Queue Configuration
+
+Edit `lib/queue/config.ts`:
+```typescript
+export const queueConfig = {
+  defaultJobOptions: {
+    attempts: 3,           // Retry 3 times
+    backoff: {
+      type: 'exponential',
+      delay: 2000,         // Start with 2s delay
+    },
+    removeOnComplete: 100, // Keep last 100 completed
+    removeOnFail: 500,     // Keep last 500 failed
+  },
+}
+```
+
+## 🔐 RBAC System
+
+### Role Hierarchy
+
+```
+Super Admin (Level 10)
+    ↓
+Admin (Level 9)
+    ↓
+Manager (Level 8)
+    ↓
+Team Lead (Level 7)
+    ↓
+Senior Agent (Level 6)
+    ↓
+Agent (Level 5)
+    ↓
+Junior Agent (Level 4)
+    ↓
+Viewer (Level 3)
+    ↓
+Guest (Level 2)
+    ↓
+Restricted (Level 1)
+```
+
+### Permission Categories
+
+- **Conversations**: View, create, update, delete, assign
+- **Messages**: Send, view, delete
+- **Contacts**: View, create, update, delete, import, export
+- **Broadcasts**: View, create, send, delete
+- **Agents**: View, create, update, delete, assign
+- **Reports**: View, export
+- **Settings**: View, update
+- **RBAC**: Manage roles, permissions, users
+- **Admin**: Full system access
+
+### Using RBAC
+
+**In API Routes:**
+```typescript
+import { requirePermission } from '@/lib/rbac/middleware'
+
+export async function POST(request: Request) {
+  // Check permission
+  const hasPermission = await requirePermission('messages.send')
+  if (hasPermission !== true) return hasPermission // Returns 403
+  
+  // Your logic here
+}
+```
+
+**In Components:**
+```typescript
+import { usePermissions } from '@/lib/rbac/hooks/usePermissions'
+
+function MyComponent() {
+  const { can, canAny, canAll } = usePermissions()
+  
+  if (!can('messages.send')) {
+    return <div>No permission</div>
+  }
+  
+  return <button>Send Message</button>
+}
+```
+
+**Check multiple permissions:**
+```typescript
+// User needs ANY of these permissions
+if (canAny(['messages.send', 'messages.send_template'])) {
+  // Show send button
+}
+
+// User needs ALL of these permissions
+if (canAll(['contacts.view', 'contacts.export'])) {
+  // Show export button
+}
+```
+
+### Managing Roles
+
+1. Go to Admin > RBAC Management
+2. Create/edit roles
+3. Assign permissions to roles
+4. Assign roles to users
+
+
+## 👨‍💻 Development
+
+### Code Structure
+
+**Modular Architecture:**
+- Each feature is a self-contained module
+- Modules can be enabled/disabled per tenant
+- Clean separation of concerns
+
+**Module Structure:**
+```typescript
+// modules/mymodule/module.ts
+export const myModule = {
+  id: 'my-module',
+  name: 'My Module',
+  description: 'Module description',
+  version: '1.0.0',
+  enabled: true,
+  routes: ['/my-route'],
+  permissions: ['mymodule.view', 'mymodule.create'],
+}
+```
+
+### Adding New Features
+
+1. **Create module directory:**
+```bash
+mkdir -p modules/myfeature/{components,services}
+```
+
+2. **Define module:**
+```typescript
+// modules/myfeature/module.ts
+export const myFeatureModule = {
+  id: 'my-feature',
+  name: 'My Feature',
+  // ... module config
+}
+```
+
+3. **Register module:**
+```typescript
+// core/index.ts
+import { myFeatureModule } from '@/modules/myfeature/module'
+
+export const modules = [
+  // ... existing modules
+  myFeatureModule,
+]
+```
+
+4. **Add permissions:**
+```sql
+-- In Supabase
+INSERT INTO permissions (permission_key, permission_name, category)
+VALUES ('myfeature.view', 'View My Feature', 'myfeature');
+```
+
+### Testing
+
+**Run tests:**
+```bash
+# Unit tests
+npm run test:unit
+
+# Service tests
+npm run test:service
+
+# Integration tests
+npm run test:integration
+
+# All tests
+npm test
+
+# With coverage
+npm run test:coverage
+```
+
+### Code Quality
+
+**Linting:**
+```bash
+npm run lint
+```
+
+**Type checking:**
+```bash
+npx tsc --noEmit
+```
+
+### Database Migrations
+
+**Create migration:**
+```sql
+-- supabase/migrations/YYYYMMDDHHMMSS_description.sql
+-- Your SQL here
+```
+
+**Apply migrations:**
+- Via Supabase Dashboard
+- Or using Supabase CLI
+
+### Environment Variables
+
+**Required:**
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- `SUPABASE_SERVICE_ROLE_KEY`
+- `REDIS_HOST`
+- `REDIS_PORT`
+
+**Optional:**
+- `REDIS_PASSWORD`
+- `SENTRY_DSN`
+- `NEXT_PUBLIC_APP_URL`
+- `WHATSAPP_SERVICE_URL`
+
+
+## 🚀 Deployment
+
+### Vercel Deployment (Recommended for Next.js)
+
+1. **Push to GitHub**
+```bash
+git push origin main
+```
+
+2. **Import to Vercel**
+- Go to vercel.com
+- Import your repository
+- Configure environment variables
+- Deploy
+
+3. **Configure environment variables in Vercel:**
+- All variables from `.env.local`
+- Set `WHATSAPP_SERVICE_URL` to your WhatsApp service URL
+
+### WhatsApp Service Deployment
+
+**Option 1: VPS/Cloud Server**
+
+1. **Setup server:**
+```bash
+# Install Node.js
+curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
+sudo apt-get install -y nodejs
+
+# Install PM2
+npm install -g pm2
+```
+
+2. **Deploy service:**
+```bash
+# Clone repository
+git clone <repo-url>
+cd whatsapp-crm-nextjs
+
+# Install dependencies
+npm install
+
+# Start service with PM2
+pm2 start whatsapp-service/src/server.js --name whatsapp-service
+
+# Save PM2 config
+pm2 save
+
+# Setup auto-start
+pm2 startup
+```
+
+3. **Configure Nginx (optional):**
+```nginx
+server {
+    listen 80;
+    server_name whatsapp-api.yourdomain.com;
+    
+    location / {
+        proxy_pass http://localhost:3001;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_cache_bypass $http_upgrade;
+    }
+}
+```
+
+**Option 2: Docker**
+
+```dockerfile
+# Dockerfile for WhatsApp Service
+FROM node:18-alpine
+
+WORKDIR /app
+
+COPY package*.json ./
+RUN npm ci --only=production
+
+COPY whatsapp-service ./whatsapp-service
+
+EXPOSE 3001
+
+CMD ["node", "whatsapp-service/src/server.js"]
+```
+
+```bash
+# Build and run
+docker build -t whatsapp-service .
+docker run -d -p 3001:3001 --name whatsapp-service whatsapp-service
+```
+
+### Redis Deployment
+
+**Option 1: Redis Cloud**
+- Sign up at redis.com
+- Create database
+- Use connection string in `.env`
+
+**Option 2: AWS ElastiCache**
+- Create ElastiCache cluster
+- Use endpoint in `.env`
+
+**Option 3: Self-hosted**
+```bash
+# Install Redis
+sudo apt-get install redis-server
+
+# Configure Redis
+sudo nano /etc/redis/redis.conf
+
+# Start Redis
+sudo systemctl start redis
+sudo systemctl enable redis
+```
+
+### Database (Supabase)
+
+1. Create Supabase project
+2. Run all migrations
+3. Enable RLS on all tables
+4. Enable Realtime for required tables
+5. Configure connection pooling if needed
+
+### Environment Setup
+
+**Production checklist:**
+- [ ] All environment variables set
+- [ ] Database migrations applied
+- [ ] RLS policies enabled
+- [ ] Realtime enabled
+- [ ] Redis configured
+- [ ] WhatsApp service running
+- [ ] Queue workers running
+- [ ] SSL certificates installed
+- [ ] Monitoring setup (Sentry)
+- [ ] Backup strategy in place
+
+
+## 🔧 Troubleshooting
+
+### Common Issues
+
+#### 1. WhatsApp Service Won't Start
+
+**Error: Port 3001 already in use**
+```bash
+# Kill process on port
+lsof -ti:3001 | xargs kill -9
+
+# Or use script
+./scripts/whatsapp-service.sh stop
+./scripts/whatsapp-service.sh start
+```
+
+**Error: Cannot find module**
+```bash
+# Reinstall dependencies
+cd whatsapp-service
+npm install
+```
+
+#### 2. Session Not Auto-Reconnecting
+
+**Check credentials:**
+```bash
+ls -la whatsapp-service/.baileys_auth/[session-id]/
+```
+
+**Check logs:**
+```bash
+./scripts/whatsapp-service.sh logs
+```
+
+**Solution:**
+- Ensure `creds.json` exists and has `me` field
+- Check phone: WhatsApp > Settings > Linked Devices
+- If device not listed, scan QR again
+
+#### 3. Queue Not Processing
+
+**Check Redis:**
+```bash
+redis-cli ping
+# Should return: PONG
+```
+
+**Check workers:**
+```bash
+# Ensure workers are running
+ps aux | grep "start-workers"
+```
+
+**Restart workers:**
+```bash
+# Kill workers
+pkill -f "start-workers"
+
+# Start again
+npm run workers
+```
+
+#### 4. Database Connection Issues
+
+**Check Supabase status:**
+- Go to Supabase dashboard
+- Check project status
+
+**Test connection:**
+```bash
+# In Node.js
+node -e "
+const { createClient } = require('@supabase/supabase-js');
+const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY);
+supabase.from('profiles').select('count').then(console.log);
+"
+```
+
+#### 5. Real-time Not Working
+
+**Enable Realtime in Supabase:**
+1. Go to Database > Replication
+2. Enable replication for tables:
+   - messages
+   - conversations
+   - contacts
+   - conversation_notes
+   - conversation_labels
+
+**Check table settings:**
+```sql
+-- Enable REPLICA IDENTITY FULL
+ALTER TABLE messages REPLICA IDENTITY FULL;
+ALTER TABLE conversations REPLICA IDENTITY FULL;
+
+-- Add to publication
+ALTER PUBLICATION supabase_realtime ADD TABLE messages;
+ALTER PUBLICATION supabase_realtime ADD TABLE conversations;
+```
+
+#### 6. Permission Denied Errors
+
+**Check RLS policies:**
+```sql
+-- View policies
+SELECT * FROM pg_policies WHERE tablename = 'messages';
+```
+
+**Check user role:**
+```sql
+-- Check user's roles
+SELECT * FROM user_roles WHERE user_id = 'your-user-id';
+```
+
+**Solution:**
+- Ensure user has correct role assigned
+- Check role has required permissions
+- Verify RLS policies allow operation
+
+### Debug Mode
+
+**Enable debug logging:**
+
+**Next.js:**
+```bash
+DEBUG=* npm run dev
+```
+
+**WhatsApp Service:**
+```javascript
+// whatsapp-service/src/server.js
+// Change logger level
+logger: pino({ level: 'debug' })
+```
+
+### Performance Issues
+
+**Slow queries:**
+```sql
+-- Check slow queries
+SELECT * FROM pg_stat_statements 
+ORDER BY mean_exec_time DESC 
+LIMIT 10;
+```
+
+**Add indexes:**
+```sql
+-- Example: Add index on messages
+CREATE INDEX idx_messages_conversation_id 
+ON messages(conversation_id);
+```
+
+**Redis memory:**
+```bash
+# Check Redis memory
+redis-cli info memory
+```
+
+### Logs Location
+
+- **Next.js**: Console output
+- **WhatsApp Service**: `whatsapp-service.log`
+- **Queue Workers**: Console output or PM2 logs
+- **Supabase**: Supabase Dashboard > Logs
+
+### Getting Help
+
+1. Check logs first
+2. Review this troubleshooting section
+3. Check GitHub issues
+4. Create new issue with:
+   - Error message
+   - Steps to reproduce
+   - Environment details
+   - Relevant logs
+

@@ -1,7 +1,7 @@
 // Input bar component with emoji, attachments, and quick replies
 'use client'
 
-import { useState, useRef, Suspense, lazy } from 'react'
+import { useState, useRef, Suspense, lazy, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { 
@@ -34,6 +34,8 @@ import {
 } from '@/components/ui/dialog'
 import { useDropzone } from 'react-dropzone'
 import type { MediaAttachment } from '@/lib/types/chat'
+import { QuickReplyDropdownSimple } from './QuickReplyDropdownSimple'
+import { LocationPicker } from './LocationPicker'
 
 // Lazy load LocationMap to avoid SSR issues with Leaflet
 const LocationMap = lazy(() => import('./LocationMap').then(mod => ({ default: mod.LocationMap })))
@@ -46,6 +48,11 @@ interface InputBarProps {
   onFocus?: () => void
   disabled?: boolean
   sending?: boolean
+  replyingTo?: any | null
+  onCancelReply?: () => void
+  conversation?: any // For variable replacement in quick replies
+  droppedFile?: File | null // File dropped from drag & drop
+  onDroppedFileChange?: (file: File | null) => void // Callback to clear dropped file
 }
 
 export function InputBar({
@@ -56,11 +63,17 @@ export function InputBar({
   onFocus,
   disabled = false,
   sending = false,
+  replyingTo = null,
+  onCancelReply,
+  conversation,
+  droppedFile = null,
+  onDroppedFileChange,
 }: InputBarProps) {
   const [showEmojiPicker, setShowEmojiPicker] = useState(false)
   const [showAttachmentMenu, setShowAttachmentMenu] = useState(false)
   const [showLocationPicker, setShowLocationPicker] = useState(false)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const [fileCaption, setFileCaption] = useState('')
   const [emojiSearch, setEmojiSearch] = useState('')
   const [emojiCategory, setEmojiCategory] = useState('smileys')
   const [skinTone, setSkinTone] = useState('')
@@ -70,6 +83,62 @@ export function InputBar({
   const [searchResults, setSearchResults] = useState<any[]>([])
   const [searching, setSearching] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
+  const captionInputRef = useRef<HTMLInputElement>(null)
+  
+  // Quick Reply states
+  const [showQuickReplyDropdown, setShowQuickReplyDropdown] = useState(false)
+  const [quickReplySearch, setQuickReplySearch] = useState('')
+
+  // Handle dropped file from drag & drop
+  useEffect(() => {
+    if (droppedFile) {
+      setSelectedFile(droppedFile)
+      // Focus caption input after file is set
+      setTimeout(() => captionInputRef.current?.focus(), 100)
+    }
+  }, [droppedFile])
+
+  // Detect "/" for quick reply
+  useEffect(() => {
+    const words = value.split(' ')
+    const lastWord = words[words.length - 1]
+    
+    if (lastWord.startsWith('/')) {
+      const search = lastWord.slice(1)
+      setShowQuickReplyDropdown(true)
+      setQuickReplySearch(search)
+    } else {
+      setShowQuickReplyDropdown(false)
+      setQuickReplySearch('')
+    }
+  }, [value])
+
+  function handleQuickReplySelect(content: string) {
+    // Get text before the /command
+    const lastSlashIndex = value.lastIndexOf('/')
+    const newValue = lastSlashIndex >= 0 
+      ? value.substring(0, lastSlashIndex) + content
+      : value + content
+    
+    onChange(newValue)
+    
+    // Close dropdown
+    setShowQuickReplyDropdown(false)
+    setQuickReplySearch('')
+    
+    // Focus input
+    setTimeout(() => inputRef.current?.focus(), 50)
+  }
+
+  function handleQuickReplyClose() {
+    // Remove the "/" when closing without selecting
+    if (value.endsWith('/') || value.split(' ').pop()?.startsWith('/')) {
+      const words = value.split(' ')
+      words.pop()
+      onChange(words.join(' '))
+    }
+    setShowQuickReplyDropdown(false)
+  }
 
   // Skin tone modifiers
   const skinTones = [
@@ -424,15 +493,27 @@ export function InputBar({
   })
 
   const handleEmojiClick = (emoji: string) => {
-    const cursorPosition = inputRef.current?.selectionStart || value.length
+    // Determine which input to insert emoji into
+    const targetInput = selectedFile ? captionInputRef : inputRef
+    const targetValue = selectedFile ? fileCaption : value
+    const cursorPosition = targetInput.current?.selectionStart || targetValue.length
+    
     // Apply skin tone if emoji supports it
     const emojiWithSkinTone = skinTone && emoji.match(/👋|🤚|✋|🖖|👌|🤏|✌️|🤞|🤟|🤘|🤙|👈|👉|👆|👇|☝️|👍|👎|✊|👊|🤛|🤜|👏|🙌|👐|🤲|🤝|🙏|✍️|💪/)
       ? emoji + skinTone
       : emoji
+    
     const newValue =
-      value.slice(0, cursorPosition) + emojiWithSkinTone + value.slice(cursorPosition)
-    onChange(newValue)
-    inputRef.current?.focus()
+      targetValue.slice(0, cursorPosition) + emojiWithSkinTone + targetValue.slice(cursorPosition)
+    
+    // Update the appropriate state
+    if (selectedFile) {
+      setFileCaption(newValue)
+      captionInputRef.current?.focus()
+    } else {
+      onChange(newValue)
+      inputRef.current?.focus()
+    }
   }
 
   const handleAttachmentAction = (action: string) => {
@@ -458,7 +539,11 @@ export function InputBar({
         
         input.onchange = (e) => {
           const file = (e.target as HTMLInputElement).files?.[0]
-          if (file) setSelectedFile(file)
+          if (file) {
+            setSelectedFile(file)
+            // Focus caption input after file is selected
+            setTimeout(() => captionInputRef.current?.focus(), 100)
+          }
         }
         input.click()
         break
@@ -488,12 +573,21 @@ export function InputBar({
 
   const handleSendLocation = () => {
     if (currentLocation) {
-      const locationMessage = `📍 Location: ${locationName || 'My Location'}\nhttps://www.google.com/maps?q=${currentLocation.lat},${currentLocation.lng}`
-      onChange(locationMessage)
+      // Send as location media type
+      const locationMedia: MediaAttachment = {
+        type: 'location',
+        latitude: currentLocation.lat,
+        longitude: currentLocation.lng,
+        address: locationName || undefined,
+        name: locationName || 'My Location'
+      }
+      
+      onSend(locationMedia)
       setShowLocationPicker(false)
       setLocationName('')
       setLocationSearch('')
       setSearchResults([])
+      setCurrentLocation(null)
     }
   }
 
@@ -501,21 +595,40 @@ export function InputBar({
     if (!locationSearch.trim()) return
 
     setSearching(true)
+    setSearchResults([])
+    
     try {
-      // Using Nominatim API (OpenStreetMap geocoding service - FREE)
-      const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(locationSearch)}&limit=5`,
-        {
-          headers: {
-            'User-Agent': 'ChatApp/1.0' // Required by Nominatim
-          }
-        }
-      )
+      console.log('[Location Search] Searching for:', locationSearch)
+      
+      // Use our API route as proxy to avoid CORS issues
+      const url = `/api/geocode/search?q=${encodeURIComponent(locationSearch)}`
+      console.log('[Location Search] Calling API:', url)
+      
+      const response = await fetch(url)
+      console.log('[Location Search] Response status:', response.status, response.statusText)
+      
       const data = await response.json()
-      setSearchResults(data)
-    } catch (error) {
-      console.error('Error searching location:', error)
-      alert('Failed to search location. Please try again.')
+      console.log('[Location Search] Response data:', data)
+      
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to search location')
+      }
+      
+      // Check if data is an array (successful search results)
+      if (Array.isArray(data)) {
+        console.log('[Location Search] Found', data.length, 'results')
+        setSearchResults(data)
+        
+        if (data.length === 0) {
+          alert('No locations found. Try a different search term.')
+        }
+      } else {
+        throw new Error('Invalid response format')
+      }
+    } catch (error: any) {
+      console.error('[Location Search] Error:', error)
+      alert(error.message || 'Failed to search location. Please try again.')
+      setSearchResults([])
     } finally {
       setSearching(false)
     }
@@ -542,7 +655,13 @@ export function InputBar({
     : emojiCategories[emojiCategory as keyof typeof emojiCategories]?.emojis || []
 
   const handleSend = () => {
-    if ((!value.trim() && !selectedFile) || disabled || sending) return
+    // When file is selected, only send if file exists (caption is optional)
+    // When no file, only send if text exists
+    if (selectedFile) {
+      if (disabled || sending) return
+    } else {
+      if (!value.trim() || disabled || sending) return
+    }
 
     let media: MediaAttachment | undefined
 
@@ -556,15 +675,24 @@ export function InputBar({
       media = {
         file: selectedFile,
         type: mediaType,
+        caption: fileCaption || undefined, // Use caption from caption input
+      }
+      
+      // Clear file and caption after creating media object
+      setSelectedFile(null)
+      setFileCaption('')
+      // Clear dropped file in parent
+      if (onDroppedFileChange) {
+        onDroppedFileChange(null)
       }
     }
 
     onSend(media)
-    setSelectedFile(null)
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
+    // Normal Enter key handling
+    if (e.key === 'Enter' && !e.shiftKey && !showQuickReplyDropdown) {
       e.preventDefault()
       handleSend()
     }
@@ -580,31 +708,127 @@ export function InputBar({
         </div>
       )}
 
-      {/* Selected file preview */}
-      {selectedFile && (
-        <div className="mb-2 p-2 bg-gray-50 rounded-md flex items-center justify-between">
-          <div className="flex items-center space-x-2">
-            <Paperclip className="h-4 w-4 text-gray-500" />
-            <div className="flex-1 min-w-0">
-              <p className="text-sm text-gray-700 truncate">{selectedFile.name}</p>
-              <p className="text-xs text-gray-500">
-                {(selectedFile.size / 1024).toFixed(1)} KB
+      {/* Reply preview */}
+      {replyingTo && (
+        <div className="mb-2 p-2 bg-blue-50 border-l-4 border-blue-500 rounded flex items-start justify-between">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-1">
+              <MessageSquare className="h-3 w-3 text-blue-600" />
+              <p className="text-xs font-medium text-blue-700">
+                Replying to {replyingTo.is_from_me ? 'yourself' : (replyingTo.contact?.name || 'Customer')}
               </p>
             </div>
+            <p className="text-xs text-gray-600 truncate">
+              {replyingTo.content || (replyingTo.media_type ? `[${replyingTo.media_type}]` : 'Message')}
+            </p>
           </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setSelectedFile(null)}
-            className="h-7 w-7 p-0"
-          >
-            <X className="h-4 w-4" />
-          </Button>
+          {onCancelReply && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onCancelReply}
+              className="h-6 w-6 p-0 ml-2"
+            >
+              <X className="h-3 w-3" />
+            </Button>
+          )}
+        </div>
+      )}
+
+      {/* Selected file preview with caption input */}
+      {selectedFile && (
+        <div className="mb-2 p-3 bg-gray-50 rounded-lg border border-gray-200">
+          <div className="flex items-start gap-3 mb-2">
+            {/* File preview */}
+            <div className="shrink-0">
+              {selectedFile.type.startsWith('image/') ? (
+                <div className="w-16 h-16 rounded overflow-hidden bg-gray-200">
+                  <img
+                    src={URL.createObjectURL(selectedFile)}
+                    alt="Preview"
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+              ) : (
+                <div className="w-16 h-16 rounded bg-blue-100 flex items-center justify-center">
+                  {selectedFile.type.startsWith('video/') ? (
+                    <Video className="h-8 w-8 text-blue-600" />
+                  ) : selectedFile.type.startsWith('audio/') ? (
+                    <Mic className="h-8 w-8 text-orange-600" />
+                  ) : (
+                    <FileText className="h-8 w-8 text-purple-600" />
+                  )}
+                </div>
+              )}
+            </div>
+            
+            {/* File info */}
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-gray-700 truncate">{selectedFile.name}</p>
+              <p className="text-xs text-gray-500">
+                {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
+              </p>
+            </div>
+            
+            {/* Remove button */}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setSelectedFile(null)
+                setFileCaption('')
+                // Clear dropped file in parent
+                if (onDroppedFileChange) {
+                  onDroppedFileChange(null)
+                }
+              }}
+              className="h-8 w-8 p-0 shrink-0"
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+          
+          {/* Caption input */}
+          <div className="relative">
+            <Input
+              ref={captionInputRef}
+              placeholder="Add a caption..."
+              value={fileCaption}
+              onChange={(e) => setFileCaption(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault()
+                  handleSend()
+                }
+              }}
+              disabled={disabled || sending}
+              className="text-sm pr-10"
+            />
+            {/* Emoji button for caption */}
+            <button
+              onClick={() => {
+                setShowEmojiPicker(!showEmojiPicker)
+                // Focus caption input after emoji selection
+                setTimeout(() => captionInputRef.current?.focus(), 100)
+              }}
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+            >
+              <Smile className="h-4 w-4" />
+            </button>
+          </div>
         </div>
       )}
 
       {/* Input area */}
-      <div className="flex items-center space-x-1">
+      <div className="flex items-center space-x-1 relative">
+        {/* Quick Reply Dropdown */}
+        <QuickReplyDropdownSimple
+          show={showQuickReplyDropdown}
+          searchQuery={quickReplySearch}
+          onSelect={handleQuickReplySelect}
+          conversation={conversation}
+        />
+        
         {/* Attachment Menu */}
         <Popover open={showAttachmentMenu} onOpenChange={setShowAttachmentMenu}>
           <PopoverTrigger asChild>
@@ -641,7 +865,7 @@ export function InputBar({
           onChange={(e) => onChange(e.target.value)}
           onKeyDown={handleKeyDown}
           onFocus={onFocus}
-          disabled={disabled || sending}
+          disabled={disabled || sending || !!selectedFile} // Disable when file is selected
           className="flex-1 h-9"
         />
 
@@ -750,7 +974,7 @@ export function InputBar({
         {/* Send button */}
         <Button
           onClick={handleSend}
-          disabled={(!value.trim() && !selectedFile) || disabled || sending}
+          disabled={selectedFile ? (disabled || sending) : (!value.trim() || disabled || sending)}
           className="bg-blue-600 hover:bg-blue-700 h-9 px-4"
         >
           {sending ? (
@@ -763,15 +987,15 @@ export function InputBar({
 
       {/* Location Picker Modal */}
       <Dialog open={showLocationPicker} onOpenChange={setShowLocationPicker}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden flex flex-col">
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-hidden flex flex-col">
           <DialogHeader>
             <DialogTitle>Share Location</DialogTitle>
           </DialogHeader>
           
-          <div className="space-y-4 overflow-y-auto flex-1 pr-2">
+          <div className="space-y-4 overflow-y-auto flex-1">
             {/* Search Location */}
             <div>
-              <label className="text-sm font-medium text-gray-700 mb-1 block">
+              <label className="text-sm font-medium text-gray-700 mb-2 block">
                 Search Location
               </label>
               <div className="flex gap-2">
@@ -790,6 +1014,7 @@ export function InputBar({
                   onClick={handleSearchLocation}
                   disabled={searching || !locationSearch.trim()}
                   variant="outline"
+                  className="shrink-0"
                 >
                   {searching ? (
                     <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-600"></div>
@@ -827,7 +1052,7 @@ export function InputBar({
 
             {/* Location Name Input */}
             <div>
-              <label className="text-sm font-medium text-gray-700 mb-1 block">
+              <label className="text-sm font-medium text-gray-700 mb-2 block">
                 Location Name (Optional)
               </label>
               <Input
@@ -838,52 +1063,30 @@ export function InputBar({
               />
             </div>
 
-            {/* Map Preview with Leaflet */}
+            {/* Map with Draggable Pin */}
             {currentLocation && (
-              <div className="space-y-2">
-                {/* Leaflet Map */}
+              <div>
                 <Suspense fallback={
-                  <div className="w-full h-48 bg-gray-100 rounded-lg border flex items-center justify-center">
+                  <div className="w-full h-[300px] bg-gray-100 rounded-lg border flex items-center justify-center">
                     <div className="text-center">
-                      <MapPin className="h-8 w-8 text-red-500 mx-auto mb-2" />
+                      <MapPin className="h-8 w-8 text-red-500 mx-auto mb-2 animate-bounce" />
                       <p className="text-sm text-gray-600">Loading map...</p>
                     </div>
                   </div>
                 }>
-                  <LocationMap
+                  <LocationPicker
                     latitude={currentLocation.lat}
                     longitude={currentLocation.lng}
-                    locationName={locationName || 'My Location'}
+                    onLocationChange={(lat, lng) => {
+                      setCurrentLocation({ lat, lng })
+                    }}
                   />
                 </Suspense>
-                
-                {/* Location Info */}
-                <div className="bg-gray-50 p-2.5 rounded-lg border">
-                  <div className="flex items-center justify-between text-xs">
-                    <div className="space-y-0.5">
-                      <p className="text-gray-600">
-                        <span className="font-medium">Lat:</span> {currentLocation.lat.toFixed(6)}
-                      </p>
-                      <p className="text-gray-600">
-                        <span className="font-medium">Lng:</span> {currentLocation.lng.toFixed(6)}
-                      </p>
-                    </div>
-                    <a
-                      href={`https://www.google.com/maps?q=${currentLocation.lat},${currentLocation.lng}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-blue-600 hover:underline text-xs flex items-center gap-1"
-                    >
-                      View on Google Maps
-                      <span>→</span>
-                    </a>
-                  </div>
-                </div>
               </div>
             )}
           </div>
 
-          <DialogFooter className="mt-4 pt-4 border-t shrink-0">
+          <DialogFooter className="mt-4 pt-4 border-t shrink-0 flex gap-2">
             <Button
               variant="outline"
               onClick={() => {
@@ -891,13 +1094,14 @@ export function InputBar({
                 setLocationSearch('')
                 setSearchResults([])
               }}
+              className="flex-1"
             >
               Cancel
             </Button>
             <Button
               onClick={handleSendLocation}
               disabled={!currentLocation}
-              className="bg-blue-600 hover:bg-blue-700"
+              className="bg-blue-600 hover:bg-blue-700 flex-1"
             >
               <MapPin className="h-4 w-4 mr-2" />
               Send Location

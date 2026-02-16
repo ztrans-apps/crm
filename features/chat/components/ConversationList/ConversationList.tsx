@@ -100,10 +100,10 @@ export function ConversationList({
     if (advancedFilters.sessionOpen || advancedFilters.sessionExpiring || advancedFilters.sessionExpired) {
       // Placeholder for session filtering
     }
-    if (advancedFilters.selectedDivision && conv.assigned_to_user?.division !== advancedFilters.selectedDivision) {
+    if (advancedFilters.selectedDivision && (conv as any).assigned_to_user?.division !== advancedFilters.selectedDivision) {
       return false
     }
-    if (advancedFilters.selectedChannel && conv.channel !== advancedFilters.selectedChannel) {
+    if (advancedFilters.selectedChannel && (conv as any).channel !== advancedFilters.selectedChannel) {
       return false
     }
     if (advancedFilters.selectedTags.length > 0) {
@@ -455,16 +455,21 @@ export function ConversationList({
             <p className="text-sm">Tidak ada obrolan</p>
           </div>
         ) : (
-          sortedConversations.map((conv) => (
-            <ConversationItem
-              key={conv.id}
-              conversation={conv}
-              isSelected={selectedId === conv.id}
-              onSelect={() => onSelect(conv.id)}
-              onPick={onPickConversation ? () => onPickConversation(conv.id) : undefined}
-              showPickButton={userRole === 'agent' && !conv.assigned_to && conv.status === 'open'}
-            />
-          ))
+          sortedConversations.map((conv) => {
+            const isUnassigned = !conv.assigned_to
+            const canPick = userRole === 'agent' && isUnassigned && conv.status === 'open'
+            
+            return (
+              <ConversationItem
+                key={conv.id}
+                conversation={conv}
+                isSelected={selectedId === conv.id}
+                onSelect={() => onSelect(conv.id)}
+                onPick={onPickConversation ? () => onPickConversation(conv.id) : undefined}
+                showPickButton={canPick}
+              />
+            )
+          })
         )}
       </div>
     </div>

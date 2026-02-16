@@ -13,9 +13,14 @@ import {
   UserCog,
   Settings,
   QrCode,
-  BarChart3
+  BarChart3,
+  ArrowRightLeft,
+  Shield,
+  Sliders,
+  Activity
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { usePermissions } from '@/lib/rbac'
 
 interface SidebarProps {
   role: 'owner' | 'agent'
@@ -23,6 +28,7 @@ interface SidebarProps {
 
 export default function Sidebar({ role }: SidebarProps) {
   const pathname = usePathname()
+  const { hasPermission, loading } = usePermissions()
 
   const ownerMenuItems = [
     { icon: LayoutDashboard, label: 'Dashboard', href: '/owner/dashboard' },
@@ -34,6 +40,12 @@ export default function Sidebar({ role }: SidebarProps) {
     { icon: Radio, label: 'Broadcasts', href: '/owner/broadcasts' },
     { icon: UserCog, label: 'Agents', href: '/owner/agents' },
     { icon: BarChart3, label: 'Analytics', href: '/owner/analytics' },
+    { icon: ArrowRightLeft, label: 'Handover Reports', href: '/reports/handovers' },
+    // Admin section - only show if user has permission
+    ...(!loading && hasPermission('role.view') ? [
+      { icon: Shield, label: 'Role Management', href: '/admin/roles' },
+      { icon: Sliders, label: 'System Settings', href: '/admin/settings' },
+    ] : []),
     { icon: Settings, label: 'Settings', href: '/owner/settings' },
   ]
 
@@ -41,6 +53,7 @@ export default function Sidebar({ role }: SidebarProps) {
     { icon: LayoutDashboard, label: 'Dashboard', href: '/agent/dashboard' },
     { icon: MessageSquare, label: 'My Chats', href: '/chats' },
     { icon: Ticket, label: 'My Tickets', href: '/agent/tickets' },
+    { icon: ArrowRightLeft, label: 'My Handovers', href: '/reports/handovers' },
     { icon: Settings, label: 'Settings', href: '/agent/settings' },
   ]
 

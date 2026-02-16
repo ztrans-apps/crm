@@ -1,0 +1,287 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: whatsapp-crm-app
+  labels:
+    app: whatsapp-crm
+    component: app
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: whatsapp-crm
+      component: app
+  template:
+    metadata:
+      labels:
+        app: whatsapp-crm
+        component: app
+    spec:
+      containers:
+      - name: app
+        image: ${REGISTRY_URL}/whatsapp-crm-app:${VERSION}
+        ports:
+        - containerPort: 3000
+          name: http
+        env:
+        - name: NODE_ENV
+          value: "production"
+        - name: NEXT_PUBLIC_SUPABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: whatsapp-crm-secrets
+              key: supabase-url
+        - name: NEXT_PUBLIC_SUPABASE_ANON_KEY
+          valueFrom:
+            secretKeyRef:
+              name: whatsapp-crm-secrets
+              key: supabase-anon-key
+        - name: SUPABASE_SERVICE_ROLE_KEY
+          valueFrom:
+            secretKeyRef:
+              name: whatsapp-crm-secrets
+              key: supabase-service-key
+        - name: REDIS_HOST
+          valueFrom:
+            configMapKeyRef:
+              name: whatsapp-crm-config
+              key: redis-host
+        - name: REDIS_PORT
+          valueFrom:
+            configMapKeyRef:
+              name: whatsapp-crm-config
+              key: redis-port
+        - name: WHATSAPP_SERVICE_URL
+          valueFrom:
+            configMapKeyRef:
+              name: whatsapp-crm-config
+              key: whatsapp-service-url
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /api/health
+            port: 3000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /api/health
+            port: 3000
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: whatsapp-crm-service
+  labels:
+    app: whatsapp-crm
+    component: whatsapp-service
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: whatsapp-crm
+      component: whatsapp-service
+  template:
+    metadata:
+      labels:
+        app: whatsapp-crm
+        component: whatsapp-service
+    spec:
+      containers:
+      - name: whatsapp-service
+        image: ${REGISTRY_URL}/whatsapp-crm-service:${VERSION}
+        ports:
+        - containerPort: 3001
+          name: http
+        env:
+        - name: NODE_ENV
+          value: "production"
+        - name: PORT
+          value: "3001"
+        - name: REDIS_HOST
+          valueFrom:
+            configMapKeyRef:
+              name: whatsapp-crm-config
+              key: redis-host
+        - name: REDIS_PORT
+          valueFrom:
+            configMapKeyRef:
+              name: whatsapp-crm-config
+              key: redis-port
+        volumeMounts:
+        - name: whatsapp-auth
+          mountPath: /.wwebjs_auth
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "500m"
+          limits:
+            memory: "2Gi"
+            cpu: "1000m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 3001
+          initialDelaySeconds: 60
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 3001
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+      volumes:
+      - name: whatsapp-auth
+        persistentVolumeClaim:
+          claimName: whatsapp-auth-pvc
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: whatsapp-crm-workers
+  labels:
+    app: whatsapp-crm
+    component: workers
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: whatsapp-crm
+      component: workers
+  template:
+    metadata:
+      labels:
+        app: whatsapp-crm
+        component: workers
+    spec:
+      containers:
+      - name: workers
+        image: ${REGISTRY_URL}/whatsapp-crm-app:${VERSION}
+        command: ["npm", "run", "workers"]
+        env:
+        - name: NODE_ENV
+          value: "production"
+        - name: NEXT_PUBLIC_SUPABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: whatsapp-crm-secrets
+              key: supabase-url
+        - name: SUPABASE_SERVICE_ROLE_KEY
+          valueFrom:
+            secretKeyRef:
+              name: whatsapp-crm-secrets
+              key: supabase-service-key
+        - name: REDIS_HOST
+          valueFrom:
+            configMapKeyRef:
+              name: whatsapp-crm-config
+              key: redis-host
+        - name: REDIS_PORT
+          valueFrom:
+            configMapKeyRef:
+              name: whatsapp-crm-config
+              key: redis-port
+        - name: WHATSAPP_SERVICE_URL
+          valueFrom:
+            configMapKeyRef:
+              name: whatsapp-crm-config
+              key: whatsapp-service-url
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis
+  labels:
+    app: whatsapp-crm
+    component: redis
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: whatsapp-crm
+      component: redis
+  template:
+    metadata:
+      labels:
+        app: whatsapp-crm
+        component: redis
+    spec:
+      containers:
+      - name: redis
+        image: redis:7-alpine
+        ports:
+        - containerPort: 6379
+          name: redis
+        volumeMounts:
+        - name: redis-data
+          mountPath: /data
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "200m"
+        livenessProbe:
+          exec:
+            command:
+            - redis-cli
+            - ping
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          exec:
+            command:
+            - redis-cli
+            - ping
+          initialDelaySeconds: 5
+          periodSeconds: 5
+      volumes:
+      - name: redis-data
+        persistentVolumeClaim:
+          claimName: redis-pvc
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: redis-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: whatsapp-auth-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 20Gi

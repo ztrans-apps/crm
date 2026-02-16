@@ -1,0 +1,128 @@
+{
+  "dashboard": {
+    "title": "WhatsApp CRM Platform",
+    "tags": ["whatsapp", "crm"],
+    "timezone": "browser",
+    "panels": [
+      {
+        "id": 1,
+        "title": "System Health",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "up{job=\"whatsapp-crm-app\"}",
+            "legendFormat": "App Status"
+          }
+        ]
+      },
+      {
+        "id": 2,
+        "title": "Request Rate",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(http_requests_total[5m])",
+            "legendFormat": "{{method}} {{path}}"
+          }
+        ]
+      },
+      {
+        "id": 3,
+        "title": "Error Rate",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(http_requests_total{status=~\"5..\"}[5m])",
+            "legendFormat": "5xx Errors"
+          }
+        ]
+      },
+      {
+        "id": 4,
+        "title": "Response Time (p95)",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m]))",
+            "legendFormat": "p95"
+          }
+        ]
+      },
+      {
+        "id": 5,
+        "title": "Messages Sent",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(whatsapp_messages_sent_total[5m])",
+            "legendFormat": "Messages/sec"
+          }
+        ]
+      },
+      {
+        "id": 6,
+        "title": "Active Sessions",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "whatsapp_sessions_active",
+            "legendFormat": "Active Sessions"
+          }
+        ]
+      },
+      {
+        "id": 7,
+        "title": "Queue Size",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "redis_queue_waiting",
+            "legendFormat": "Waiting"
+          },
+          {
+            "expr": "redis_queue_active",
+            "legendFormat": "Active"
+          }
+        ]
+      },
+      {
+        "id": 8,
+        "title": "Memory Usage",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "process_resident_memory_bytes",
+            "legendFormat": "{{pod}}"
+          }
+        ]
+      },
+      {
+        "id": 9,
+        "title": "CPU Usage",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(process_cpu_seconds_total[5m])",
+            "legendFormat": "{{pod}}"
+          }
+        ]
+      },
+      {
+        "id": 10,
+        "title": "Webhook Delivery Success Rate",
+        "type": "gauge",
+        "targets": [
+          {
+            "expr": "rate(webhook_deliveries_success_total[5m]) / rate(webhook_deliveries_total[5m])",
+            "legendFormat": "Success Rate"
+          }
+        ]
+      }
+    ],
+    "refresh": "30s",
+    "time": {
+      "from": "now-6h",
+      "to": "now"
+    }
+  }
+}

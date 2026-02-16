@@ -1,542 +1,1012 @@
-import pkg from 'whatsapp-web.js'
-const { Client, LocalAuth } = pkg
-import qrcode from 'qrcode-terminal'
+import makeWASocket, {
+  DisconnectReason,
+  useMultiFileAuthState,
+  fetchLatestBaileysVersion,
+  makeCacheableSignalKeyStore,
+  Browsers
+} from '@whiskeysockets/baileys'
+import { Boom } from '@hapi/boom'
+import pino from 'pino'
+import qrcodeTerminal from 'qrcode-terminal'
+import QRCode from 'qrcode'
+import fs from 'fs'
+import path from 'path'
 import { supabase } from '../config/supabase.js'
+import reconnectManager from './reconnect-manager.js'
+import sessionManager from './session-manager.js'
 
-class WhatsAppService {
+class BaileysWhatsAppService {
   constructor() {
-    this.clients = new Map()
-    this.initializingClients = new Set() // Track clients being initialized
-    this.startHealthCheck() // Start health check on service start
+    this.sessions = new Map() // sessionKey (tenantId:sessionId) -> { sock, store, state, tenantId }
+    this.qrCodes = new Map() // sessionKey -> qrCode
+    this.authDir = '.baileys_auth'
+    
+    // Create auth directory if not exists
+    if (!fs.existsSync(this.authDir)) {
+      fs.mkdirSync(this.authDir, { recursive: true })
+    }
   }
 
-  // Health check to keep sessions alive
-  startHealthCheck() {
-    setInterval(async () => {
-      console.log('🔍 Running health check on all sessions...')
-      
-      for (const [sessionId, client] of this.clients.entries()) {
-        try {
-          // Skip if currently initializing
-          if (this.initializingClients.has(sessionId)) {
-            console.log(`  ⏳ Session ${sessionId} is initializing, skipping...`)
-            continue
-          }
+  /**
+   * Get session key
+   */
+  getSessionKey(tenantId, sessionId) {
+    return `${tenantId}:${sessionId}`
+  }
 
-          const state = await client.getState()
-          console.log(`  📱 Session ${sessionId}: ${state}`)
+  /**
+   * Initialize a WhatsApp session with tenant support
+   */
+  async initializeClient(sessionId, forceNew = false, tenantId = null) {
+    // Get tenant_id from database if not provided
+    if (!tenantId) {
+      if (!supabase) {
+        console.warn(`⚠️  Supabase not configured, using default tenant_id`)
+        tenantId = process.env.DEFAULT_TENANT_ID || '00000000-0000-0000-0000-000000000001'
+      } else {
+        try {
+          const { data, error } = await supabase
+            .from('whatsapp_sessions')
+            .select('tenant_id')
+            .eq('id', sessionId)
+            .single()
           
-          if (state !== 'CONNECTED') {
-            console.log(`  ⚠️ Session ${sessionId} not connected, reinitializing...`)
-            this.clients.delete(sessionId)
-            await this.initializeClient(sessionId)
+          if (error) {
+            console.warn(`⚠️  Failed to get tenant_id from database, using default:`, error.message)
+            tenantId = process.env.DEFAULT_TENANT_ID || '00000000-0000-0000-0000-000000000001'
+          } else {
+            tenantId = data.tenant_id
           }
         } catch (error) {
-          console.error(`  ❌ Health check error for ${sessionId}:`, error.message)
-          
-          // If error, try to reinitialize
-          try {
-            console.log(`  🔄 Attempting to reinitialize ${sessionId}...`)
-            this.clients.delete(sessionId)
-            await this.initializeClient(sessionId)
-          } catch (reinitError) {
-            console.error(`  ❌ Failed to reinitialize ${sessionId}:`, reinitError.message)
-          }
+          console.warn(`⚠️  Error querying tenant_id, using default:`, error.message)
+          tenantId = process.env.DEFAULT_TENANT_ID || '00000000-0000-0000-0000-000000000001'
         }
       }
-      
-      console.log('✓ Health check complete')
-    }, 120000) // Check every 2 minutes
-  }
-
-  async initializeClient(sessionId) {
-    // Prevent multiple initializations
-    if (this.initializingClients.has(sessionId)) {
-      console.log('Client already initializing:', sessionId)
-      // Wait for existing initialization
-      await new Promise(resolve => setTimeout(resolve, 5000))
-      return this.clients.get(sessionId)
     }
 
-    if (this.clients.has(sessionId)) {
-      console.log('Client already exists:', sessionId)
-      return this.clients.get(sessionId)
+    const sessionKey = this.getSessionKey(tenantId, sessionId)
+
+    // If forcing new, delete existing session first
+    if (forceNew && this.sessions.has(sessionKey)) {
+      console.log(`🗑️ Deleting existing session from memory: ${sessionKey}`)
+      const existingSession = this.sessions.get(sessionKey)
+      try {
+        await existingSession.sock.logout()
+      } catch (err) {
+        console.log(`⚠️  Logout error (ignoring): ${err.message}`)
+      }
+      this.sessions.delete(sessionKey)
+      this.qrCodes.delete(sessionKey)
+      this.qrCodes.delete(sessionId)
     }
 
-    this.initializingClients.add(sessionId)
-    console.log('Initializing new client for session:', sessionId)
+    // If session already exists and not forcing new, return it
+    if (this.sessions.has(sessionKey) && !forceNew) {
+      console.log(`⚠️ Session ${sessionKey} already exists, returning existing session`)
+      return this.sessions.get(sessionKey)
+    }
 
     try {
-      const client = new Client({
-        authStrategy: new LocalAuth({ clientId: sessionId }),
-        puppeteer: {
-          headless: true,
-          args: [
-            '--no-sandbox',
-            '--disable-setuid-sandbox',
-            '--disable-dev-shm-usage',
-            '--disable-accelerated-2d-canvas',
-            '--no-first-run',
-            '--no-zygote',
-            '--disable-gpu'
-          ],
-          timeout: 60000
+      console.log(`🚀 Initializing ${forceNew ? 'NEW' : ''} session: ${sessionKey}`)
+      
+      // Create session auth directory
+      const authPath = path.join(this.authDir, sessionId)
+      
+      // If forcing new session, delete old auth files
+      if (forceNew && fs.existsSync(authPath)) {
+        console.log(`🗑️ Deleting old auth files for: ${sessionId}`)
+        fs.rmSync(authPath, { recursive: true, force: true })
+      }
+      
+      if (!fs.existsSync(authPath)) {
+        fs.mkdirSync(authPath, { recursive: true })
+        console.log(`📁 Created auth directory: ${authPath}`)
+      } else {
+        console.log(`📁 Auth directory already exists: ${authPath}`)
+      }
+
+      // Load auth state
+      const { state, saveCreds } = await useMultiFileAuthState(authPath)
+
+      console.log(`📂 Auth state loaded from: ${authPath}`)
+      console.log(`🔐 Has existing credentials: ${!!state.creds}`)
+      console.log(`🔍 Debug - state.creds keys:`, Object.keys(state.creds || {}))
+      console.log(`🔍 Debug - state.creds.me:`, JSON.stringify(state.creds?.me))
+      console.log(`👤 Registered phone: ${state.creds?.me?.id || 'none (will need QR scan)'}`)
+      console.log(`🔑 Has registration ID: ${state.creds?.registrationId !== undefined ? state.creds.registrationId : 'none'}`)
+      
+      // Check if we have valid credentials
+      // registrationId can be 0, so check for undefined/null explicitly
+      const hasValidCreds = !!(state.creds?.me?.id && state.creds?.registrationId !== undefined && state.creds?.registrationId !== null)
+      
+      if (hasValidCreds) {
+        console.log(`✅ Valid credentials found, will attempt auto-reconnect`)
+        
+        // Update database status to 'connecting'
+        if (supabase) {
+          await supabase
+            .from('whatsapp_sessions')
+            .update({ 
+              status: 'connecting',
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', sessionId)
+        }
+      } else {
+        console.log(`⚠️ No valid credentials, will need QR scan`)
+        
+        // Update database status to 'disconnected'
+        if (supabase) {
+          await supabase
+            .from('whatsapp_sessions')
+            .update({ 
+              status: 'disconnected',
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', sessionId)
+        }
+      }
+
+      // Get latest Baileys version
+      const { version } = await fetchLatestBaileysVersion()
+
+      // Create socket connection with timeout handling
+      const sock = makeWASocket({
+        version,
+        auth: {
+          creds: state.creds,
+          keys: makeCacheableSignalKeyStore(state.keys, pino({ level: 'silent' }))
+        },
+        printQRInTerminal: false,
+        logger: pino({ level: 'silent' }),
+        browser: Browsers.ubuntu('Chrome'),
+        connectTimeoutMs: 60000, // 60 seconds timeout
+        defaultQueryTimeoutMs: 60000, // 60 seconds for queries
+        retryRequestDelayMs: 250, // Retry delay
+        maxMsgRetryCount: 3, // Max retry for messages
+        keepAliveIntervalMs: 30000, // Keep alive every 30s
+      })
+
+      console.log(`🔌 Socket created for ${sessionKey}`)
+
+      // Store session with tenant info
+      const sessionData = { sock, state, saveCreds, tenantId, sessionId }
+      this.sessions.set(sessionKey, sessionData)
+
+      // Register with session manager
+      sessionManager.registerSession(tenantId, sessionId, {
+        sock,
+        phoneNumber: null, // Will be updated on connection
+        status: 'initializing'
+      })
+
+      console.log(`📡 Attaching event listeners for ${sessionKey}`)
+
+      // Global error handler for socket
+      sock.ev.on('error', (error) => {
+        console.error(`❌ Socket error for ${sessionKey}:`, error)
+        
+        // Handle timeout errors specifically
+        if (error.message?.includes('Timed Out') || error.message?.includes('timeout')) {
+          console.log(`⏱️ Timeout detected for ${sessionKey}, will auto-reconnect`)
+          // Don't crash, let connection.update handle reconnection
         }
       })
 
-    // Store client
-    this.clients.set(sessionId, client)
+      // Handle connection updates
+      sock.ev.on('connection.update', async (update) => {
+        const { connection, lastDisconnect, qr } = update
+        
+        console.log(`🔄 Connection update for ${sessionKey}:`, {
+          connection,
+          hasQR: !!qr,
+          hasLastDisconnect: !!lastDisconnect
+        })
 
-    // QR Code event
-    client.on('qr', async (qr) => {
-      console.log('QR received for session:', sessionId)
-      
-      // Show in terminal
-      qrcode.generate(qr, { small: true })
-      
-      // Convert QR to base64 image for browser
-      const QRCode = await import('qrcode')
-      const qrImage = await QRCode.toDataURL(qr)
-      
-      // Emit to Socket.IO
-      const io = global.io
-      if (io) {
-        io.emit('qr', { sessionId, qr: qrImage })
-      }
-    })
+        // Handle QR code
+        if (qr) {
+          console.log(`📱 QR code generated for session: ${sessionKey}`)
+          console.log(`📱 Current time: ${new Date().toISOString()}`)
+          console.log(`📱 QR will expire in ~40 seconds`)
+          
+          // Show in terminal
+          qrcodeTerminal.generate(qr, { small: true })
+          
+          // Convert to base64 for browser
+          const qrImage = await QRCode.toDataURL(qr)
+          
+          // Store with BOTH sessionKey and sessionId for compatibility
+          this.qrCodes.set(sessionKey, qrImage)
+          this.qrCodes.set(sessionId, qrImage) // Also store with sessionId only
+          
+          console.log(`✅ QR code stored in memory for session: ${sessionKey}`)
+          console.log(`✅ QR code also stored with sessionId: ${sessionId}`)
+          console.log(`✅ Total QR codes in memory: ${this.qrCodes.size}`)
+          
+          // Emit via Socket.IO
+          const io = global.io
+          if (io) {
+            io.emit('qr', { sessionId, tenantId, qr: qrImage })
+          }
+        }
 
-    // Ready event
-    client.on('ready', async () => {
-      console.log('✅ WhatsApp ready for session:', sessionId)
-      console.log('⏳ Initializing contact list and LID...')
-      console.log('')
-      console.log('⚠️  IMPORTANT: Wait 10-30 seconds before sending messages!')
-      console.log('   WhatsApp needs time to:')
-      console.log('   - Load contact list')
-      console.log('   - Initialize LID (Linked Identity)')
-      console.log('   - Sync with WhatsApp servers')
-      console.log('')
-      
-      // Update status in database to 'connected' (matching existing data)
-      if (supabase) {
-        await supabase
-          .from('whatsapp_sessions')
-          .update({ status: 'connected' })
-          .eq('id', sessionId)
-      }
-      
-      // Wait for full initialization
-      setTimeout(() => {
-        console.log('✅ Session fully initialized for:', sessionId)
-        console.log('✅ Ready to send messages!')
-        console.log('')
-      }, 30000) // Wait 30 seconds for full initialization
-      
-      const io = global.io
-      if (io) {
-        io.emit('ready', { sessionId })
-      }
-    })
+        // Handle connection state
+        if (connection === 'close') {
+          const shouldReconnect = (lastDisconnect?.error instanceof Boom)
+            ? lastDisconnect.error.output.statusCode !== DisconnectReason.loggedOut
+            : true
 
-    // Disconnected event
-    client.on('disconnected', async (reason) => {
-      console.log('WhatsApp disconnected:', sessionId, reason)
-      
-      this.clients.delete(sessionId)
-      
-      // Update status in database
-      if (supabase) {
-        await supabase
-          .from('whatsapp_sessions')
-          .update({ status: 'disconnected' })
-          .eq('id', sessionId)
-      }
-      
-      const io = global.io
-      if (io) {
-        io.emit('disconnected', { sessionId, reason })
-      }
+          const statusCode = lastDisconnect?.error instanceof Boom 
+            ? lastDisconnect.error.output.statusCode 
+            : null
 
-      // Auto-reconnect after 5 seconds (unless manually disconnected)
-      // Check if session still exists in database (not manually deleted)
-      if (supabase && reason !== 'MANUAL_DISCONNECT') {
-        console.log('Scheduling auto-reconnect for session:', sessionId)
-        setTimeout(async () => {
-          try {
-            const { data: session } = await supabase
+          console.log(`❌ Connection closed for ${sessionKey}, status: ${statusCode}, shouldReconnect: ${shouldReconnect}`)
+
+          // Update session manager
+          sessionManager.updateStatus(tenantId, sessionId, 'disconnected')
+
+          // Update database
+          if (supabase) {
+            await supabase
               .from('whatsapp_sessions')
-              .select('id, status')
+              .update({ 
+                status: shouldReconnect ? 'reconnecting' : 'disconnected',
+                metadata: { lastDisconnect: statusCode }
+              })
               .eq('id', sessionId)
-              .single()
-
-            // Only reconnect if session still exists and not manually disconnected
-            if (session && session.status !== 'disconnected') {
-              console.log('Auto-reconnecting session:', sessionId)
-              await this.initializeClient(sessionId)
-            } else {
-              console.log('Session was manually disconnected, skipping auto-reconnect')
-            }
-          } catch (error) {
-            console.error('Auto-reconnect error:', error)
+              .eq('tenant_id', tenantId)
           }
-        }, 5000) // Wait 5 seconds before reconnecting
-      }
-    })
 
-    // Message event
-    client.on('message', async (message) => {
-      console.log('📨 Message received!')
-      console.log('  - From:', message.from)
-      console.log('  - Body:', message.body)
-      console.log('  - Timestamp:', message.timestamp)
-      console.log('  - Session:', sessionId)
-      
-      try {
-        // Get contact info to extract pushname
-        const contact = await message.getContact()
-        const pushname = contact.pushname || contact.name || null
-        
-        console.log('  - Contact pushname:', pushname)
-        
-        // Save to database with pushname
-        await this.saveIncomingMessage(sessionId, message, pushname)
-        console.log('  ✓ Message saved to database')
-      } catch (error) {
-        console.error('  ❌ Error saving message:', error)
-      }
-      
-      const io = global.io
-      if (io) {
-        const eventData = {
-          sessionId,
-          from: message.from,
-          body: message.body,
-          timestamp: message.timestamp
-        }
-        io.emit('message', eventData)
-        console.log('  ✓ Emitted Socket.IO event:', eventData)
-      } else {
-        console.log('  ⚠️ Socket.IO not available')
-      }
-    })
+          // Emit via Socket.IO
+          const io = global.io
+          if (io) {
+            io.emit('disconnected', { sessionId, tenantId, shouldReconnect })
+          }
 
-    // Message acknowledgement event (for status updates)
-    client.on('message_ack', async (message, ack) => {
-      console.log('📨 Message ACK received!')
-      console.log('  - Message ID:', message.id._serialized)
-      console.log('  - ACK Status:', ack)
-      console.log('  - ACK Name:', ['ERROR', 'PENDING', 'SERVER_ACK', 'DELIVERY_ACK', 'READ', 'PLAYED'][ack] || 'UNKNOWN')
-      console.log('  - Session:', sessionId)
-      console.log('  - From:', message.from)
-      console.log('  - To:', message.to)
-      console.log('  - Body:', message.body?.substring(0, 50))
-      
-      // ack values:
-      // 0 = ERROR
-      // 1 = PENDING
-      // 2 = SERVER_ACK (sent)
-      // 3 = DELIVERY_ACK (delivered)
-      // 4 = READ (read)
-      // 5 = PLAYED (for voice messages)
-      
-      let status = 'sent'
-      if (ack === 2) status = 'sent'
-      if (ack === 3) status = 'delivered'
-      if (ack === 4) status = 'read'
-      if (ack === 0) status = 'failed'
-      
-      console.log('  - Mapped status:', status)
-      
-      try {
-        // Update message status in database
-        if (supabase) {
-          // First, let's check what messages exist in the database
-          const { data: allMessages } = await supabase
-            .from('messages')
-            .select('id, whatsapp_message_id, status, content')
-            .eq('is_from_me', true)
-            .order('created_at', { ascending: false })
-            .limit(10)
+          // Remove from sessions
+          this.sessions.delete(sessionKey)
           
-          console.log('  - Recent messages in DB:')
-          allMessages?.forEach(m => {
-            console.log(`    * ${m.whatsapp_message_id} -> ${m.status} (${m.content?.substring(0, 30)})`)
-          })
+          // IMPORTANT: Don't delete QR code on connection close!
+          // QR code should persist to allow user to scan even after connection closes
+          // QR will be deleted when:
+          // 1. User successfully scans and connects
+          // 2. User manually cancels
+          // 3. Session is force deleted
+          console.log(`⏳ Keeping QR code after connection close for: ${sessionKey}`)
+          console.log(`⏳ QR codes in memory: ${this.qrCodes.size}`)
           
-          console.log('  - Searching for message with ID:', message.id._serialized)
-          
-          const { data, error } = await supabase
-            .from('messages')
-            .update({ status })
-            .eq('whatsapp_message_id', message.id._serialized)
-            .select()
-          
-          if (error) {
-            console.error('  ❌ Error updating message status:', error)
-          } else if (data && data.length > 0) {
-            console.log('  ✅ SUCCESS! Message status updated to:', status)
-            console.log('  ✅ Updated', data.length, 'message(s)')
-            console.log('  ✅ Updated message:', {
-              id: data[0].id,
-              content: data[0].content?.substring(0, 30),
-              old_status: allMessages?.find(m => m.id === data[0].id)?.status,
-              new_status: status
-            })
+          sessionManager.unregisterSession(tenantId, sessionId)
+
+          // Reconnect if not logged out
+          if (shouldReconnect) {
+            console.log(`🔄 Scheduling auto-reconnect for session: ${sessionKey}`)
+            
+            // Use reconnect manager with exponential backoff
+            reconnectManager.scheduleReconnect(
+              sessionId,
+              async (sid) => {
+                try {
+                  await this.initializeClient(sid, false, tenantId)
+                  return true // Success
+                } catch (error) {
+                  console.error(`❌ Reconnect attempt failed for ${sid}:`, error)
+                  return false // Failed, will retry
+                }
+              },
+              async (sid) => {
+                // Max attempts reached
+                console.error(`❌ Max reconnect attempts reached for session: ${sid}`)
+                
+                // Update database
+                if (supabase) {
+                  await supabase
+                    .from('whatsapp_sessions')
+                    .update({ 
+                      status: 'failed',
+                      metadata: { error: 'Max reconnect attempts reached' }
+                    })
+                    .eq('id', sid)
+                    .eq('tenant_id', tenantId)
+                }
+                
+                // Emit via Socket.IO
+                const io = global.io
+                if (io) {
+                  io.emit('reconnect-failed', { sessionId: sid, tenantId })
+                }
+              }
+            )
           } else {
-            console.log('  ⚠️ WARNING: No message found with whatsapp_message_id:', message.id._serialized)
-            console.log('  ⚠️ Possible reasons:')
-            console.log('     1. Message ID format mismatch')
-            console.log('     2. Message not yet saved to database')
-            console.log('     3. Message is from customer (no whatsapp_message_id)')
-            console.log('     4. This is an incoming message, not outgoing')
+            console.log(`🚫 Not reconnecting session ${sessionKey} (logged out)`)
           }
-        } else {
-          console.log('  ⚠️ Supabase not configured')
+        } else if (connection === 'open') {
+          console.log(`✅ Session connected: ${sessionKey}`)
+          console.log(`📊 Updating database for session: ${sessionId}, tenant: ${tenantId}`)
+          
+          // Reset reconnect attempts on successful connection
+          reconnectManager.resetAttempts(sessionId)
+          
+          // Get phone number from Baileys
+          const phoneNumber = sock.user?.id?.split(':')[0] || null
+          console.log(`📱 Phone number detected: ${phoneNumber}`)
+          console.log(`📱 Formatted phone: +${phoneNumber}`)
+          
+          // IMPORTANT: Update creds.me if not set (for auto-reconnect to work)
+          if (sock.user && (!state.creds.me || !state.creds.me.id)) {
+            console.log(`🔧 Updating creds.me for future auto-reconnect`)
+            state.creds.me = {
+              id: sock.user.id,
+              name: sock.user.name || sock.user.verifiedName || 'WhatsApp User',
+              lid: sock.user.lid || sock.user.id
+            }
+            // Save credentials immediately
+            await saveCreds()
+            console.log(`✅ Credentials updated and saved`)
+          }
+          
+          // Update session manager
+          sessionManager.updateStatus(tenantId, sessionId, 'active')
+          
+          // Update database with phone number
+          if (supabase) {
+            console.log(`💾 Attempting to update database...`)
+            const updateResult = await supabase
+              .from('whatsapp_sessions')
+              .update({ 
+                status: 'connected',
+                phone_number: phoneNumber ? `+${phoneNumber}` : null,
+                metadata: { lastConnected: new Date().toISOString() }
+              })
+              .eq('id', sessionId)
+              .eq('tenant_id', tenantId)
+            
+            if (updateResult.error) {
+              console.error(`❌ Failed to update phone number in database:`, updateResult.error)
+              console.error(`❌ Error details:`, JSON.stringify(updateResult.error, null, 2))
+            } else {
+              console.log(`✅ Phone number updated in database: +${phoneNumber}`)
+              console.log(`✅ Status updated to: connected`)
+              console.log(`✅ Update result:`, updateResult)
+            }
+          } else {
+            console.warn(`⚠️  Supabase not configured, phone number not saved to database`)
+          }
+          
+          // Emit via Socket.IO
+          const io = global.io
+          if (io) {
+            io.emit('connected', { sessionId, tenantId, phoneNumber })
+          }
+          
+          // Clear QR code AFTER updating database
+          // This ensures frontend can detect the connection first
+          // Increased delay to ensure UI has time to process
+          setTimeout(() => {
+            this.qrCodes.delete(sessionKey)
+            this.qrCodes.delete(sessionId) // Also delete sessionId key
+            console.log(`🗑️ QR code cleared for session: ${sessionKey} and ${sessionId}`)
+          }, 5000) // Increased from 2s to 5s
+        } else if (connection === 'connecting') {
+          console.log(`🔄 Session connecting: ${sessionKey}`)
+          sessionManager.updateStatus(tenantId, sessionId, 'connecting')
         }
-      } catch (error) {
-        console.error('  ❌ Error updating message status:', error)
-      }
-      
-      const io = global.io
-      if (io) {
-        io.emit('message_status', {
-          sessionId,
-          messageId: message.id._serialized,
-          status
-        })
-        console.log('  ✓ Emitted message_status event via Socket.IO')
-      }
-    })
+      })
 
-    // Initialize
-    await client.initialize()
+      // Handle credentials update
+      sock.ev.on('creds.update', saveCreds)
 
-    console.log('✓ WhatsApp client initialized for session:', sessionId)
-    console.log('✓ Event listeners registered: qr, ready, disconnected, message, message_ack')
+      // Handle incoming messages
+      sock.ev.on('messages.upsert', async ({ messages, type }) => {
+        if (type !== 'notify') return
 
-    this.initializingClients.delete(sessionId)
-    return client
-  } catch (error) {
-    console.error('Failed to initialize client:', error)
-    this.initializingClients.delete(sessionId)
-    this.clients.delete(sessionId)
-    throw error
-  }
-}
+        for (const msg of messages) {
+          // Skip if message is from me or status broadcast
+          if (msg.key.fromMe || msg.key.remoteJid === 'status@broadcast') continue
 
-  async sendMessage(sessionId, to, message) {
-    let client = this.clients.get(sessionId)
-    
-    if (!client) {
-      console.error('Session not found:', sessionId)
-      
-      // Try to initialize if not found
-      console.log('Attempting to initialize session:', sessionId)
-      try {
-        client = await this.initializeClient(sessionId)
-      } catch (error) {
-        throw new Error('Session not found and failed to initialize: ' + error.message)
-      }
-    }
+          console.log('📨 New message received:', {
+            from: msg.key.remoteJid,
+            messageId: msg.key.id,
+            hasMessage: !!msg.message,
+            messageKeys: msg.message ? Object.keys(msg.message) : []
+          })
 
-    try {
-      // Validate and format phone number
-      let phoneNumber = to.replace('@c.us', '')
-      
-      // Remove any non-digit characters
-      phoneNumber = phoneNumber.replace(/\D/g, '')
-      
-      // Validate phone number length (Indonesian: 10-13 digits after country code)
-      if (phoneNumber.length < 10 || phoneNumber.length > 15) {
-        throw new Error(`Invalid phone number format: ${phoneNumber}. Expected 10-15 digits, got ${phoneNumber.length}`)
-      }
-      
-      console.log('Formatted phone number:', phoneNumber)
-      
-      const chatId = `${phoneNumber}@c.us`
-      
-      // Check if client is ready
-      let state
-      try {
-        state = await client.getState()
-        console.log('Client state:', state)
-      } catch (stateError) {
-        console.error('Failed to get client state:', stateError.message)
-        throw new Error('Client state check failed. Session may be disconnected.')
-      }
-      
-      if (state !== 'CONNECTED') {
-        console.error('Client not connected. State:', state)
-        
-        // Try to reinitialize
-        console.log('Reinitializing client due to disconnected state...')
-        this.clients.delete(sessionId)
-        client = await this.initializeClient(sessionId)
-        
-        throw new Error(`WhatsApp client reconnecting. Please wait 10 seconds and try again.`)
-      }
-      
-      const result = await client.sendMessage(chatId, message)
-      
-      return { 
-        success: true,
-        messageId: result.id._serialized
-      }
+          // Update session activity
+          sessionManager.updateActivity(tenantId, sessionId, 'message')
+
+          // Save to database
+          try {
+            await this.saveIncomingMessage(sessionId, msg, tenantId)
+          } catch (error) {
+            console.error('❌ Error processing message:', error)
+            sessionManager.updateActivity(tenantId, sessionId, 'error')
+          }
+
+          // Emit via Socket.IO
+          const io = global.io
+          if (io) {
+            io.emit('message', {
+              sessionId,
+              tenantId,
+              from: msg.key.remoteJid,
+              message: msg
+            })
+          }
+        }
+      })
+
+      // Handle message updates (read receipts, delivery, etc)
+      sock.ev.on('messages.update', async (updates) => {
+        for (const update of updates) {
+          if (update.update.status) {
+            const status = this.mapBaileysStatus(update.update.status)
+            
+            // Update in database
+            if (supabase) {
+              await supabase
+                .from('messages')
+                .update({ status })
+                .eq('whatsapp_message_id', update.key.id)
+            }
+
+            // Emit via Socket.IO
+            const io = global.io
+            if (io) {
+              io.emit('message_status', {
+                sessionId,
+                messageId: update.key.id,
+                status
+              })
+            }
+          }
+        }
+      })
+
+      return this.sessions.get(sessionId)
+
     } catch (error) {
-      console.error('Error sending message:', error.message)
-      
-      // Handle "No LID for user" error
-      if (error.message.includes('No LID for user')) {
-        console.error('❌ LID Error: Session not fully initialized')
-        console.error('   This usually means:')
-        console.error('   1. Session just connected - wait 15-30 seconds')
-        console.error('   2. Contact list not loaded yet')
-        console.error('   3. Session needs to be restarted')
-        console.error('')
-        console.error('   Quick fix: Restart WhatsApp service and wait 30 seconds after QR scan')
-        
-        throw new Error('Session belum siap. Tunggu 30 detik setelah scan QR code, atau restart WhatsApp service.')
-      }
-      
-      // If detached frame or evaluation error, reinitialize
-      if (error.message.includes('detached Frame') || 
-          error.message.includes('evaluate') ||
-          error.message.includes('Execution context')) {
-        console.log('Frame/context error detected, reinitializing client...')
-        this.clients.delete(sessionId)
-        
-        // Try to reinitialize in background
-        this.initializeClient(sessionId).catch(err => {
-          console.error('Background reinitialization failed:', err.message)
-        })
-        
-        throw new Error('WhatsApp session disconnected. Reconnecting... Please try again in 10 seconds.')
-      }
-      
+      console.error('❌ Failed to initialize session:', error)
+      this.sessions.delete(sessionId)
       throw error
     }
   }
 
-  async disconnectSession(sessionId) {
-    const client = this.clients.get(sessionId)
-    
-    if (client) {
-      // Mark as manual disconnect to prevent auto-reconnect
-      if (supabase) {
-        await supabase
-          .from('whatsapp_sessions')
-          .update({ status: 'disconnected' })
-          .eq('id', sessionId)
+  /**
+   * Send text message
+   */
+  async sendMessage(sessionId, to, message, quotedMessageId = null, tenantId = null) {
+    // Get tenant_id from parameter or database
+    if (!tenantId) {
+      if (!supabase) {
+        console.warn(`⚠️  Supabase not configured, using default tenant_id`)
+        tenantId = process.env.DEFAULT_TENANT_ID || '00000000-0000-0000-0000-000000000001'
+      } else {
+        try {
+          const { data, error } = await supabase
+            .from('whatsapp_sessions')
+            .select('tenant_id')
+            .eq('id', sessionId)
+            .single()
+          
+          if (error) {
+            console.warn(`⚠️  Failed to get tenant_id from database, using default:`, error.message)
+            tenantId = process.env.DEFAULT_TENANT_ID || '00000000-0000-0000-0000-000000000001'
+          } else {
+            tenantId = data.tenant_id
+          }
+        } catch (error) {
+          console.warn(`⚠️  Error querying tenant_id, using default:`, error.message)
+          tenantId = process.env.DEFAULT_TENANT_ID || '00000000-0000-0000-0000-000000000001'
+        }
       }
-      
-      await client.destroy()
-      this.clients.delete(sessionId)
     }
-    
-    return { success: true }
-  }
 
-  getSessionStatus(sessionId) {
-    const client = this.clients.get(sessionId)
+    const sessionKey = this.getSessionKey(tenantId, sessionId)
+    const session = this.sessions.get(sessionKey)
     
-    if (!client) {
-      return 'disconnected'
-    }
-    
-    return 'connected'
-  }
-
-  getAllSessions() {
-    return Array.from(this.clients.keys())
-  }
-
-  async getMessageInfo(sessionId, messageId) {
-    const client = this.clients.get(sessionId)
-    
-    if (!client) {
+    if (!session) {
+      console.error(`❌ Session not found: ${sessionKey}`)
+      console.log(`📋 Available sessions:`, Array.from(this.sessions.keys()))
       throw new Error('Session not found: ' + sessionId)
     }
 
+    const { sock } = session
+
     try {
-      // Get message by ID
-      const message = await client.getMessageById(messageId)
+      // Format phone number (remove @c.us if present)
+      let phoneNumber = to.replace('@c.us', '').replace(/\D/g, '')
       
-      if (!message) {
-        return {
-          found: false,
-          messageId
+      // Validate
+      if (phoneNumber.length < 10 || phoneNumber.length > 15) {
+        throw new Error(`Invalid phone number: ${phoneNumber}`)
+      }
+
+      // Baileys format: number@s.whatsapp.net
+      const jid = `${phoneNumber}@s.whatsapp.net`
+
+      // Prepare message content
+      const messageContent = { text: message }
+
+      // Add quoted message if provided
+      if (quotedMessageId && supabase) {
+        try {
+          // Get the original message from database to get the raw message object
+          const { data: quotedMsg } = await supabase
+            .from('messages')
+            .select('metadata, content, is_from_me, whatsapp_message_id, message_type')
+            .eq('whatsapp_message_id', quotedMessageId)
+            .single()
+          
+          if (quotedMsg && quotedMsg.metadata?.raw_message) {
+            // Use the stored raw message for proper quoting
+            const rawMsg = quotedMsg.metadata.raw_message
+            
+            // For Baileys, we need to pass the message as contextInfo
+            // This is the proper way to quote messages in Baileys
+            messageContent.contextInfo = {
+              stanzaId: rawMsg.key.id,
+              participant: rawMsg.key.fromMe ? undefined : rawMsg.key.remoteJid,
+              quotedMessage: rawMsg.message
+            }
+          } else if (quotedMsg) {
+            // Fallback: create a simple quoted message using contextInfo
+            messageContent.contextInfo = {
+              stanzaId: quotedMessageId,
+              participant: quotedMsg.is_from_me ? undefined : jid,
+              quotedMessage: {
+                conversation: quotedMsg.content || ''
+              }
+            }
+          }
+        } catch (err) {
+          // Silent fail - just send without quote if error
         }
       }
 
-      // Get ACK status
-      let status = 'sent'
-      if (message.ack === 3) status = 'delivered'
-      if (message.ack === 4) status = 'read'
-      if (message.ack === 0) status = 'failed'
+      // Send message
+      const result = await sock.sendMessage(jid, messageContent)
 
       return {
-        found: true,
-        messageId: message.id._serialized,
-        ack: message.ack,
-        status,
-        timestamp: message.timestamp,
-        from: message.from,
-        to: message.to,
-        body: message.body
+        success: true,
+        messageId: result.key.id
       }
     } catch (error) {
-      console.error('Error getting message info:', error)
+      console.error('❌ Failed to send message:', error)
       throw error
     }
   }
 
-  async saveIncomingMessage(sessionId, message, pushname = null) {
-    if (!supabase) {
-      console.log('Supabase not configured, skipping message save')
-      return
+  /**
+   * Send media message
+   */  /**
+   * Send media message
+   */
+  async sendMedia(sessionId, to, mediaBuffer, options = {}, tenantId = null) {
+    // Get tenant_id from parameter or database
+    if (!tenantId) {
+      if (!supabase) {
+        console.warn(`⚠️  Supabase not configured, using default tenant_id`)
+        tenantId = process.env.DEFAULT_TENANT_ID || '00000000-0000-0000-0000-000000000001'
+      } else {
+        try {
+          const { data, error } = await supabase
+            .from('whatsapp_sessions')
+            .select('tenant_id')
+            .eq('id', sessionId)
+            .single()
+          
+          if (error) {
+            console.warn(`⚠️  Failed to get tenant_id from database, using default:`, error.message)
+            tenantId = process.env.DEFAULT_TENANT_ID || '00000000-0000-0000-0000-000000000001'
+          } else {
+            tenantId = data.tenant_id
+          }
+        } catch (error) {
+          console.warn(`⚠️  Error querying tenant_id, using default:`, error.message)
+          tenantId = process.env.DEFAULT_TENANT_ID || '00000000-0000-0000-0000-000000000001'
+        }
+      }
     }
 
+    const sessionKey = this.getSessionKey(tenantId, sessionId)
+    const session = this.sessions.get(sessionKey)
+    
+    if (!session) {
+      throw new Error('Session not found: ' + sessionId)
+    }
+
+    const { sock } = session
+
     try {
-      // Get user_id from whatsapp_sessions
-      const { data: session } = await supabase
+      let phoneNumber = to.replace('@c.us', '').replace(/\D/g, '')
+      const jid = `${phoneNumber}@s.whatsapp.net`
+
+      const { mimetype, caption, filename } = options
+
+      let messageContent = {}
+
+      if (mimetype.startsWith('image/')) {
+        messageContent = {
+          image: mediaBuffer,
+          caption: caption || ''
+        }
+      } else if (mimetype.startsWith('video/')) {
+        messageContent = {
+          video: mediaBuffer,
+          caption: caption || ''
+        }
+      } else if (mimetype.startsWith('audio/')) {
+        messageContent = {
+          audio: mediaBuffer,
+          mimetype
+        }
+      } else {
+        // For documents, caption is not directly supported by WhatsApp
+        // We'll send the document first, then send caption as a separate message if provided
+        messageContent = {
+          document: mediaBuffer,
+          mimetype,
+          fileName: filename || 'document'
+        }
+      }
+
+      const result = await sock.sendMessage(jid, messageContent)
+
+      // If it's a document and has caption, send caption as separate message
+      if (!mimetype.startsWith('image/') && 
+          !mimetype.startsWith('video/') && 
+          !mimetype.startsWith('audio/') && 
+          caption && caption.trim()) {
+        // Send caption as a separate text message
+        await sock.sendMessage(jid, { text: caption })
+      }
+
+      return {
+        success: true,
+        messageId: result.key.id
+      }
+    } catch (error) {
+      console.error('❌ Failed to send media:', error)
+      throw error
+    }
+  }
+
+  /**
+   * Send location message
+   */
+  async sendLocation(sessionId, to, latitude, longitude, options = {}, tenantId = null) {
+    // Get tenant_id from parameter or database
+    if (!tenantId) {
+      if (!supabase) {
+        console.warn(`⚠️  Supabase not configured, using default tenant_id`)
+        tenantId = process.env.DEFAULT_TENANT_ID || '00000000-0000-0000-0000-000000000001'
+      } else {
+        try {
+          const { data, error } = await supabase
+            .from('whatsapp_sessions')
+            .select('tenant_id')
+            .eq('id', sessionId)
+            .single()
+          
+          if (error) {
+            console.warn(`⚠️  Failed to get tenant_id from database, using default:`, error.message)
+            tenantId = process.env.DEFAULT_TENANT_ID || '00000000-0000-0000-0000-000000000001'
+          } else {
+            tenantId = data.tenant_id
+          }
+        } catch (error) {
+          console.warn(`⚠️  Error querying tenant_id, using default:`, error.message)
+          tenantId = process.env.DEFAULT_TENANT_ID || '00000000-0000-0000-0000-000000000001'
+        }
+      }
+    }
+
+    const sessionKey = this.getSessionKey(tenantId, sessionId)
+    const session = this.sessions.get(sessionKey)
+    
+    if (!session) {
+      throw new Error('Session not found: ' + sessionId)
+    }
+
+    const { sock } = session
+
+    try {
+      let phoneNumber = to.replace('@c.us', '').replace(/\D/g, '')
+      const jid = `${phoneNumber}@s.whatsapp.net`
+
+      const { address, name } = options
+
+      const locationMessage = {
+        location: {
+          degreesLatitude: latitude,
+          degreesLongitude: longitude,
+          name: name || null,
+          address: address || null
+        }
+      }
+
+      const result = await sock.sendMessage(jid, locationMessage)
+
+      return {
+        success: true,
+        messageId: result.key.id
+      }
+    } catch (error) {
+      console.error('❌ Failed to send location:', error)
+      throw error
+    }
+  }
+
+  /**
+   * Disconnect session
+   */
+  async disconnectSession(sessionId) {
+    // Get tenant_id from database if needed
+    let tenantId = null
+    if (supabase) {
+      try {
+        const { data, error } = await supabase
+          .from('whatsapp_sessions')
+          .select('tenant_id')
+          .eq('id', sessionId)
+          .single()
+        
+        if (!error && data) {
+          tenantId = data.tenant_id
+        }
+      } catch (error) {
+        // Ignore error, continue with sessionId only
+        console.warn(`⚠️  Could not get tenant_id, continuing anyway:`, error.message)
+      }
+    }
+
+    const sessionKey = tenantId ? this.getSessionKey(tenantId, sessionId) : sessionId
+    const session = this.sessions.get(sessionKey)
+    
+    if (session) {
+      const { sock } = session
+      
+      // Update database first
+      if (supabase) {
+        await supabase
+          .from('whatsapp_sessions')
+          .update({ status: 'disconnected' })
+          .eq('id', sessionId)
+      }
+
+      // Logout from WhatsApp
+      await sock.logout()
+      
+      // Remove from memory
+      this.sessions.delete(sessionId)
+      this.qrCodes.delete(sessionId)
+    }
+
+    return { success: true }
+  }
+
+  /**
+   * Force delete session (remove auth files)
+   */
+  async forceDeleteSession(sessionId) {
+    // Get tenant_id from database if needed
+    let tenantId = null
+    try {
+      const { data, error } = await supabase
+        .from('whatsapp_sessions')
+        .select('tenant_id')
+        .eq('id', sessionId)
+        .single()
+      
+      if (!error && data) {
+        tenantId = data.tenant_id
+      }
+    } catch (error) {
+      // Ignore error, continue with sessionId only
+    }
+
+    const sessionKey = tenantId ? this.getSessionKey(tenantId, sessionId) : sessionId
+
+    // Disconnect if connected
+    if (this.sessions.has(sessionKey)) {
+      const { sock } = this.sessions.get(sessionKey)
+      try {
+        await sock.logout()
+      } catch (error) {
+        console.log('Error during logout:', error.message)
+      }
+      this.sessions.delete(sessionKey)
+    }
+
+    // Delete auth files
+    const authPath = path.join(this.authDir, sessionId)
+    if (fs.existsSync(authPath)) {
+      fs.rmSync(authPath, { recursive: true, force: true })
+    }
+
+    // Delete from database
+    if (supabase) {
+      await supabase
+        .from('whatsapp_sessions')
+        .delete()
+        .eq('id', sessionId)
+    }
+
+    // Delete QR codes (both keys)
+    this.qrCodes.delete(sessionKey)
+    this.qrCodes.delete(sessionId)
+    console.log(`🗑️ QR codes deleted for: ${sessionKey} and ${sessionId}`)
+
+    return { success: true }
+  }
+
+  /**
+   * Get session status
+   */
+  async getSessionStatus(sessionId) {
+    // IMPORTANT: Always get status from database first
+    // Memory status might be stale or from old session
+    if (supabase) {
+      try {
+        const { data, error } = await supabase
+          .from('whatsapp_sessions')
+          .select('status, tenant_id')
+          .eq('id', sessionId)
+          .single()
+        
+        if (!error && data) {
+          console.log(`📊 Session status from DB: ${data.status}`)
+          return data.status
+        }
+      } catch (error) {
+        console.warn(`⚠️  Failed to get status from DB, checking memory`)
+      }
+    }
+
+    // Fallback: check memory (only if DB query failed)
+    let tenantId = null
+    try {
+      const { data, error } = await supabase
+        .from('whatsapp_sessions')
+        .select('tenant_id')
+        .eq('id', sessionId)
+        .single()
+      
+      if (!error && data) {
+        tenantId = data.tenant_id
+      }
+    } catch (error) {
+      // Ignore error
+    }
+
+    // Try with sessionKey first
+    const sessionKey = tenantId ? this.getSessionKey(tenantId, sessionId) : null
+    
+    if (sessionKey && this.sessions.has(sessionKey)) {
+      return 'connected'
+    }
+    
+    // Fallback: try with sessionId only
+    return this.sessions.has(sessionId) ? 'connected' : 'disconnected'
+  }
+
+  /**
+   * Get QR code for session
+   */
+  async getQRCode(sessionId) {
+    // Try to get tenant_id from database
+    let tenantId = null
+    if (supabase) {
+      try {
+        const { data, error } = await supabase
+          .from('whatsapp_sessions')
+          .select('tenant_id')
+          .eq('id', sessionId)
+          .single()
+        
+        if (!error && data) {
+          tenantId = data.tenant_id
+        }
+      } catch (error) {
+        // Ignore error, try with sessionId only
+      }
+    }
+
+    // Try with sessionKey first, then fallback to sessionId
+    const sessionKey = tenantId ? this.getSessionKey(tenantId, sessionId) : null
+    
+    console.log(`🔍 Looking for QR code:`, {
+      sessionId,
+      tenantId,
+      sessionKey,
+      hasQRWithKey: sessionKey ? this.qrCodes.has(sessionKey) : false,
+      hasQRWithId: this.qrCodes.has(sessionId),
+      totalQRs: this.qrCodes.size,
+      allKeys: Array.from(this.qrCodes.keys())
+    })
+    
+    if (sessionKey && this.qrCodes.has(sessionKey)) {
+      console.log(`✅ QR code found with sessionKey: ${sessionKey}`)
+      return this.qrCodes.get(sessionKey)
+    }
+    
+    // Fallback: try with sessionId only (for backward compatibility)
+    if (this.qrCodes.has(sessionId)) {
+      console.log(`✅ QR code found with sessionId: ${sessionId}`)
+      return this.qrCodes.get(sessionId)
+    }
+    
+    console.log(`❌ No QR code found for session: ${sessionId}`)
+    return null
+  }
+
+  /**
+   * Get all active sessions
+   */
+  getAllSessions() {
+    return Array.from(this.sessions.keys())
+  }
+
+  /**
+   * Get all stored QR codes (for debugging)
+   */
+  getAllQRCodes() {
+    const qrCodes = {}
+    for (const [key, qr] of this.qrCodes.entries()) {
+      qrCodes[key] = qr ? 'QR_EXISTS' : 'NULL'
+    }
+    return qrCodes
+  }
+
+  /**
+   * Map Baileys message status to our status
+   */
+  mapBaileysStatus(baileysStatus) {
+    // Baileys status: PENDING, SERVER_ACK, DELIVERY_ACK, READ, PLAYED
+    switch (baileysStatus) {
+      case 1: // PENDING
+        return 'sending'
+      case 2: // SERVER_ACK
+        return 'sent'
+      case 3: // DELIVERY_ACK
+        return 'delivered'
+      case 4: // READ
+      case 5: // PLAYED
+        return 'read'
+      default:
+        return 'sent'
+    }
+  }
+
+  /**
+   * Save incoming message to database
+   */
+  async saveIncomingMessage(sessionId, msg) {
+    if (!supabase) return
+
+    try {
+      // Get session user_id
+      const { data: session, error: sessionError } = await supabase
         .from('whatsapp_sessions')
         .select('user_id')
         .eq('id', sessionId)
         .single()
 
-      if (!session) {
-        console.error('Session not found:', sessionId)
+      if (sessionError || !session) {
+        console.error('  ❌ Session not found in database:', sessionId, sessionError)
         return
       }
 
       const userId = session.user_id
+      console.log(`  👤 User ID: ${userId}`)
 
-      // Extract phone number from message.from (format: 6285155046155@c.us)
-      const rawFrom = message.from
-      console.log('  📱 Raw message.from:', rawFrom)
-      
-      const phoneNumber = rawFrom.split('@')[0]
-      console.log('  📱 Extracted phone number:', phoneNumber)
-      
-      // Validate phone number length
-      if (phoneNumber.length < 10 || phoneNumber.length > 15) {
-        console.error('  ❌ Invalid phone number length:', phoneNumber.length)
-        console.error('  ❌ Phone number:', phoneNumber)
-        return
-      }
-      
-      // Format with + prefix
+      // Extract phone number from JID (format: 6285xxx@s.whatsapp.net)
+      const phoneNumber = msg.key.remoteJid.split('@')[0]
       const formattedPhone = phoneNumber.startsWith('62') ? `+${phoneNumber}` : `+62${phoneNumber}`
-      
-      console.log('  📞 Processing contact:', {
-        raw: rawFrom,
-        extracted: phoneNumber,
-        formatted: formattedPhone,
-        length: formattedPhone.length,
-        pushname: pushname
-      })
 
-      // 1. Find or create contact WITH pushname
+      // Get pushname (contact name from WhatsApp)
+      const pushname = msg.pushName || null
+
+      // Find or create contact
       let { data: contact } = await supabase
         .from('contacts')
         .select('id, name')
@@ -545,167 +1015,372 @@ class WhatsAppService {
         .single()
 
       if (!contact) {
-        // Create new contact WITH name from WhatsApp pushname
-        console.log('  ➕ Creating new contact with pushname:', pushname)
-        const { data: newContact, error: contactError } = await supabase
+        // Get default tenant ID from environment
+        const defaultTenantId = process.env.DEFAULT_TENANT_ID || '00000000-0000-0000-0000-000000000001';
+        
+        const { data: newContact } = await supabase
           .from('contacts')
           .insert({
             user_id: userId,
             phone_number: formattedPhone,
-            name: pushname  // Auto-save name from WhatsApp
+            name: pushname,
+            tenant_id: defaultTenantId
           })
           .select()
           .single()
-
-        if (contactError) {
-          console.error('Error creating contact:', contactError)
-          throw contactError
-        }
         contact = newContact
-        console.log('  ✅ Contact created with name:', pushname)
-      } else {
-        // Update existing contact if name is empty and pushname is available
-        if (pushname && (!contact.name || contact.name.trim() === '')) {
-          console.log('  📝 Updating contact name from pushname:', pushname)
-          const { error: updateError } = await supabase
-            .from('contacts')
-            .update({ name: pushname })
-            .eq('id', contact.id)
-          
-          if (updateError) {
-            console.error('  ❌ Error updating contact name:', updateError)
-          } else {
-            console.log('  ✅ Contact name updated to:', pushname)
-            contact.name = pushname
-          }
-        } else if (contact.name) {
-          console.log('  ℹ️ Contact already has name:', contact.name)
-        }
+      } else if (pushname && !contact.name) {
+        await supabase
+          .from('contacts')
+          .update({ name: pushname })
+          .eq('id', contact.id)
       }
 
-      // 2. Find or create conversation
-      // Only look for open conversations to avoid duplicates
+      // Find or create conversation
       let { data: conversations } = await supabase
         .from('conversations')
-        .select('id, status, workflow_status')
-        .eq('whatsapp_session_id', sessionId)
+        .select('id, status, workflow_status, whatsapp_session_id')
         .eq('contact_id', contact.id)
         .eq('status', 'open')
         .order('created_at', { ascending: false })
         .limit(1)
 
-      let conversation = conversations && conversations.length > 0 ? conversations[0] : null
+      let conversation = conversations?.[0]
+      
+      // Auto-assign conversation to current session if:
+      // 1. Conversation exists but has no session assigned, OR
+      // 2. Conversation's session is different from current session
+      if (conversation && conversation.whatsapp_session_id !== sessionId) {
+        console.log(`  🔄 Auto-assigning conversation ${conversation.id} to session ${sessionId}`)
+        await supabase
+          .from('conversations')
+          .update({ whatsapp_session_id: sessionId })
+          .eq('id', conversation.id)
+        
+        conversation.whatsapp_session_id = sessionId
+      }
+
+      // Extract message content
+      const messageText = msg.message?.conversation || 
+                         msg.message?.extendedTextMessage?.text ||
+                         msg.message?.imageMessage?.caption ||
+                         msg.message?.videoMessage?.caption ||
+                         msg.message?.documentMessage?.caption ||
+                         msg.message?.documentWithCaptionMessage?.message?.documentMessage?.caption ||
+                         null
+
+      // Extract quoted message ID if this is a reply
+      let quotedMessageId = null
+      if (msg.message?.extendedTextMessage?.contextInfo?.stanzaId) {
+        quotedMessageId = msg.message.extendedTextMessage.contextInfo.stanzaId
+      }
 
       if (!conversation) {
-        // Create new conversation with unread_count = 1
+        // Get default tenant ID from environment
+        const defaultTenantId = process.env.DEFAULT_TENANT_ID || '00000000-0000-0000-0000-000000000001';
+        
         const { data: newConv, error: convError } = await supabase
           .from('conversations')
           .insert({
             whatsapp_session_id: sessionId,
             contact_id: contact.id,
+            tenant_id: defaultTenantId,
             status: 'open',
             read_status: 'unread',
             unread_count: 1,
-            last_message: message.body,
-            last_message_at: new Date(message.timestamp * 1000).toISOString()
+            last_message: messageText || '[Media]',
+            last_message_at: new Date(msg.messageTimestamp * 1000).toISOString()
           })
           .select()
           .single()
-
-        if (convError) {
-          console.error('Error creating conversation:', convError)
-          throw convError
+        
+        if (convError || !newConv) {
+          console.error('  ❌ Failed to create conversation:', convError)
+          return
         }
+        
         conversation = newConv
       } else {
-        // Get current unread_count and status
+        // Update conversation
         const { data: currentConv } = await supabase
           .from('conversations')
-          .select('unread_count, read_status, status, workflow_status')
+          .select('unread_count, status, workflow_status')
           .eq('id', conversation.id)
           .single()
-        
-        const currentCount = currentConv?.unread_count || 0
-        const currentReadStatus = currentConv?.read_status || 'unread'
+
         const isClosed = currentConv?.status === 'closed' || currentConv?.workflow_status === 'done'
-        
-        console.log('  📊 Current conversation state:', {
-          id: conversation.id,
-          currentCount,
-          currentReadStatus,
-          isClosed
-        })
-        
-        // ALWAYS increment unread_count for incoming messages (don't check read_status)
-        // Agent will mark as read when they view the conversation
-        const newCount = currentCount + 1
-        const newReadStatus = 'unread'
-        
-        console.log('  ➕ Incrementing unread_count:', {
-          from: currentCount,
-          to: newCount
-        })
-        
-        // Prepare update data
         const updateData = {
-          last_message: message.body,
-          last_message_at: new Date(message.timestamp * 1000).toISOString(),
-          read_status: newReadStatus,
-          unread_count: newCount
+          last_message: messageText || '[Media]',
+          last_message_at: new Date(msg.messageTimestamp * 1000).toISOString(),
+          read_status: 'unread',
+          unread_count: (currentConv?.unread_count || 0) + 1
         }
-        
-        // If conversation was closed, reopen it and reset workflow
+
         if (isClosed) {
-          console.log('  ⚠️ Conversation was closed, reopening...')
           updateData.status = 'open'
           updateData.workflow_status = 'incoming'
           updateData.closed_at = null
-          updateData.closed_by = null
-          updateData.workflow_completed_at = null
-          updateData.assigned_to = null // Unassign so it goes back to pool
+          updateData.assigned_to = null
         }
-        
-        // Update conversation
-        const { error: updateError } = await supabase
+
+        await supabase
           .from('conversations')
           .update(updateData)
           .eq('id', conversation.id)
+      }
+
+      // Handle media
+      let mediaUrl = null
+      let mediaType = null
+      let mediaFilename = null
+      let mediaSize = null
+      let mediaMimeType = null
+      let messageType = 'text'
+      let locationContent = null // For storing lat,lng
+
+      // Log message structure for debugging
+      if (msg.message) {
+        console.log('  📋 Message structure:', Object.keys(msg.message))
+      }
+
+      // Check for media and download
+      const session_sock = this.sessions.get(sessionId)
+      
+      // Helper function to download and upload media
+      const downloadAndUploadMedia = async (msg, type, mimetype, filename = null) => {
+        try {
+          // Download media using Baileys downloadMediaMessage
+          const { downloadMediaMessage } = await import('@whiskeysockets/baileys')
+          const buffer = await downloadMediaMessage(
+            msg,
+            'buffer',
+            {},
+            {
+              logger: pino({ level: 'silent' }),
+              reuploadRequest: session_sock.sock.updateMediaMessage
+            }
+          )
           
-        if (updateError) {
-          console.error('  ❌ Error updating conversation:', updateError)
-        } else {
-          console.log('  ✅ Conversation updated successfully')
+          if (buffer) {
+            // Generate filename if not provided
+            const timestamp = Date.now()
+            const ext = mimetype.split('/')[1]?.split(';')[0] || 'bin'
+            
+            // If filename is provided, add timestamp to make it unique
+            let generatedFilename
+            if (filename) {
+              const nameParts = filename.split('.')
+              const extension = nameParts.pop()
+              const baseName = nameParts.join('.')
+              generatedFilename = `${baseName}_${timestamp}.${extension}`
+            } else {
+              generatedFilename = `${type}_${timestamp}.${ext}`
+            }
+            
+            // Upload to Supabase Storage
+            const filePath = `${userId}/${conversation.id}/${generatedFilename}`
+            
+            const { data: uploadData, error: uploadError } = await supabase.storage
+              .from('chat-media')
+              .upload(filePath, buffer, {
+                contentType: mimetype,
+                upsert: false
+              })
+            
+            if (uploadError) {
+              console.error('  ❌ Upload error:', uploadError)
+              return null
+            } else {
+              const { data: urlData } = supabase.storage
+                .from('chat-media')
+                .getPublicUrl(filePath)
+              
+              return {
+                url: urlData.publicUrl,
+                filename: generatedFilename,
+                size: buffer.length,
+                mimetype: mimetype
+              }
+            }
+          }
+        } catch (mediaError) {
+          console.error(`  ❌ ${type} download error:`, mediaError)
+          return null
         }
+      }
+      
+      // Handle different media types
+      if (msg.message?.imageMessage) {
+        messageType = 'image'
+        mediaType = 'image'
+        mediaMimeType = msg.message.imageMessage.mimetype || 'image/jpeg'
         
-        if (isClosed) {
-          console.log('  ✓ Conversation reopened and reset to incoming')
+        const result = await downloadAndUploadMedia(msg, 'image', mediaMimeType)
+        if (result) {
+          mediaUrl = result.url
+          mediaFilename = result.filename
+          mediaSize = result.size
+        }
+      } 
+      else if (msg.message?.videoMessage) {
+        messageType = 'video'
+        mediaType = 'video'
+        mediaMimeType = msg.message.videoMessage.mimetype || 'video/mp4'
+        
+        const result = await downloadAndUploadMedia(msg, 'video', mediaMimeType)
+        if (result) {
+          mediaUrl = result.url
+          mediaFilename = result.filename
+          mediaSize = result.size
+        }
+      } 
+      else if (msg.message?.audioMessage) {
+        messageType = 'audio'
+        mediaType = 'audio'
+        mediaMimeType = msg.message.audioMessage.mimetype || 'audio/ogg'
+        
+        const result = await downloadAndUploadMedia(msg, 'audio', mediaMimeType)
+        if (result) {
+          mediaUrl = result.url
+          mediaFilename = result.filename
+          mediaSize = result.size
+        }
+      } 
+      else if (msg.message?.documentMessage) {
+        console.log('  📄 Processing document message...')
+        messageType = 'document'
+        mediaType = 'document'
+        mediaMimeType = msg.message.documentMessage.mimetype || 'application/octet-stream'
+        const docFilename = msg.message.documentMessage.fileName || null
+        
+        console.log('  📄 Document info:', { mimetype: mediaMimeType, filename: docFilename })
+        
+        const result = await downloadAndUploadMedia(msg, 'document', mediaMimeType, docFilename)
+        if (result) {
+          mediaUrl = result.url
+          mediaFilename = result.filename
+          mediaSize = result.size
+          console.log('  ✅ Document uploaded:', { url: mediaUrl, filename: mediaFilename, size: mediaSize })
+        } else {
+          console.log('  ❌ Document upload failed')
         }
       }
-
-      // 3. Save message
-      const { error: msgError } = await supabase
-        .from('messages')
-        .insert({
-          conversation_id: conversation.id,
-          sender_type: 'customer',
-          content: message.body,
-          is_from_me: false,
-          status: 'delivered',
-          created_at: new Date(message.timestamp * 1000).toISOString()
-        })
-
-      if (msgError) {
-        console.error('Error saving message:', msgError)
-        throw msgError
+      else if (msg.message?.documentWithCaptionMessage) {
+        console.log('  📄 Processing documentWithCaptionMessage...')
+        messageType = 'document'
+        mediaType = 'document'
+        const docMsg = msg.message.documentWithCaptionMessage.message?.documentMessage
+        if (docMsg) {
+          mediaMimeType = docMsg.mimetype || 'application/octet-stream'
+          const docFilename = docMsg.fileName || null
+          
+          console.log('  📄 Document with caption info:', { mimetype: mediaMimeType, filename: docFilename, caption: messageText })
+          
+          // For documentWithCaptionMessage, we need to download using the original message
+          // but Baileys expects the documentMessage to be at the top level
+          // So we create a modified message structure
+          const modifiedMsg = {
+            ...msg,
+            message: msg.message.documentWithCaptionMessage.message
+          }
+          
+          const result = await downloadAndUploadMedia(modifiedMsg, 'document', mediaMimeType, docFilename)
+          if (result) {
+            mediaUrl = result.url
+            mediaFilename = result.filename
+            mediaSize = result.size
+            console.log('  ✅ Document with caption uploaded:', { url: mediaUrl, filename: mediaFilename, size: mediaSize })
+          } else {
+            console.log('  ❌ Document with caption upload failed')
+          }
+        } else {
+          console.log('  ❌ No documentMessage found in documentWithCaptionMessage')
+        }
+      }
+      else if (msg.message?.stickerMessage) {
+        messageType = 'image' // Treat sticker as image
+        mediaType = 'image'
+        mediaMimeType = msg.message.stickerMessage.mimetype || 'image/webp'
+        
+        const result = await downloadAndUploadMedia(msg, 'sticker', mediaMimeType)
+        if (result) {
+          mediaUrl = result.url
+          mediaFilename = result.filename
+          mediaSize = result.size
+        }
+      }
+      else if (msg.message?.locationMessage) {
+        messageType = 'location'
+        mediaType = 'location'
+        
+        const location = msg.message.locationMessage
+        const latitude = location.degreesLatitude
+        const longitude = location.degreesLongitude
+        const name = location.name || null
+        const address = location.address || null
+        
+        // Store coordinates in content field (format: "lat,lng")
+        locationContent = `${latitude},${longitude}`
+        
+        // Store Google Maps URL in media_url
+        mediaUrl = `https://www.google.com/maps?q=${latitude},${longitude}`
+        
+        // Store address in media_filename (if available)
+        mediaFilename = address || name || null
       }
 
-      console.log('✓ Message saved to database')
-      console.log('✓ Contact name:', contact.name || 'Not set')
+      // Save message
+      if (!conversation || !conversation.id) {
+        console.error('  ❌ Cannot save message: conversation is null or has no ID')
+        return
+      }
+      
+      // Get default tenant ID from environment
+      const defaultTenantId = process.env.DEFAULT_TENANT_ID || '00000000-0000-0000-0000-000000000001';
+      
+      const messageData = {
+        conversation_id: conversation.id,
+        sender_type: 'customer',
+        content: messageType === 'location' ? locationContent : messageText,
+        is_from_me: false,
+        status: 'delivered',
+        message_type: messageType,
+        media_url: mediaUrl,
+        media_type: mediaType,
+        media_filename: mediaFilename,
+        media_size: mediaSize,
+        media_mime_type: mediaMimeType,
+        whatsapp_message_id: msg.key.id,
+        quoted_message_id: quotedMessageId,
+        tenant_id: defaultTenantId,
+        created_at: new Date(msg.messageTimestamp * 1000).toISOString(),
+        // Store the raw message object in metadata for quoting later
+        metadata: {
+          raw_message: {
+            key: msg.key,
+            message: msg.message,
+            messageTimestamp: msg.messageTimestamp
+          }
+        }
+      }
+      
+      await supabase
+        .from('messages')
+        .insert(messageData)
+      
+      console.log('  ✅ Message saved to database:', {
+        id: messageData.whatsapp_message_id,
+        type: messageType,
+        hasMedia: !!mediaUrl,
+        content: messageText || '[no text]'
+      })
+
+      if (mediaUrl) {
+      }
     } catch (error) {
-      console.error('Error saving message to database:', error)
-      // Don't throw - just log, so service doesn't crash
+      console.error('❌ Error saving message:', error)
     }
   }
 }
 
-export default new WhatsAppService()
+export default new BaileysWhatsAppService()

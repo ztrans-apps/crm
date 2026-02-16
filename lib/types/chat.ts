@@ -70,9 +70,15 @@ export interface MediaAsset {
 }
 
 export interface MediaAttachment {
-  file: File
+  file?: File
   type: MediaType
   preview?: string
+  caption?: string // Caption text for media (like WhatsApp)
+  // For location type
+  latitude?: number
+  longitude?: number
+  address?: string
+  name?: string
 }
 
 // Filter types
@@ -87,7 +93,7 @@ export interface ConversationWithRelations extends Conversation {
 }
 
 // Extended message with relations
-export interface MessageWithRelations extends Message {
+export interface MessageWithRelations extends Omit<Message, 'media_url' | 'media_type' | 'media_filename' | 'media_size' | 'media_mime_type'> {
   sent_by_user?: {
     id: string
     full_name: string | null
@@ -99,6 +105,26 @@ export interface MessageWithRelations extends Message {
     name: string | null
     phone_number: string
   }
+  // Override media fields to allow undefined
+  media_url?: string | null | undefined
+  media_type?: MediaType | null | undefined
+  media_filename?: string | null | undefined
+  media_size?: number | null | undefined
+  media_mime_type?: string | null | undefined
+  // Quoted message
+  quoted_message?: {
+    id: string
+    content: string | null
+    sender_type: 'customer' | 'agent' | 'bot'
+    is_from_me: boolean
+    contact?: {
+      name: string | null
+      phone_number: string
+    }
+    sent_by_user?: {
+      full_name: string | null
+    }
+  } | null
 }
 
 // Response window status

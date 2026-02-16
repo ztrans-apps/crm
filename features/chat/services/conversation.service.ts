@@ -27,13 +27,16 @@ export class ConversationService extends BaseService {
         .select(`
           *,
           contact:contacts!inner(id, name, phone_number, email, metadata),
-          whatsapp_session:whatsapp_sessions(id)
+          whatsapp_session:whatsapp_sessions(id),
+          assigned_agent:profiles!conversations_assigned_to_fkey(id, full_name, email)
         `)
 
       // Apply role-based filtering
       if (role === 'agent') {
-        // Agents see: unassigned OR assigned to them
-        query = query.or(`assigned_to.eq.${userId},assigned_to.is.null`)
+        // Agents see:
+        // 1. Conversations assigned to them
+        // 2. Unassigned conversations (incoming/waiting status only)
+        query = query.or(`and(assigned_to.eq.${userId}),and(assigned_to.is.null,workflow_status.in.(incoming,waiting))`)
       }
       // Owners and supervisors see all (no filter)
 
@@ -95,8 +98,9 @@ export class ConversationService extends BaseService {
         .from('conversations')
         .select(`
           *,
-          contact:contacts!inner(name, phone_number, metadata),
-          whatsapp_session:whatsapp_sessions(id)
+          contact:contacts!inner(id, name, phone_number, email, metadata),
+          whatsapp_session:whatsapp_sessions(id),
+          assigned_agent:profiles!conversations_assigned_to_fkey(id, full_name, email)
         `)
         .eq('id', conversationId)
         .single()
@@ -179,7 +183,6 @@ export class ConversationService extends BaseService {
         .update({
           assigned_to: agentId,
           assignment_method: 'manual',
-          picked_at: new Date().toISOString(),
           workflow_status: 'waiting',
           updated_at: new Date().toISOString(),
         })
@@ -209,7 +212,6 @@ export class ConversationService extends BaseService {
         .update({
           assigned_to: agentId,
           assignment_method: 'manual',
-          assigned_at: new Date().toISOString(),
           workflow_status: 'waiting',
           updated_at: new Date().toISOString(),
         })
@@ -242,36 +244,40 @@ export class ConversationService extends BaseService {
         reason,
       })
 
+      // Update conversation
       // @ts-ignore
-      const { error } = await this.supabase
+      const { error: updateError } = await this.supabase
         .from('conversations')
         .update({
           assigned_to: toAgentId,
-          assignment_method: 'handover',
-          handover_from: fromAgentId,
-          handover_reason: reason || null,
-          handover_at: new Date().toISOString(),
+          assignment_method: 'manual',
           workflow_status: 'waiting',
           updated_at: new Date().toISOString(),
         })
         .eq('id', conversationId)
         .eq('assigned_to', fromAgentId) // Only if currently assigned to fromAgent
 
-      if (error) {
-        this.handleError(error, 'ConversationService.handoverConversation')
+      if (updateError) {
+        this.handleError(updateError, 'ConversationService.handoverConversation')
       }
 
-      // Log handover in status history
+      // Log handover for tracking
       // @ts-ignore
-      await this.supabase
-        .from('conversation_status_history')
+      const { error: logError } = await this.supabase
+        .from('handover_logs')
         .insert({
           conversation_id: conversationId,
-          from_status: 'in_progress',
-          to_status: 'waiting',
-          changed_by: fromAgentId,
-          notes: `Handover to agent ${toAgentId}${reason ? ': ' + reason : ''}`,
+          from_agent_id: fromAgentId,
+          to_agent_id: toAgentId,
+          reason: reason || null,
+          handover_at: new Date().toISOString(),
+          tenant_id: this.defaultTenantId,
         })
+
+      if (logError) {
+        console.error('Failed to log handover:', logError)
+        // Don't throw error, handover already succeeded
+      }
 
       return true
     } catch (error) {
@@ -338,6 +344,87 @@ export class ConversationService extends BaseService {
       }
     } catch (error) {
       this.handleError(error, 'ConversationService.getConversationStats')
+    }
+  }
+
+  /**
+   * Get handover statistics for an agent
+   */
+  async getHandoverStats(agentId: string, dateFrom?: Date, dateTo?: Date) {
+    try {
+      this.log('ConversationService', 'Getting handover stats', { agentId, dateFrom, dateTo })
+
+      let query = this.supabase
+        .from('handover_logs')
+        .select(`
+          *,
+          from_agent:profiles!handover_logs_from_agent_id_fkey(id, full_name, email),
+          to_agent:profiles!handover_logs_to_agent_id_fkey(id, full_name, email),
+          conversation:conversations(id, contact:contacts(name, phone_number))
+        `)
+
+      // Filter by agent (either from or to)
+      query = query.or(`from_agent_id.eq.${agentId},to_agent_id.eq.${agentId}`)
+
+      // Apply date filters
+      if (dateFrom) {
+        query = query.gte('handover_at', dateFrom.toISOString())
+      }
+      if (dateTo) {
+        query = query.lte('handover_at', dateTo.toISOString())
+      }
+
+      query = query.order('handover_at', { ascending: false })
+
+      const { data, error } = await query
+
+      if (error) {
+        this.handleError(error, 'ConversationService.getHandoverStats')
+      }
+
+      const handovers = data || []
+
+      // Calculate statistics
+      const handedOver = handovers.filter(h => h.from_agent_id === agentId)
+      const received = handovers.filter(h => h.to_agent_id === agentId)
+
+      return {
+        total: handovers.length,
+        handedOver: handedOver.length,
+        received: received.length,
+        handedOverList: handedOver,
+        receivedList: received,
+        allHandovers: handovers,
+      }
+    } catch (error) {
+      this.handleError(error, 'ConversationService.getHandoverStats')
+    }
+  }
+
+  /**
+   * Get handover history for a conversation
+   */
+  async getConversationHandoverHistory(conversationId: string) {
+    try {
+      this.log('ConversationService', 'Getting conversation handover history', { conversationId })
+
+      const { data, error } = await this.supabase
+        .from('handover_logs')
+        .select(`
+          *,
+          from_agent:profiles!handover_logs_from_agent_id_fkey(id, full_name, email),
+          to_agent:profiles!handover_logs_to_agent_id_fkey(id, full_name, email)
+        `)
+        .eq('conversation_id', conversationId)
+        .order('handover_at', { ascending: false })
+
+      if (error) {
+        this.handleError(error, 'ConversationService.getConversationHandoverHistory')
+      }
+
+      return data || []
+    } catch (error) {
+      this.handleError(error, 'ConversationService.getConversationHandoverHistory')
     }
   }
 }

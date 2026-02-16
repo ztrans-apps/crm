@@ -21,11 +21,11 @@ export class MessageService extends BaseService {
   }
 
   /**
-   * Get messages for a conversation
+   * Get messages for a conversation with pagination
    */
-  async getMessages(conversationId: string) {
+  async getMessages(conversationId: string, limit: number = 20, offset: number = 0) {
     try {
-      this.log('MessageService', 'Getting messages', { conversationId })
+      this.log('MessageService', 'Getting messages', { conversationId, limit, offset })
 
       // First get conversation to get contact info
       const { data: conversation } = await this.supabase
@@ -34,29 +34,148 @@ export class MessageService extends BaseService {
         .eq('id', conversationId)
         .single()
 
-      // Then get messages with sender info
+      // Then get messages with sender info and quoted message (ordered DESC for pagination, then reverse)
+      // @ts-ignore - Supabase type issue
       const { data, error } = await this.supabase
         .from('messages')
         .select(`
           *,
-          sent_by_user:profiles!messages_sender_id_fkey(id, full_name, email, avatar_url)
+          sent_by_user:profiles(id, full_name, email, avatar_url)
         `)
         .eq('conversation_id', conversationId)
-        .order('created_at', { ascending: true })
+        .order('created_at', { ascending: false })
+        .range(offset, offset + limit - 1)
 
       if (error) {
         this.handleError(error, 'MessageService.getMessages')
       }
 
-      // Add contact info to each message
-      const messagesWithContact = (data || []).map(msg => ({
-        ...msg,
-        contact: conversation?.contact || null
-      }))
+      console.log('📋 getMessages result:', {
+        conversationId,
+        totalMessages: data?.length || 0,
+        sampleMessage: data?.[0] ? {
+          id: data[0].id,
+          sender_id: data[0].sender_id,
+          sent_by_user: data[0].sent_by_user,
+          has_sent_by_user: !!data[0].sent_by_user
+        } : null
+      })
 
-      return messagesWithContact
+      // Reverse to show oldest first (for chat display)
+      const reversedData = (data || []).reverse()
+
+      // Fetch quoted messages if any
+      const messagesWithQuoted = await Promise.all(
+        reversedData.map(async (msg) => {
+          let quotedMessage = null
+          
+          if (msg.quoted_message_id) {
+            // Find quoted message by whatsapp_message_id
+            const { data: quoted } = await this.supabase
+              .from('messages')
+              .select(`
+                id,
+                content,
+                sender_type,
+                is_from_me,
+                sent_by_user:profiles(full_name)
+              `)
+              .eq('whatsapp_message_id', msg.quoted_message_id)
+              .eq('conversation_id', conversationId)
+              .single()
+            
+            if (quoted) {
+              quotedMessage = {
+                ...quoted,
+                contact: conversation?.contact || null
+              }
+            }
+          }
+
+          return {
+            ...msg,
+            contact: conversation?.contact || null,
+            quoted_message: quotedMessage
+          }
+        })
+      )
+
+      return messagesWithQuoted
     } catch (error) {
       this.handleError(error, 'MessageService.getMessages')
+    }
+  }
+
+  /**
+   * Get single message with relations (for realtime updates)
+   */
+  async getMessage(messageId: string): Promise<any> {
+    try {
+      this.log('MessageService', 'Getting single message', { messageId })
+
+      // Get message with sender info
+      // @ts-ignore - Supabase type issue
+      const { data: message, error } = await this.supabase
+        .from('messages')
+        .select(`
+          *,
+          sent_by_user:profiles(id, full_name, email, avatar_url)
+        `)
+        .eq('id', messageId)
+        .single()
+
+      if (error) {
+        this.handleError(error, 'MessageService.getMessage')
+        return null
+      }
+
+      console.log('🔍 getMessage result:', {
+        messageId,
+        sender_id: message?.sender_id,
+        sent_by_user: message?.sent_by_user,
+        has_sent_by_user: !!message?.sent_by_user
+      })
+
+      // Get conversation to get contact info
+      const { data: conversation } = await this.supabase
+        .from('conversations')
+        .select('contact:contacts(*)')
+        .eq('id', message.conversation_id)
+        .single()
+
+      // Fetch quoted message if any
+      let quotedMessage = null
+      if (message.quoted_message_id) {
+        const { data: quoted } = await this.supabase
+          .from('messages')
+          .select(`
+            id,
+            content,
+            sender_type,
+            is_from_me,
+            sent_by_user:profiles(full_name)
+          `)
+          .eq('whatsapp_message_id', message.quoted_message_id)
+          .eq('conversation_id', message.conversation_id)
+          .single()
+        
+        if (quoted) {
+          quotedMessage = {
+            ...quoted,
+            contact: conversation?.contact || null
+          }
+        }
+      }
+
+      // Add contact info and quoted message to message
+      return {
+        ...message,
+        contact: conversation?.contact || null,
+        quoted_message: quotedMessage
+      }
+    } catch (error) {
+      this.handleError(error, 'MessageService.getMessage')
+      return null
     }
   }
 
@@ -87,6 +206,7 @@ export class MessageService extends BaseService {
         content: params.content,
         is_from_me: true,
         status: 'sent',
+        tenant_id: this.defaultTenantId,
         created_at: new Date().toISOString(),
       }
 
@@ -105,9 +225,7 @@ export class MessageService extends BaseService {
       try {
         const response = await fetch(`${this.serviceUrl}/api/send-message`, {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
+          headers: this.getDefaultHeaders(),
           body: JSON.stringify({
             sessionId: params.sessionId,
             to: params.whatsappNumber,
@@ -178,9 +296,7 @@ export class MessageService extends BaseService {
       // Call translation API
       const response = await fetch('/api/translate', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: this.getDefaultHeaders(),
         body: JSON.stringify({
           text: content,
           targetLang: targetLanguage,
@@ -188,7 +304,8 @@ export class MessageService extends BaseService {
       })
 
       if (!response.ok) {
-        throw new Error('Translation request failed')
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.error || 'Translation request failed')
       }
 
       const result = await response.json()
@@ -198,8 +315,10 @@ export class MessageService extends BaseService {
       }
 
       return result.translatedText
-    } catch (error) {
-      this.handleError(error, 'MessageService.translateMessage')
+    } catch (error: any) {
+      console.error('Translation error:', error)
+      // Return original text if translation fails
+      return content
     }
   }
 
