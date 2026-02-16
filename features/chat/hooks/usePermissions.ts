@@ -1,7 +1,6 @@
 // Hook for checking user permissions
-import { useMemo } from 'react'
-import { UserRole, getPermissions } from '@/lib/permissions/roles'
-import { getAvailableActions } from '@/lib/permissions/chat'
+import { useMemo, useEffect, useState } from 'react'
+import { UserRole, getAvailableActions } from '@/lib/rbac/chat-permissions'
 
 interface UsePermissionsProps {
   role: UserRole
@@ -10,11 +9,21 @@ interface UsePermissionsProps {
 }
 
 export function usePermissions({ role, userId, conversation }: UsePermissionsProps) {
-  const permissions = useMemo(() => getPermissions(role), [role])
+  const [conversationActions, setConversationActions] = useState({
+    canSendMessage: false,
+    canPick: false,
+    canAssign: false,
+    canHandover: false,
+    canClose: false,
+    canEditContact: false,
+    canApplyLabel: false,
+    canCreateNote: false,
+    canChangeStatus: false,
+  })
   
-  const conversationActions = useMemo(() => {
+  useEffect(() => {
     if (!conversation || !userId) {
-      return {
+      setConversationActions({
         canSendMessage: false,
         canPick: false,
         canAssign: false,
@@ -24,11 +33,17 @@ export function usePermissions({ role, userId, conversation }: UsePermissionsPro
         canApplyLabel: false,
         canCreateNote: false,
         canChangeStatus: false,
-      }
+      })
+      return
     }
     
-    return getAvailableActions(role, userId, conversation)
-  }, [role, userId, conversation])
+    getAvailableActions(userId, conversation).then(setConversationActions)
+  }, [userId, conversation])
+  
+  const permissions = useMemo(() => ({
+    canViewAllConversations: role === 'owner' || role === 'supervisor',
+    canManageAgents: role === 'owner' || role === 'supervisor',
+  }), [role])
   
   return {
     permissions,

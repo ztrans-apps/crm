@@ -1,7 +1,7 @@
 // Auth middleware - inspired by reference project's validateUser/validateAgent
 import { createClient } from '@/lib/supabase/client'
 import type { SupabaseClient } from '@supabase/supabase-js'
-import type { UserRole } from '@/lib/permissions/roles'
+import type { UserRole } from '@/lib/rbac/chat-permissions'
 
 export interface AuthUser {
   id: string

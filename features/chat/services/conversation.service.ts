@@ -1,7 +1,7 @@
 // Conversation service - handles conversation business logic
 import { BaseService } from './base.service'
-import type { UserRole } from '@/lib/permissions/roles'
-import { canViewConversation } from '@/lib/permissions/chat'
+import type { UserRole } from '@/lib/rbac/chat-permissions'
+import { canViewConversation } from '@/lib/rbac/chat-permissions'
 
 export interface ConversationFilters {
   status?: 'open' | 'closed'
