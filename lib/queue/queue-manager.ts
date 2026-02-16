@@ -47,12 +47,24 @@ class QueueManager {
     data: T,
     options?: {
       delay?: number;
-      priority?: number;
+      priority?: number; // 1 (highest) to 10 (lowest)
       attempts?: number;
+      ttl?: number; // Time to live in milliseconds
+      removeOnComplete?: boolean | number | { age?: number; count?: number };
+      removeOnFail?: boolean | number | { age?: number };
     }
   ) {
     const queue = this.getQueue(queueName);
-    return await queue.add(jobName, data, options);
+    
+    // Add TTL as job expiration if specified
+    const jobOptions: any = { ...options };
+    if (options?.ttl) {
+      jobOptions.removeOnComplete = {
+        age: Math.floor(options.ttl / 1000), // Convert to seconds
+      };
+    }
+    
+    return await queue.add(jobName, data, jobOptions);
   }
 
   /**

@@ -1,10 +1,15 @@
 import express from 'express'
 import whatsappService from '../services/whatsapp.js'
+import rateLimiterInstance, { rateLimiterMiddleware } from '../middleware/rateLimiter.js'
+import circuitBreakers from '../services/circuitBreaker.js'
+import messageDeduplicator from '../services/messageDeduplicator.js'
+import deliveryTracker from '../services/deliveryTracker.js'
+import healthMonitor from '../services/healthMonitor.js'
 
 const router = express.Router()
 
-// Send single message
-router.post('/send', async (req, res) => {
+// Send single message (with rate limiting, circuit breaker, and deduplication)
+router.post('/send', rateLimiterMiddleware, async (req, res) => {
   try {
     const { sessionId, to, message, quotedMessageId } = req.body
 
@@ -15,7 +20,39 @@ router.post('/send', async (req, res) => {
       })
     }
 
-    const result = await whatsappService.sendMessage(sessionId, to, message, quotedMessageId)
+    // Check for duplicate message
+    const messageHash = messageDeduplicator.generateHash(sessionId, to, message)
+    if (messageDeduplicator.isDuplicate(messageHash)) {
+      return res.status(409).json({
+        success: false,
+        message: 'Duplicate message detected',
+        isDuplicate: true
+      })
+    }
+
+    // Execute with circuit breaker protection
+    const result = await circuitBreakers.whatsapp.execute(
+      async () => {
+        const sendResult = await whatsappService.sendMessage(sessionId, to, message, quotedMessageId)
+        
+        // Track delivery
+        if (sendResult.messageId) {
+          deliveryTracker.trackDelivery(sendResult.messageId, 'sent', {
+            sessionId,
+            to,
+            timestamp: Date.now()
+          })
+        }
+        
+        // Mark message as sent (not duplicate)
+        messageDeduplicator.markAsSent(messageHash)
+        
+        // Record successful operation
+        healthMonitor.recordOperation('send_message', true)
+        
+        return sendResult
+      }
+    )
     
     res.json({ 
       success: true,
@@ -24,6 +61,17 @@ router.post('/send', async (req, res) => {
     })
   } catch (error) {
     console.error('Send message error:', error)
+    healthMonitor.recordOperation('send_message', false)
+    
+    // Check if circuit breaker is open
+    if (error.message?.includes('Circuit breaker is OPEN')) {
+      return res.status(503).json({
+        success: false,
+        error: 'Service temporarily unavailable',
+        circuitBreakerOpen: true
+      })
+    }
+    
     res.status(500).json({
       success: false,
       error: error.message
@@ -31,8 +79,8 @@ router.post('/send', async (req, res) => {
   }
 })
 
-// Send bulk messages
-router.post('/send-bulk', async (req, res) => {
+// Send bulk messages (with rate limiting and circuit breaker)
+router.post('/send-bulk', rateLimiterMiddleware, async (req, res) => {
   try {
     const { sessionId, recipients, message } = req.body
 
@@ -44,14 +92,49 @@ router.post('/send-bulk', async (req, res) => {
     }
 
     const results = []
+    let successCount = 0
+    let failureCount = 0
     
     for (const recipient of recipients) {
       try {
-        await whatsappService.sendMessage(sessionId, recipient.phone_number, message)
+        // Check for duplicate
+        const messageHash = messageDeduplicator.generateHash(sessionId, recipient.phone_number, message)
+        if (messageDeduplicator.isDuplicate(messageHash)) {
+          results.push({ 
+            phone: recipient.phone_number, 
+            success: false,
+            error: 'Duplicate message',
+            isDuplicate: true
+          })
+          failureCount++
+          continue
+        }
+
+        // Execute with circuit breaker
+        const breaker = getCircuitBreaker(sessionId)
+        await breaker.execute(
+          async () => {
+            const result = await whatsappService.sendMessage(sessionId, recipient.phone_number, message)
+            
+            // Track delivery
+            if (result.messageId) {
+              deliveryTracker.trackDelivery(result.messageId, 'sent', {
+                sessionId,
+                to: recipient.phone_number,
+                timestamp: Date.now()
+              })
+            }
+            
+            messageDeduplicator.markAsSent(messageHash)
+            return result
+          }
+        )
+        
         results.push({ 
           phone: recipient.phone_number, 
           success: true 
         })
+        successCount++
         
         // Rate limiting: 1 message per second
         await new Promise(resolve => setTimeout(resolve, 1000))
@@ -61,16 +144,26 @@ router.post('/send-bulk', async (req, res) => {
           success: false, 
           error: error.message 
         })
+        failureCount++
       }
     }
+    
+    // Record bulk operation
+    healthMonitor.recordOperation('send_bulk', successCount > 0)
     
     res.json({ 
       success: true,
       message: 'Bulk messages sent',
+      summary: {
+        total: recipients.length,
+        success: successCount,
+        failed: failureCount
+      },
       results
     })
   } catch (error) {
     console.error('Send bulk error:', error)
+    healthMonitor.recordOperation('send_bulk', false)
     res.status(500).json({
       success: false,
       error: error.message
@@ -78,7 +171,7 @@ router.post('/send-bulk', async (req, res) => {
   }
 })
 
-// Reconnect/reload a session
+// Reconnect/reload a session (with circuit breaker)
 router.post('/reconnect/:sessionId', async (req, res) => {
   try {
     const { sessionId } = req.params
@@ -87,6 +180,7 @@ router.post('/reconnect/:sessionId', async (req, res) => {
     const status = whatsappService.getSessionStatus(sessionId)
     
     if (status === 'connected') {
+      healthMonitor.recordSessionStatus(sessionId, 'connected')
       return res.json({
         success: true,
         message: 'Session already connected',
@@ -94,8 +188,14 @@ router.post('/reconnect/:sessionId', async (req, res) => {
       })
     }
 
-    // Initialize/reconnect the session
-    await whatsappService.initializeClient(sessionId)
+    // Initialize/reconnect with circuit breaker
+    const breaker = getCircuitBreaker(sessionId)
+    await breaker.execute(
+      async () => {
+        await whatsappService.initializeClient(sessionId)
+        healthMonitor.recordSessionStatus(sessionId, 'connecting')
+      }
+    )
     
     res.json({
       success: true,
@@ -104,6 +204,16 @@ router.post('/reconnect/:sessionId', async (req, res) => {
     })
   } catch (error) {
     console.error('Reconnect error:', error)
+    healthMonitor.recordSessionStatus(req.params.sessionId, 'disconnected')
+    
+    if (error.message?.includes('Circuit breaker is OPEN')) {
+      return res.status(503).json({
+        success: false,
+        error: 'Service temporarily unavailable',
+        circuitBreakerOpen: true
+      })
+    }
+    
     res.status(500).json({
       success: false,
       error: error.message

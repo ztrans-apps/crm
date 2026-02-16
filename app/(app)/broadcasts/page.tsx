@@ -1,45 +1,86 @@
-// app/(app)/broadcasts/page.tsx
-'use client'
+'use client';
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Radio, Plus } from 'lucide-react'
-import { PermissionGuard } from '@/lib/rbac/components/PermissionGuard'
+import { useState, useEffect } from 'react';
+import { Button } from '@/components/ui/button';
+import { Plus } from 'lucide-react';
+import { CampaignList, CampaignForm, CampaignStats } from '@/modules/broadcast/components';
 
 export default function BroadcastsPage() {
-  return (
-    <PermissionGuard permission={['broadcast.view']}>
-      <div className="space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold">Broadcasts</h1>
-            <p className="text-gray-600">Send bulk messages to contacts</p>
-          </div>
-          <Button className="flex items-center gap-2">
-            <Plus className="h-4 w-4" />
-            New Broadcast
-          </Button>
-        </div>
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [stats, setStats] = useState({
+    total_campaigns: 0,
+    total_sent: 0,
+    total_delivered: 0,
+    total_failed: 0,
+    pending: 0,
+    success_rate: 0,
+  });
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Radio className="h-5 w-5" />
-              Broadcast History
-            </CardTitle>
-            <CardDescription>
-              All broadcast campaigns
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="flex flex-col items-center justify-center py-12 text-gray-500">
-              <Radio className="h-12 w-12 mb-4 opacity-20" />
-              <p>No broadcasts sent</p>
-              <p className="text-sm">Create your first broadcast campaign</p>
-            </div>
-          </CardContent>
-        </Card>
+  // Fetch stats
+  useEffect(() => {
+    async function fetchStats() {
+      try {
+        const response = await fetch('/api/broadcast/stats');
+        if (response.ok) {
+          const data = await response.json();
+          setStats(data.stats);
+        }
+      } catch (error) {
+        console.error('Failed to fetch stats:', error);
+      }
+    }
+
+    fetchStats();
+  }, [refreshKey]);
+
+  const handleAddCampaign = () => {
+    setShowAddModal(true);
+  };
+
+  const handleCampaignCreated = () => {
+    setRefreshKey(prev => prev + 1);
+  };
+
+  const handleSelectCampaign = (campaign: any) => {
+    console.log('Selected campaign:', campaign);
+    // TODO: Show campaign details
+  };
+
+  return (
+    <div className="space-y-6 p-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Broadcast Campaigns</h1>
+          <p className="text-gray-600 mt-1">Send messages to multiple contacts at once</p>
+        </div>
+        <Button
+          onClick={handleAddCampaign}
+          size="lg"
+          className="bg-purple-600 hover:bg-purple-700"
+        >
+          <Plus className="h-4 w-4 mr-2" />
+          New Campaign
+        </Button>
       </div>
-    </PermissionGuard>
-  )
+
+      {/* Stats */}
+      <CampaignStats stats={stats} />
+
+      {/* Campaign List */}
+      <CampaignList
+        key={refreshKey}
+        onAddCampaign={handleAddCampaign}
+        onSelectCampaign={handleSelectCampaign}
+      />
+
+      {/* Add Campaign Modal */}
+      <CampaignForm
+        open={showAddModal}
+        onOpenChange={setShowAddModal}
+        onSuccess={handleCampaignCreated}
+      />
+    </div>
+  );
 }

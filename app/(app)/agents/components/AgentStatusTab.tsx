@@ -21,7 +21,7 @@ export default function AgentStatusTab() {
   const [agents, setAgents] = useState<Agent[]>([])
   const [loading, setLoading] = useState(false)
   const [resetting, setResetting] = useState(false)
-  const { can } = usePermissions()
+  const { hasPermission } = usePermissions()
 
   useEffect(() => {
     loadAgents()
@@ -141,7 +141,7 @@ export default function AgentStatusTab() {
                 <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
                 Refresh
               </Button>
-              {can('agent.status.manage') && (
+              {hasPermission('agent.status.manage') && (
                 <Button
                   onClick={handleResetAll}
                   disabled={resetting}
@@ -175,7 +175,7 @@ export default function AgentStatusTab() {
                   <span className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(agent.agent_status, agent.last_activity)}`}>
                     {getStatusLabel(agent.agent_status, agent.last_activity)}
                   </span>
-                  {can('agent.status.manage') && (
+                  {hasPermission('agent.status.manage') && (
                     <Button
                       size="sm"
                       variant="outline"

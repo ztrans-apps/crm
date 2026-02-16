@@ -37,7 +37,7 @@ interface MenuItem {
 
 export default function DynamicSidebar({ userRole }: DynamicSidebarProps) {
   const pathname = usePathname()
-  const { can, loading } = usePermissions()
+  const { hasPermission, loading } = usePermissions()
 
   // Define all possible menu items with their required permissions
   const allMenuItems: MenuItem[] = [
@@ -134,11 +134,11 @@ export default function DynamicSidebar({ userRole }: DynamicSidebarProps) {
     if (loading) return false
     
     // Check single permission
-    if (item.permission) return can(item.permission)
+    if (item.permission) return hasPermission(item.permission)
     
     // Check any of multiple permissions
     if (item.requireAny) {
-      return item.requireAny.some(perm => can(perm))
+      return item.requireAny.some(perm => hasPermission(perm))
     }
     
     return false

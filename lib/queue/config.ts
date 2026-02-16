@@ -24,9 +24,7 @@ export const queueConfig = {
       age: 3600, // 1 hour
       count: 1000,
     },
-    removeOnFail: {
-      age: 86400, // 24 hours
-    },
+    removeOnFail: false, // Don't auto-remove failed jobs - send to DLQ instead
   },
 };
 
@@ -37,4 +35,5 @@ export const QUEUE_NAMES = {
   BROADCAST_SEND: 'broadcast-send',
   WEBHOOK_DELIVER: 'webhook-deliver',
   AUDIT_LOG: 'audit-log',
+  DEAD_LETTER: 'dead-letter', // DLQ for failed jobs
 } as const;

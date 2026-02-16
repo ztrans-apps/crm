@@ -169,7 +169,7 @@ router.delete('/sessions/:sessionId', async (req, res) => {
   }
 })
 
-// Reconnect session
+// Reconnect session (smart auto-reconnect)
 router.post('/reconnect/:sessionId', async (req, res) => {
   try {
     const { sessionId } = req.params
@@ -177,30 +177,62 @@ router.post('/reconnect/:sessionId', async (req, res) => {
     
     console.log(`🔄 Reconnect requested for session: ${sessionId}, forceNew: ${forceNew}`)
     
-    // If forceNew=true, delete auth files first
-    if (forceNew === 'true') {
-      console.log(`🗑️ forceNew=true, deleting auth files for: ${sessionId}`)
-      const authPath = path.join('.baileys_auth', sessionId)
+    // Check if valid credentials exist
+    const authPath = path.join('.baileys_auth', sessionId)
+    const credsPath = path.join(authPath, 'creds.json')
+    
+    let hasValidCreds = false
+    if (fs.existsSync(credsPath)) {
+      try {
+        const credsData = JSON.parse(fs.readFileSync(credsPath, 'utf-8'))
+        // registrationId can be 0, so check for undefined/null explicitly
+        hasValidCreds = !!(credsData.me?.id && credsData.registrationId !== undefined && credsData.registrationId !== null)
+        console.log(`🔐 Credentials check: ${hasValidCreds ? 'VALID' : 'INVALID'}`)
+        console.log(`📱 Phone: ${credsData.me?.id || 'none'}`)
+        console.log(`🔑 Registration ID: ${credsData.registrationId}`)
+      } catch (err) {
+        console.log(`⚠️  Failed to read credentials: ${err.message}`)
+      }
+    } else {
+      console.log(`⚠️  No credentials file found: ${credsPath}`)
+    }
+    
+    // Determine if we should force new session
+    let shouldForceNew = forceNew === 'true'
+    
+    // If forceNew not explicitly set, decide based on credentials
+    if (forceNew !== 'true' && forceNew !== 'false') {
+      shouldForceNew = !hasValidCreds
+      console.log(`🤔 Auto-deciding forceNew: ${shouldForceNew} (based on credentials)`)
+    }
+    
+    // If forceNew=true or no valid creds, delete auth files
+    if (shouldForceNew) {
+      console.log(`🗑️ Deleting auth files for: ${sessionId}`)
       
       if (fs.existsSync(authPath)) {
         fs.rmSync(authPath, { recursive: true, force: true })
         console.log(`✅ Auth files deleted: ${authPath}`)
-      } else {
-        console.log(`⚠️  No auth files found: ${authPath}`)
       }
       
       // Wait a bit for filesystem
       await new Promise(resolve => setTimeout(resolve, 500))
+    } else {
+      console.log(`✅ Valid credentials found, attempting auto-reconnect without QR`)
     }
     
-    // Try to initialize client again
-    await whatsappService.initializeClient(sessionId, forceNew === 'true')
+    // Try to initialize client
+    await whatsappService.initializeClient(sessionId, shouldForceNew)
     
     res.json({ 
       success: true,
-      message: 'Session reconnection initiated',
+      message: hasValidCreds && !shouldForceNew 
+        ? 'Auto-reconnecting with existing credentials' 
+        : 'New QR code will be generated',
       sessionId,
-      forceNew: forceNew === 'true'
+      forceNew: shouldForceNew,
+      hasValidCreds,
+      autoReconnect: hasValidCreds && !shouldForceNew
     })
   } catch (error) {
     console.error('Reconnect error:', error)

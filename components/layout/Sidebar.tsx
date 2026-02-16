@@ -28,7 +28,7 @@ interface SidebarProps {
 
 export default function Sidebar({ role }: SidebarProps) {
   const pathname = usePathname()
-  const { can, loading } = usePermissions()
+  const { hasPermission, loading } = usePermissions()
 
   const ownerMenuItems = [
     { icon: LayoutDashboard, label: 'Dashboard', href: '/owner/dashboard' },
@@ -42,7 +42,7 @@ export default function Sidebar({ role }: SidebarProps) {
     { icon: BarChart3, label: 'Analytics', href: '/owner/analytics' },
     { icon: ArrowRightLeft, label: 'Handover Reports', href: '/reports/handovers' },
     // Admin section - only show if user has permission
-    ...(!loading && can('role.view') ? [
+    ...(!loading && hasPermission('role.view') ? [
       { icon: Shield, label: 'Role Management', href: '/admin/roles' },
       { icon: Sliders, label: 'System Settings', href: '/admin/settings' },
     ] : []),

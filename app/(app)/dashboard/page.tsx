@@ -26,7 +26,7 @@ export default function DashboardPage() {
   })
   const [loading, setLoading] = useState(true)
   const [userRole, setUserRole] = useState<string>('')
-  const { can } = usePermissions()
+  const { hasPermission } = usePermissions()
 
   useEffect(() => {
     loadDashboardData()
@@ -155,7 +155,7 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        {can('contact.view') && (
+        {hasPermission('contact.view') && (
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Total Contacts</CardTitle>
@@ -235,7 +235,7 @@ export default function DashboardPage() {
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {can('chat.view') && (
+            {hasPermission('chat.view') && (
               <a
                 href="/chats"
                 className="flex flex-col items-center justify-center p-6 border-2 border-dashed rounded-lg hover:border-green-500 hover:bg-green-50 transition-colors cursor-pointer"
@@ -246,7 +246,7 @@ export default function DashboardPage() {
               </a>
             )}
 
-            {can('contact.view') && (
+            {hasPermission('contact.view') && (
               <a
                 href="/contacts"
                 className="flex flex-col items-center justify-center p-6 border-2 border-dashed rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-colors cursor-pointer"
@@ -257,7 +257,7 @@ export default function DashboardPage() {
               </a>
             )}
 
-            {can('broadcast.manage') && (
+            {hasPermission('broadcast.manage') && (
               <a
                 href="/broadcasts"
                 className="flex flex-col items-center justify-center p-6 border-2 border-dashed rounded-lg hover:border-purple-500 hover:bg-purple-50 transition-colors cursor-pointer"

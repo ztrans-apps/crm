@@ -108,6 +108,45 @@ class BaileysWhatsAppService {
       // Load auth state
       const { state, saveCreds } = await useMultiFileAuthState(authPath)
 
+      console.log(`📂 Auth state loaded from: ${authPath}`)
+      console.log(`🔐 Has existing credentials: ${!!state.creds}`)
+      console.log(`🔍 Debug - state.creds keys:`, Object.keys(state.creds || {}))
+      console.log(`🔍 Debug - state.creds.me:`, JSON.stringify(state.creds?.me))
+      console.log(`👤 Registered phone: ${state.creds?.me?.id || 'none (will need QR scan)'}`)
+      console.log(`🔑 Has registration ID: ${state.creds?.registrationId !== undefined ? state.creds.registrationId : 'none'}`)
+      
+      // Check if we have valid credentials
+      // registrationId can be 0, so check for undefined/null explicitly
+      const hasValidCreds = !!(state.creds?.me?.id && state.creds?.registrationId !== undefined && state.creds?.registrationId !== null)
+      
+      if (hasValidCreds) {
+        console.log(`✅ Valid credentials found, will attempt auto-reconnect`)
+        
+        // Update database status to 'connecting'
+        if (supabase) {
+          await supabase
+            .from('whatsapp_sessions')
+            .update({ 
+              status: 'connecting',
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', sessionId)
+        }
+      } else {
+        console.log(`⚠️ No valid credentials, will need QR scan`)
+        
+        // Update database status to 'disconnected'
+        if (supabase) {
+          await supabase
+            .from('whatsapp_sessions')
+            .update({ 
+              status: 'disconnected',
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', sessionId)
+        }
+      }
+
       // Get latest Baileys version
       const { version } = await fetchLatestBaileysVersion()
 
@@ -129,8 +168,6 @@ class BaileysWhatsAppService {
       })
 
       console.log(`🔌 Socket created for ${sessionKey}`)
-      console.log(`🔌 Has existing creds: ${!!state.creds?.me}`)
-      console.log(`🔌 Registered phone: ${state.creds?.me?.id || 'none'}`)
 
       // Store session with tenant info
       const sessionData = { sock, state, saveCreds, tenantId, sessionId }
@@ -293,6 +330,19 @@ class BaileysWhatsAppService {
           const phoneNumber = sock.user?.id?.split(':')[0] || null
           console.log(`📱 Phone number detected: ${phoneNumber}`)
           console.log(`📱 Formatted phone: +${phoneNumber}`)
+          
+          // IMPORTANT: Update creds.me if not set (for auto-reconnect to work)
+          if (sock.user && (!state.creds.me || !state.creds.me.id)) {
+            console.log(`🔧 Updating creds.me for future auto-reconnect`)
+            state.creds.me = {
+              id: sock.user.id,
+              name: sock.user.name || sock.user.verifiedName || 'WhatsApp User',
+              lid: sock.user.lid || sock.user.id
+            }
+            // Save credentials immediately
+            await saveCreds()
+            console.log(`✅ Credentials updated and saved`)
+          }
           
           // Update session manager
           sessionManager.updateStatus(tenantId, sessionId, 'active')
@@ -989,14 +1039,26 @@ class BaileysWhatsAppService {
       // Find or create conversation
       let { data: conversations } = await supabase
         .from('conversations')
-        .select('id, status, workflow_status')
-        .eq('whatsapp_session_id', sessionId)
+        .select('id, status, workflow_status, whatsapp_session_id')
         .eq('contact_id', contact.id)
         .eq('status', 'open')
         .order('created_at', { ascending: false })
         .limit(1)
 
       let conversation = conversations?.[0]
+      
+      // Auto-assign conversation to current session if:
+      // 1. Conversation exists but has no session assigned, OR
+      // 2. Conversation's session is different from current session
+      if (conversation && conversation.whatsapp_session_id !== sessionId) {
+        console.log(`  🔄 Auto-assigning conversation ${conversation.id} to session ${sessionId}`)
+        await supabase
+          .from('conversations')
+          .update({ whatsapp_session_id: sessionId })
+          .eq('id', conversation.id)
+        
+        conversation.whatsapp_session_id = sessionId
+      }
 
       // Extract message content
       const messageText = msg.message?.conversation || 

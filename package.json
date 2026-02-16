@@ -15,12 +15,8 @@
     "test:unit": "vitest run tests/unit",
     "test:service": "vitest run tests/service",
     "test:integration": "vitest run tests/integration",
-    "test:e2e": "playwright test",
-    "test:e2e:ui": "playwright test --ui",
-    "test:all": "npm run test:unit && npm run test:service && npm run test:integration",
     "test:watch": "vitest watch",
-    "test:coverage": "vitest run --coverage",
-    "test:ui": "vitest --ui"
+    "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
     "@radix-ui/react-popover": "^1.1.15",

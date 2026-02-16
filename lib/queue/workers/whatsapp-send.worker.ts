@@ -5,6 +5,8 @@
 
 import { Worker, Job } from 'bullmq';
 import { redisConnection, QUEUE_NAMES } from '../config';
+import { deadLetterQueue } from '../services/dead-letter-queue';
+import { queueMetrics } from '../services/queue-metrics';
 
 interface SendMessageJob {
   tenantId: string;
@@ -165,8 +167,20 @@ export const whatsappSendWorker = new Worker(
 
 whatsappSendWorker.on('completed', (job) => {
   console.log(`[WhatsApp:Send] Job ${job.id} completed`);
+  
+  // Record processing time for metrics
+  if (job.finishedOn && job.processedOn) {
+    const duration = job.finishedOn - job.processedOn;
+    queueMetrics.recordProcessingTime(QUEUE_NAMES.WHATSAPP_SEND, duration);
+  }
 });
 
-whatsappSendWorker.on('failed', (job, err) => {
+whatsappSendWorker.on('failed', async (job, err) => {
   console.error(`[WhatsApp:Send] Job ${job?.id} failed:`, err.message);
+  
+  // Move to DLQ if all attempts exhausted
+  if (job && job.attemptsMade >= (job.opts.attempts || 3)) {
+    console.log(`[WhatsApp:Send] Job ${job.id} exhausted all attempts, moving to DLQ`);
+    await deadLetterQueue.moveToDeadLetter(QUEUE_NAMES.WHATSAPP_SEND, job, err);
+  }
 });
