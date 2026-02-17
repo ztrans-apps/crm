@@ -219,56 +219,8 @@ export function SessionMonitor({ refreshInterval = 5000 }: SessionMonitorProps) 
             <p>No active sessions</p>
           </div>
         ) : (
-          <div className="space-y-2">
-            {states.map((session) => (
-              <div
-                key={session.sessionId}
-                className={`border rounded-lg p-4 transition-colors ${getStateColor(session.state)}`}
-              >
-                <div className="flex items-start justify-between">
-                  <div className="flex items-start gap-3 flex-1">
-                    <div className="mt-1">
-                      {getStateIcon(session.state)}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1 flex-wrap">
-                        {session.phoneNumber && (
-                          <div className="flex items-center gap-1.5 text-sm font-medium text-gray-900">
-                            <Phone className="h-3.5 w-3.5" />
-                            {session.phoneNumber}
-                          </div>
-                        )}
-                        {session.name && (
-                          <span className="text-sm text-gray-600">
-                            ({session.name})
-                          </span>
-                        )}
-                        {getStateBadge(session.state)}
-                      </div>
-                      <div className="flex items-center gap-4 text-xs text-gray-600 flex-wrap">
-                        <span className="font-mono truncate">{session.sessionId}</span>
-                        <span>Updated: {formatTimestamp(session.lastUpdate)}</span>
-                        {session.errorCount > 0 && (
-                          <span className="text-red-600 font-medium">
-                            Errors: {session.errorCount}
-                          </span>
-                        )}
-                        {session.state === 'DISCONNECTED' && (
-                          <span className="text-yellow-600 font-medium flex items-center gap-1">
-                            <Loader2 className="h-3 w-3 animate-spin" />
-                            Auto-reconnecting...
-                          </span>
-                        )}
-                      </div>
-                      {/* State Message */}
-                      <p className="text-xs text-gray-500 mt-1 italic">
-                        {getStateMessage(session.state, session.errorCount)}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ))}
+          <div className="text-sm text-gray-600">
+            {states.length} session(s) monitored
           </div>
         )}
       </CardContent>

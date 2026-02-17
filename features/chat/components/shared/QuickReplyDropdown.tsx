@@ -237,8 +237,8 @@ export function QuickReplyDropdown({
                       </span>
                     )}
                   </div>
-                  <p className="text-xs text-gray-600 line-clamp-2">
-                    {qr.content}
+                  <p className="text-xs text-gray-600 line-clamp-2 whitespace-pre-wrap">
+                    {qr.content.replace(/\\n/g, '\n')}
                   </p>
                 </div>
                 {index === selectedIndex && (

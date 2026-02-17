@@ -1,46 +1,30 @@
 'use client'
 
-// Edit Role Page
-// Form untuk edit existing role dan permissions
-
 import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { createClient } from '@/lib/supabase/client'
+import { usePermissions } from '@/lib/rbac/hooks/usePermissions'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Textarea } from '@/components/ui/textarea'
-import { Checkbox } from '@/components/ui/checkbox'
-import { Badge } from '@/components/ui/badge'
-import { 
-  Shield, 
-  ArrowLeft, 
-  Save, 
-  AlertCircle,
-  Check,
-  Search,
-  Trash2
-} from 'lucide-react'
-import { usePermissions } from '@/lib/rbac/hooks/usePermissions'
-import { createClient } from '@/lib/supabase/client'
+import { Card, CardContent } from '@/components/ui/card'
+import { Switch } from '@/components/ui/switch'
+import { ArrowLeft, Save, Trash2, Search } from 'lucide-react'
 
 interface Permission {
   id: string
   permission_key: string
   permission_name: string
   module: string
-  resource: string | null
+  resource: string
   action: string
-  description: string | null
+  description: string
 }
 
 interface Role {
   id: string
   role_key: string
   role_name: string
-  description: string | null
-  is_system_role: boolean
-  is_active: boolean
+  description: string
   permissions: Permission[]
 }
 
@@ -50,34 +34,30 @@ export default function EditRolePage() {
   const roleId = params.roleId as string
   
   const { hasPermission } = usePermissions()
+  const canEdit = hasPermission('role.edit')
+  const canDelete = hasPermission('role.delete')
+
+  const [role, setRole] = useState<Role | null>(null)
+  const [allPermissions, setAllPermissions] = useState<Permission[]>([])
+  const [selectedPermissions, setSelectedPermissions] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [success, setSuccess] = useState(false)
   
-  // Form state
-  const [role, setRole] = useState<Role | null>(null)
-  const [roleName, setRoleName] = useState('')
-  const [roleKey, setRoleKey] = useState('')
-  const [description, setDescription] = useState('')
-  const [selectedPermissions, setSelectedPermissions] = useState<Set<string>>(new Set())
-  
-  // Data state
-  const [allPermissions, setAllPermissions] = useState<Permission[]>([])
+  // UI state
   const [searchQuery, setSearchQuery] = useState('')
+  const [selectedModule, setSelectedModule] = useState<string | null>(null)
 
   const supabase = createClient()
-  const canEdit = hasPermission('role.edit')
-  const canDelete = hasPermission('role.delete')
 
   useEffect(() => {
     loadData()
   }, [roleId])
 
-  async function loadData() {
+  const loadData = async () => {
     try {
       setLoading(true)
-      
+
       // Load role with permissions
       const { data: roleData, error: roleError } = await supabase
         .from('roles')
@@ -98,143 +78,80 @@ export default function EditRolePage() {
       }
 
       setRole(roleWithPerms)
-      setRoleName(roleWithPerms.role_name)
-      setRoleKey(roleWithPerms.role_key)
-      setDescription(roleWithPerms.description || '')
-      setSelectedPermissions(new Set(roleWithPerms.permissions.map((p: Permission) => p.permission_key)))
+      setSelectedPermissions(new Set(roleWithPerms.permissions.map((p: Permission) => p.id)))
 
       // Load all permissions
-      const { data: permsData, error: permsError } = await supabase
+      const { data: perms, error: permsError } = await supabase
         .from('permissions')
         .select('*')
         .order('module, permission_name')
 
       if (permsError) throw permsError
-      setAllPermissions(permsData || [])
+      setAllPermissions(perms || [])
 
     } catch (err: any) {
-      console.error('Error loading role:', err)
       setError(err.message)
     } finally {
       setLoading(false)
     }
   }
 
-  function togglePermission(permissionKey: string) {
-    const newSelected = new Set(selectedPermissions)
-    if (newSelected.has(permissionKey)) {
-      newSelected.delete(permissionKey)
-    } else {
-      newSelected.add(permissionKey)
-    }
-    setSelectedPermissions(newSelected)
-  }
-
-  function toggleModule(module: string) {
-    const modulePerms = allPermissions
-      .filter(p => p.module === module)
-      .map(p => p.permission_key)
-    
-    const allSelected = modulePerms.every(key => selectedPermissions.has(key))
-    const newSelected = new Set(selectedPermissions)
-    
-    if (allSelected) {
-      modulePerms.forEach(key => newSelected.delete(key))
-    } else {
-      modulePerms.forEach(key => newSelected.add(key))
-    }
-    
-    setSelectedPermissions(newSelected)
-  }
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    
+  const handleSave = async () => {
     if (!canEdit) {
       setError('You do not have permission to edit roles')
       return
     }
 
-    if (!roleName) {
-      setError('Role name is required')
-      return
-    }
-
-    if (selectedPermissions.size === 0) {
-      setError('Please select at least one permission')
-      return
-    }
-
-    setSaving(true)
-    setError(null)
-
     try {
-      // Update role
-      const { error: roleError } = await supabase
+      setSaving(true)
+      setError(null)
+
+      const { error: updateError } = await supabase
         .from('roles')
         .update({
-          role_name: roleName,
-          description: description || null
+          role_name: role?.role_name,
+          description: role?.description,
         })
         .eq('id', roleId)
 
-      if (roleError) throw roleError
+      if (updateError) throw updateError
 
-      // Delete existing permissions
-      const { error: deleteError } = await supabase
+      // Update permissions
+      await supabase
         .from('role_permissions')
         .delete()
         .eq('role_id', roleId)
 
-      if (deleteError) throw deleteError
+      if (selectedPermissions.size > 0) {
+        const rolePermissions = Array.from(selectedPermissions).map(permId => ({
+          role_id: roleId,
+          permission_id: permId,
+        }))
 
-      // Get permission IDs
-      const permissionIds = allPermissions
-        .filter(p => selectedPermissions.has(p.permission_key))
-        .map(p => p.id)
+        const { error: permError } = await supabase
+          .from('role_permissions')
+          .insert(rolePermissions)
 
-      // Assign new permissions
-      const rolePermissions = permissionIds.map(permId => ({
-        role_id: roleId,
-        permission_id: permId
-      }))
+        if (permError) throw permError
+      }
 
-      const { error: permError } = await supabase
-        .from('role_permissions')
-        .insert(rolePermissions)
-
-      if (permError) throw permError
-
-      setSuccess(true)
-      setTimeout(() => {
-        router.push('/admin/rbac')
-      }, 1500)
-
+      router.push('/admin/rbac')
     } catch (err: any) {
-      console.error('Error updating role:', err)
       setError(err.message)
     } finally {
       setSaving(false)
     }
   }
 
-  async function handleDelete() {
+  const handleDelete = async () => {
     if (!canDelete) {
       setError('You do not have permission to delete roles')
       return
     }
 
-    if (role?.is_system_role) {
-      setError('Cannot delete system roles')
+    if (!confirm(`Are you sure you want to delete role "${role?.role_name}"?`)) {
       return
     }
-
-    if (!confirm(`Are you sure you want to delete the role "${roleName}"? This action cannot be undone.`)) {
-      return
-    }
-
-    setSaving(true)
-    setError(null)
 
     try {
       const { error } = await supabase
@@ -243,42 +160,57 @@ export default function EditRolePage() {
         .eq('id', roleId)
 
       if (error) throw error
-
       router.push('/admin/rbac')
     } catch (err: any) {
-      console.error('Error deleting role:', err)
       setError(err.message)
-      setSaving(false)
     }
   }
 
-  // Group permissions by module
-  const permissionsByModule = allPermissions.reduce((acc, perm) => {
-    if (!acc[perm.module]) {
-      acc[perm.module] = []
+  const togglePermission = (permId: string) => {
+    const newSelected = new Set(selectedPermissions)
+    if (newSelected.has(permId)) {
+      newSelected.delete(permId)
+    } else {
+      newSelected.add(permId)
     }
-    acc[perm.module].push(perm)
-    return acc
-  }, {} as Record<string, Permission[]>)
+    setSelectedPermissions(newSelected)
+  }
 
-  // Filter permissions by search
-  const filteredModules = Object.entries(permissionsByModule).reduce((acc, [module, perms]) => {
-    const filtered = perms.filter(p => 
-      p.permission_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      p.permission_key.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      p.description?.toLowerCase().includes(searchQuery.toLowerCase())
-    )
-    if (filtered.length > 0) {
-      acc[module] = filtered
+  // Group permissions by module
+  const modules = Array.from(new Set(allPermissions.map(p => p.module)))
+  const modulePermissions = modules.map(module => ({
+    module,
+    count: allPermissions.filter(p => p.module === module).length,
+    permissions: allPermissions.filter(p => p.module === module)
+  }))
+
+  // Filter permissions
+  const filteredModules = modulePermissions.filter(m => {
+    if (selectedModule && m.module !== selectedModule) return false
+    if (searchQuery) {
+      return m.permissions.some(p => 
+        p.permission_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        p.description?.toLowerCase().includes(searchQuery.toLowerCase())
+      )
     }
-    return acc
-  }, {} as Record<string, Permission[]>)
+    return true
+  })
+
+  const displayedPermissions = selectedModule
+    ? allPermissions.filter(p => p.module === selectedModule)
+    : allPermissions
+
+  const filteredPermissions = displayedPermissions.filter(p => {
+    if (!searchQuery) return true
+    return p.permission_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+           p.description?.toLowerCase().includes(searchQuery.toLowerCase())
+  })
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-96">
+      <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 mx-auto"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
           <p className="mt-4 text-gray-600">Loading role...</p>
         </div>
       </div>
@@ -287,25 +219,12 @@ export default function EditRolePage() {
 
   if (!canEdit) {
     return (
-      <div className="container mx-auto py-8 px-4">
-        <Card className="max-w-2xl mx-auto">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-red-600">
-              <AlertCircle className="h-5 w-5" />
-              Access Denied
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-gray-600">
-              You don't have permission to edit roles.
-            </p>
-            <Button 
-              variant="outline" 
-              className="mt-4"
-              onClick={() => router.push('/admin/rbac')}
-            >
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to RBAC
+      <div className="p-6">
+        <Card>
+          <CardContent className="p-6">
+            <p className="text-red-600">You don't have permission to edit roles.</p>
+            <Button onClick={() => router.push('/admin/rbac')} className="mt-4">
+              Go Back
             </Button>
           </CardContent>
         </Card>
@@ -314,217 +233,140 @@ export default function EditRolePage() {
   }
 
   return (
-    <div className="container mx-auto py-8 px-4">
-      <div className="mb-6">
-        <Button 
-          variant="ghost" 
-          onClick={() => router.push('/admin/rbac')}
-          className="mb-4"
-        >
-          <ArrowLeft className="h-4 w-4 mr-2" />
-          Back to RBAC
-        </Button>
-        
-        <div className="flex items-center justify-between">
+    <div className="p-6 max-w-7xl mx-auto">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-4">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => router.push('/admin/rbac')}
+          >
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back
+          </Button>
           <div>
-            <h1 className="text-3xl font-bold flex items-center gap-2">
-              <Shield className="h-8 w-8" />
-              Edit Role
-            </h1>
-            <p className="text-gray-600 mt-2">
-              Modify role details and permissions
-            </p>
+            <h1 className="text-3xl font-bold">Edit Role: {role?.role_name}</h1>
+            <p className="text-gray-600 mt-1">Manage role permissions</p>
           </div>
-          
-          {canDelete && !role?.is_system_role && (
+        </div>
+        <div className="flex gap-2">
+          {canDelete && (
             <Button
-              variant="destructive"
+              variant="outline"
               onClick={handleDelete}
-              disabled={saving}
+              className="text-red-600 border-red-600 hover:bg-red-50"
             >
               <Trash2 className="h-4 w-4 mr-2" />
-              Delete Role
+              Delete
             </Button>
           )}
+          <Button onClick={handleSave} disabled={saving}>
+            <Save className="h-4 w-4 mr-2" />
+            {saving ? 'Saving...' : 'Save Changes'}
+          </Button>
         </div>
       </div>
-
-      {success && (
-        <Card className="mb-6 border-green-200 bg-green-50">
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-2 text-green-600">
-              <Check className="h-5 w-5" />
-              <p>Role updated successfully! Redirecting...</p>
-            </div>
-          </CardContent>
-        </Card>
-      )}
 
       {error && (
-        <Card className="mb-6 border-red-200 bg-red-50">
-          <CardContent className="pt-6">
-            <div className="flex items-center gap-2 text-red-600">
-              <AlertCircle className="h-5 w-5" />
-              <p>{error}</p>
-            </div>
-          </CardContent>
-        </Card>
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+          <p className="text-red-800">{error}</p>
+        </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left Column - Form */}
-        <div className="lg:col-span-1">
-          <Card>
-            <CardHeader>
-              <CardTitle>Role Details</CardTitle>
-              <CardDescription>
-                Basic information about the role
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {role?.is_system_role && (
-                <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                  <p className="text-sm text-yellow-800">
-                    This is a system role. Role key cannot be changed.
-                  </p>
-                </div>
-              )}
-
-              <div>
-                <Label htmlFor="roleName">Role Name *</Label>
+      {/* Main Content */}
+      <Card>
+        <CardContent className="p-6">
+          <div className="grid grid-cols-12 gap-6">
+            {/* Left Sidebar - Module Filter */}
+            <div className="col-span-3 border-r pr-6">
+              <div className="mb-4">
                 <Input
-                  id="roleName"
-                  value={roleName}
-                  onChange={(e) => setRoleName(e.target.value)}
-                  placeholder="e.g., Customer Support Agent"
-                  disabled={saving}
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="roleKey">Role Key</Label>
-                <Input
-                  id="roleKey"
-                  value={roleKey}
-                  disabled={true}
-                  className="bg-gray-100"
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  Role key cannot be changed
-                </p>
-              </div>
-
-              <div>
-                <Label htmlFor="description">Description</Label>
-                <Textarea
-                  id="description"
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  placeholder="Describe the role's purpose and responsibilities"
-                  rows={3}
-                  disabled={saving}
-                />
-              </div>
-
-              <div className="pt-4 border-t">
-                <p className="text-sm font-medium mb-2">
-                  Selected Permissions: {selectedPermissions.size}
-                </p>
-                <Button
-                  type="button"
-                  onClick={handleSubmit}
-                  disabled={saving || selectedPermissions.size === 0}
+                  placeholder="Search permissions..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
                   className="w-full"
+                  icon={<Search className="h-4 w-4" />}
+                />
+              </div>
+              
+              <div className="space-y-1">
+                <button
+                  onClick={() => setSelectedModule(null)}
+                  className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors ${
+                    selectedModule === null
+                      ? 'bg-blue-50 text-blue-700 font-medium'
+                      : 'hover:bg-gray-50 text-gray-700'
+                  }`}
                 >
-                  <Save className="h-4 w-4 mr-2" />
-                  {saving ? 'Saving...' : 'Save Changes'}
-                </Button>
+                  All Modules ({allPermissions.length})
+                </button>
+                {modulePermissions.map(({ module, count }) => (
+                  <button
+                    key={module}
+                    onClick={() => setSelectedModule(module)}
+                    className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors ${
+                      selectedModule === module
+                        ? 'bg-blue-50 text-blue-700 font-medium'
+                        : 'hover:bg-gray-50 text-gray-700'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="capitalize">{module}</span>
+                      <span className="text-xs text-gray-500">({count})</span>
+                    </div>
+                  </button>
+                ))}
               </div>
-            </CardContent>
-          </Card>
-        </div>
+            </div>
 
-        {/* Right Column - Permissions */}
-        <div className="lg:col-span-2">
-          <Card>
-            <CardHeader>
-              <CardTitle>Permissions</CardTitle>
-              <CardDescription>
-                Select permissions for this role
-              </CardDescription>
-              <div className="mt-4">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                  <Input
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Search permissions..."
-                    className="pl-10"
-                  />
-                </div>
+            {/* Right Content - Permissions */}
+            <div className="col-span-9">
+              <div className="mb-4">
+                <h3 className="text-lg font-semibold capitalize">
+                  {selectedModule || 'All'} Permissions
+                </h3>
+                <p className="text-sm text-gray-600">
+                  {selectedPermissions.size} of {allPermissions.length} permissions selected
+                </p>
               </div>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-6">
-                {Object.entries(filteredModules).map(([module, perms]) => {
-                  const allSelected = perms.every(p => selectedPermissions.has(p.permission_key))
-                  const someSelected = perms.some(p => selectedPermissions.has(p.permission_key))
-                  
-                  return (
-                    <div key={module} className="border rounded-lg p-4">
-                      <div className="flex items-center justify-between mb-3">
-                        <div className="flex items-center gap-2">
-                          <Checkbox
-                            checked={allSelected}
-                            onCheckedChange={() => toggleModule(module)}
-                            className={someSelected && !allSelected ? 'opacity-50' : ''}
-                          />
-                          <h3 className="font-semibold capitalize">{module} Module</h3>
-                          <Badge variant="secondary">
-                            {perms.filter(p => selectedPermissions.has(p.permission_key)).length} / {perms.length}
-                          </Badge>
-                        </div>
+
+              <div className="space-y-3">
+                {filteredPermissions.map((permission) => (
+                  <div
+                    key={permission.id}
+                    className="flex items-start justify-between p-4 border rounded-lg hover:bg-gray-50 transition-colors"
+                  >
+                    <div className="flex-1">
+                      <div className="font-medium text-gray-900">
+                        {permission.permission_name}
                       </div>
-                      
-                      <div className="space-y-2 ml-6">
-                        {perms.map((perm) => (
-                          <div
-                            key={perm.id}
-                            className="flex items-start gap-3 p-2 hover:bg-gray-50 rounded"
-                          >
-                            <Checkbox
-                              checked={selectedPermissions.has(perm.permission_key)}
-                              onCheckedChange={() => togglePermission(perm.permission_key)}
-                            />
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2">
-                                <code className="text-xs bg-gray-100 px-2 py-1 rounded">
-                                  {perm.permission_key}
-                                </code>
-                                <Badge variant="outline" className="text-xs">
-                                  {perm.action}
-                                </Badge>
-                              </div>
-                              <p className="text-sm text-gray-700 mt-1">
-                                {perm.permission_name}
-                              </p>
-                              {perm.description && (
-                                <p className="text-xs text-gray-500 mt-1">
-                                  {perm.description}
-                                </p>
-                              )}
-                            </div>
-                          </div>
-                        ))}
+                      {permission.description && (
+                        <div className="text-sm text-gray-600 mt-1">
+                          {permission.description}
+                        </div>
+                      )}
+                      <div className="text-xs text-gray-500 mt-1">
+                        {permission.permission_key}
                       </div>
                     </div>
-                  )
-                })}
+                    <Switch
+                      checked={selectedPermissions.has(permission.id)}
+                      onCheckedChange={() => togglePermission(permission.id)}
+                    />
+                  </div>
+                ))}
+
+                {filteredPermissions.length === 0 && (
+                  <div className="text-center py-12 text-gray-500">
+                    No permissions found matching your search.
+                  </div>
+                )}
               </div>
-            </CardContent>
-          </Card>
-        </div>
-      </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   )
 }

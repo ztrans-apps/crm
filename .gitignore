@@ -52,6 +52,11 @@ scripts/*-migration.sql
 scripts/fix-*.sql
 scripts/check-*.sql
 
+# Debug scripts (for development only)
+scripts/check-all-tables.js
+scripts/check-table-columns.js
+scripts/check-database-schema.js
+
 # vercel
 .vercel
 

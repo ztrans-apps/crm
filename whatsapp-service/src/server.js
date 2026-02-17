@@ -433,11 +433,13 @@ process.on('unhandledRejection', (reason, promise) => {
 process.on('SIGTERM', async () => {
   console.log('📴 SIGTERM received, shutting down gracefully...')
   
-  // Close all WhatsApp sessions
+  // Close all WhatsApp sessions WITHOUT logging out
+  // This preserves auth credentials for next restart
   for (const [sessionKey, session] of whatsappService.sessions.entries()) {
     try {
       console.log(`📴 Closing session: ${sessionKey}`)
-      await session.sock.logout()
+      // Use end() instead of logout() to preserve credentials
+      await session.sock.end()
     } catch (error) {
       console.error(`❌ Error closing session ${sessionKey}:`, error.message)
     }
@@ -459,11 +461,13 @@ process.on('SIGTERM', async () => {
 process.on('SIGINT', async () => {
   console.log('📴 SIGINT received, shutting down gracefully...')
   
-  // Close all WhatsApp sessions
+  // Close all WhatsApp sessions WITHOUT logging out
+  // This preserves auth credentials for next restart
   for (const [sessionKey, session] of whatsappService.sessions.entries()) {
     try {
       console.log(`📴 Closing session: ${sessionKey}`)
-      await session.sock.logout()
+      // Use end() instead of logout() to preserve credentials
+      await session.sock.end()
     } catch (error) {
       console.error(`❌ Error closing session ${sessionKey}:`, error.message)
     }

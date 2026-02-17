@@ -96,79 +96,188 @@ export default function RolesPage() {
         </div>
       }
     >
-      <div className="p-8">
-        <div className="mb-6 flex items-center justify-between">
-          <h1 className="text-3xl font-bold">Role Management</h1>
+      <div className="p-8 max-w-7xl mx-auto">
+        {/* Header */}
+        <div className="mb-8 flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">Role Management</h1>
+            <p className="text-gray-600 mt-1">Manage roles and their permissions</p>
+          </div>
           
           <PermissionGuard permission="role.create">
             <button
               onClick={() => setShowCreateModal(true)}
-              className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+              className="px-6 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium flex items-center gap-2"
             >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
               Create Role
             </button>
           </PermissionGuard>
         </div>
 
-        <div className="grid gap-6">
-          {roles.map((role) => (
-            <div key={role.id} className="border rounded-lg p-6 bg-white shadow">
-              <div className="flex items-start justify-between mb-4">
-                <div>
-                  <h2 className="text-xl font-semibold">{role.role_name}</h2>
-                  {role.description && (
-                    <p className="text-gray-600 mt-1">{role.description}</p>
-                  )}
-                  {role.is_master_template && (
-                    <span className="inline-block mt-2 px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded">
-                      Master Template
-                    </span>
-                  )}
-                </div>
-
-                <div className="flex gap-2">
-                  <PermissionGuard permission="role.edit">
-                    <button
-                      onClick={() => setSelectedRole(role)}
-                      className="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 rounded"
-                    >
-                      Edit
-                    </button>
-                  </PermissionGuard>
-
-                  <PermissionGuard permission="role.delete">
-                    {!role.is_master_template && (
-                      <button
-                        onClick={() => handleDeleteRole(role.id)}
-                        className="px-3 py-1 text-sm bg-red-100 text-red-700 hover:bg-red-200 rounded"
-                      >
-                        Delete
-                      </button>
-                    )}
-                  </PermissionGuard>
-                </div>
-              </div>
-
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          <div className="bg-white rounded-lg border p-6">
+            <div className="flex items-center justify-between">
               <div>
-                <h3 className="font-medium mb-2">Permissions ({role.permissions.length})</h3>
-                <div className="flex flex-wrap gap-2">
-                  {role.permissions.slice(0, 10).map((perm) => (
-                    <span
-                      key={perm.id}
-                      className="px-2 py-1 text-xs bg-gray-100 rounded"
-                    >
-                      {perm.permission_key}
-                    </span>
-                  ))}
-                  {role.permissions.length > 10 && (
-                    <span className="px-2 py-1 text-xs text-gray-500">
-                      +{role.permissions.length - 10} more
-                    </span>
-                  )}
-                </div>
+                <p className="text-sm text-gray-600 mb-1">Total Roles</p>
+                <p className="text-3xl font-bold text-gray-900">{roles.length}</p>
+              </div>
+              <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                </svg>
               </div>
             </div>
-          ))}
+          </div>
+
+          <div className="bg-white rounded-lg border p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600 mb-1">Total Permissions</p>
+                <p className="text-3xl font-bold text-gray-900">{allPermissions.length}</p>
+              </div>
+              <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
+                <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                </svg>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-lg border p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600 mb-1">System Roles</p>
+                <p className="text-3xl font-bold text-gray-900">
+                  {roles.filter(r => r.is_system_role).length}
+                </p>
+              </div>
+              <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
+                <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                </svg>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Roles Table */}
+        <div className="bg-white rounded-lg border overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-gray-50 border-b">
+                <tr>
+                  <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Role
+                  </th>
+                  <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Description
+                  </th>
+                  <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Permissions
+                  </th>
+                  <th className="px-6 py-4 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Type
+                  </th>
+                  <th className="px-6 py-4 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200">
+                {roles.map((role) => (
+                  <tr key={role.id} className="hover:bg-gray-50 transition-colors">
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center">
+                        <div className="flex-shrink-0 h-10 w-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center">
+                          <span className="text-white font-semibold text-sm">
+                            {role.role_name.charAt(0).toUpperCase()}
+                          </span>
+                        </div>
+                        <div className="ml-4">
+                          <div className="text-sm font-medium text-gray-900">
+                            {role.role_name}
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            {role.role_key}
+                          </div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="text-sm text-gray-900 max-w-xs truncate">
+                        {role.description || '-'}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center gap-2">
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                          {role.permissions.length} permissions
+                        </span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      {role.is_master_template ? (
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                          Master Template
+                        </span>
+                      ) : role.is_system_role ? (
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                          System Role
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                          Custom
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                      <div className="flex items-center justify-end gap-2">
+                        <PermissionGuard permission="role.edit">
+                          <button
+                            onClick={() => setSelectedRole(role)}
+                            className="inline-flex items-center px-3 py-1.5 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors"
+                          >
+                            <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                            </svg>
+                            Edit
+                          </button>
+                        </PermissionGuard>
+
+                        <PermissionGuard permission="role.delete">
+                          {!role.is_master_template && (
+                            <button
+                              onClick={() => handleDeleteRole(role.id)}
+                              className="inline-flex items-center px-3 py-1.5 border border-red-300 rounded-md text-sm font-medium text-red-700 bg-white hover:bg-red-50 transition-colors"
+                            >
+                              <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              </svg>
+                              Delete
+                            </button>
+                          )}
+                        </PermissionGuard>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {roles.length === 0 && (
+            <div className="text-center py-12">
+              <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+              </svg>
+              <h3 className="mt-2 text-sm font-medium text-gray-900">No roles</h3>
+              <p className="mt-1 text-sm text-gray-500">Get started by creating a new role.</p>
+            </div>
+          )}
         </div>
 
         {/* Edit Role Modal */}
@@ -222,6 +331,8 @@ function RoleEditModal({
     new Set(role.permissions.map(p => p.id))
   )
   const [saving, setSaving] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [selectedModule, setSelectedModule] = useState<string | null>(null)
 
   function togglePermission(permId: string) {
     const newSet = new Set(selectedPermissions)
@@ -230,21 +341,6 @@ function RoleEditModal({
     } else {
       newSet.add(permId)
     }
-    setSelectedPermissions(newSet)
-  }
-
-  function toggleModule(module: string) {
-    const modulePerms = permissionsByModule[module]
-    const allSelected = modulePerms.every(p => selectedPermissions.has(p.id))
-    
-    const newSet = new Set(selectedPermissions)
-    modulePerms.forEach(p => {
-      if (allSelected) {
-        newSet.delete(p.id)
-      } else {
-        newSet.add(p.id)
-      }
-    })
     setSelectedPermissions(newSet)
   }
 
@@ -276,87 +372,147 @@ function RoleEditModal({
     }
   }
 
+  // Get modules with counts
+  const modules = Object.keys(permissionsByModule).map(module => ({
+    name: module,
+    count: permissionsByModule[module].length
+  }))
+
+  // Filter permissions
+  const displayedPermissions = selectedModule
+    ? permissionsByModule[selectedModule] || []
+    : allPermissions
+
+  const filteredPermissions = displayedPermissions.filter(p => {
+    if (!searchQuery) return true
+    return p.permission_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+           p.description?.toLowerCase().includes(searchQuery.toLowerCase())
+  })
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-        <div className="p-6 border-b sticky top-0 bg-white">
-          <h2 className="text-2xl font-bold">Edit Role: {role.role_name}</h2>
+      <div className="bg-white rounded-lg max-w-6xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+        {/* Header */}
+        <div className="p-6 border-b">
+          <div className="flex items-center justify-between">
+            <h2 className="text-2xl font-bold">Edit Role: {role.role_name}</h2>
+            <button
+              onClick={onClose}
+              className="text-gray-400 hover:text-gray-600"
+            >
+              ✕
+            </button>
+          </div>
+          <p className="text-sm text-gray-600 mt-1">
+            Manage role permissions. Use Search to filter the permissions below.
+          </p>
         </div>
 
-        <div className="p-6 space-y-6">
-          <div>
-            <label className="block text-sm font-medium mb-2">Role Name</label>
-            <input
-              type="text"
-              value={roleName}
-              onChange={(e) => setRoleName(e.target.value)}
-              className="w-full px-3 py-2 border rounded"
-              disabled={role.is_master_template}
-            />
+        {/* Content */}
+        <div className="flex-1 overflow-hidden flex">
+          {/* Left Sidebar - Module Filter */}
+          <div className="w-64 border-r p-4 overflow-y-auto">
+            <div className="mb-4">
+              <input
+                type="text"
+                placeholder="Search for..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full px-3 py-2 border rounded text-sm"
+              />
+            </div>
+
+            <div className="space-y-1">
+              <button
+                onClick={() => setSelectedModule(null)}
+                className={`w-full text-left px-3 py-2 rounded text-sm transition-colors ${
+                  selectedModule === null
+                    ? 'bg-blue-50 text-blue-700 font-medium'
+                    : 'hover:bg-gray-50 text-gray-700'
+                }`}
+              >
+                All Modules ({allPermissions.length})
+              </button>
+              
+              {modules.map(({ name, count }) => (
+                <button
+                  key={name}
+                  onClick={() => setSelectedModule(name)}
+                  className={`w-full text-left px-3 py-2 rounded text-sm transition-colors ${
+                    selectedModule === name
+                      ? 'bg-blue-50 text-blue-700 font-medium'
+                      : 'hover:bg-gray-50 text-gray-700'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="capitalize">{name}</span>
+                    <span className="text-xs text-gray-500">({count})</span>
+                  </div>
+                </button>
+              ))}
+            </div>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium mb-2">Description</label>
-            <textarea
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              className="w-full px-3 py-2 border rounded"
-              rows={3}
-            />
-          </div>
+          {/* Right Content - Permissions */}
+          <div className="flex-1 p-6 overflow-y-auto">
+            <div className="mb-4">
+              <h3 className="text-lg font-semibold capitalize">
+                {selectedModule || 'All'} Module
+              </h3>
+              <p className="text-sm text-gray-600">
+                {selectedPermissions.size} of {allPermissions.length} permissions selected
+              </p>
+            </div>
 
-          <div>
-            <h3 className="text-lg font-semibold mb-4">Permissions</h3>
-            
-            {Object.entries(permissionsByModule).map(([module, perms]) => {
-              const allSelected = perms.every(p => selectedPermissions.has(p.id))
-              const someSelected = perms.some(p => selectedPermissions.has(p.id))
-
-              return (
-                <div key={module} className="mb-4 border rounded p-4">
-                  <div className="flex items-center mb-3">
+            <div className="space-y-3">
+              {filteredPermissions.map((permission) => (
+                <div
+                  key={permission.id}
+                  className="flex items-start justify-between p-4 border rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  <div className="flex-1">
+                    <div className="font-medium text-gray-900">
+                      {permission.permission_name}
+                    </div>
+                    {permission.description && (
+                      <div className="text-sm text-gray-600 mt-1">
+                        {permission.description}
+                      </div>
+                    )}
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer ml-4">
                     <input
                       type="checkbox"
-                      checked={allSelected}
-                      ref={(el) => {
-                        if (el) el.indeterminate = someSelected && !allSelected
-                      }}
-                      onChange={() => toggleModule(module)}
-                      className="mr-2"
+                      checked={selectedPermissions.has(permission.id)}
+                      onChange={() => togglePermission(permission.id)}
+                      className="sr-only peer"
                     />
-                    <h4 className="font-medium capitalize">{module}</h4>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-2 ml-6">
-                    {perms.map((perm) => (
-                      <label key={perm.id} className="flex items-center">
-                        <input
-                          type="checkbox"
-                          checked={selectedPermissions.has(perm.id)}
-                          onChange={() => togglePermission(perm.id)}
-                          className="mr-2"
-                        />
-                        <span className="text-sm">{perm.permission_name}</span>
-                      </label>
-                    ))}
-                  </div>
+                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                  </label>
                 </div>
-              )
-            })}
+              ))}
+
+              {filteredPermissions.length === 0 && (
+                <div className="text-center py-12 text-gray-500">
+                  No permissions found matching your search.
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
-        <div className="p-6 border-t flex justify-end gap-3 sticky bottom-0 bg-white">
+        {/* Footer */}
+        <div className="p-6 border-t flex justify-end gap-3">
           <button
             onClick={onClose}
-            className="px-4 py-2 border rounded hover:bg-gray-50"
+            className="px-6 py-2 border rounded hover:bg-gray-50"
             disabled={saving}
           >
             Cancel
           </button>
           <button
             onClick={handleSave}
-            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+            className="px-6 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
             disabled={saving}
           >
             {saving ? 'Saving...' : 'Save Changes'}
@@ -383,6 +539,8 @@ function RoleCreateModal({
   const [description, setDescription] = useState('')
   const [selectedPermissions, setSelectedPermissions] = useState<Set<string>>(new Set())
   const [saving, setSaving] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [selectedModule, setSelectedModule] = useState<string | null>(null)
 
   function togglePermission(permId: string) {
     const newSet = new Set(selectedPermissions)
@@ -391,21 +549,6 @@ function RoleCreateModal({
     } else {
       newSet.add(permId)
     }
-    setSelectedPermissions(newSet)
-  }
-
-  function toggleModule(module: string) {
-    const modulePerms = permissionsByModule[module]
-    const allSelected = modulePerms.every(p => selectedPermissions.has(p.id))
-    
-    const newSet = new Set(selectedPermissions)
-    modulePerms.forEach(p => {
-      if (allSelected) {
-        newSet.delete(p.id)
-      } else {
-        newSet.add(p.id)
-      }
-    })
     setSelectedPermissions(newSet)
   }
 
@@ -442,89 +585,179 @@ function RoleCreateModal({
     }
   }
 
+  // Get modules with counts
+  const modules = Object.keys(permissionsByModule).map(module => ({
+    name: module,
+    count: permissionsByModule[module].length
+  }))
+
+  // Filter permissions
+  const displayedPermissions = selectedModule
+    ? permissionsByModule[selectedModule] || []
+    : allPermissions
+
+  const filteredPermissions = displayedPermissions.filter(p => {
+    if (!searchQuery) return true
+    return p.permission_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+           p.description?.toLowerCase().includes(searchQuery.toLowerCase())
+  })
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-        <div className="p-6 border-b sticky top-0 bg-white">
-          <h2 className="text-2xl font-bold">Create New Role</h2>
+      <div className="bg-white rounded-lg max-w-6xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+        {/* Header */}
+        <div className="p-6 border-b">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-2xl font-bold">Create New Role</h2>
+              <p className="text-sm text-gray-600 mt-1">
+                Set up a new role with specific permissions
+              </p>
+            </div>
+            <button
+              onClick={onClose}
+              className="text-gray-400 hover:text-gray-600"
+            >
+              ✕
+            </button>
+          </div>
         </div>
 
-        <div className="p-6 space-y-6">
+        {/* Basic Info */}
+        <div className="p-6 border-b space-y-4">
           <div>
-            <label className="block text-sm font-medium mb-2">Role Name</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Role Name <span className="text-red-500">*</span>
+            </label>
             <input
               type="text"
               value={roleName}
               onChange={(e) => setRoleName(e.target.value)}
-              className="w-full px-3 py-2 border rounded"
               placeholder="e.g., Team Lead"
+              className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-2">Description</label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Description
+            </label>
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              className="w-full px-3 py-2 border rounded"
-              rows={3}
               placeholder="Describe the role's purpose..."
+              rows={2}
+              className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             />
-          </div>
-
-          <div>
-            <h3 className="text-lg font-semibold mb-4">Permissions</h3>
-            
-            {Object.entries(permissionsByModule).map(([module, perms]) => {
-              const allSelected = perms.every(p => selectedPermissions.has(p.id))
-              const someSelected = perms.some(p => selectedPermissions.has(p.id))
-
-              return (
-                <div key={module} className="mb-4 border rounded p-4">
-                  <div className="flex items-center mb-3">
-                    <input
-                      type="checkbox"
-                      checked={allSelected}
-                      ref={(el) => {
-                        if (el) el.indeterminate = someSelected && !allSelected
-                      }}
-                      onChange={() => toggleModule(module)}
-                      className="mr-2"
-                    />
-                    <h4 className="font-medium capitalize">{module}</h4>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-2 ml-6">
-                    {perms.map((perm) => (
-                      <label key={perm.id} className="flex items-center">
-                        <input
-                          type="checkbox"
-                          checked={selectedPermissions.has(perm.id)}
-                          onChange={() => togglePermission(perm.id)}
-                          className="mr-2"
-                        />
-                        <span className="text-sm">{perm.permission_name}</span>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-              )
-            })}
           </div>
         </div>
 
-        <div className="p-6 border-t flex justify-end gap-3 sticky bottom-0 bg-white">
+        {/* Permissions Section */}
+        <div className="flex-1 overflow-hidden flex">
+          {/* Left Sidebar - Module Filter */}
+          <div className="w-64 border-r p-4 overflow-y-auto">
+            <div className="mb-4">
+              <input
+                type="text"
+                placeholder="Search permissions..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full px-3 py-2 border rounded text-sm"
+              />
+            </div>
+
+            <div className="space-y-1">
+              <button
+                onClick={() => setSelectedModule(null)}
+                className={`w-full text-left px-3 py-2 rounded text-sm transition-colors ${
+                  selectedModule === null
+                    ? 'bg-blue-50 text-blue-700 font-medium'
+                    : 'hover:bg-gray-50 text-gray-700'
+                }`}
+              >
+                All Modules ({allPermissions.length})
+              </button>
+              
+              {modules.map(({ name, count }) => (
+                <button
+                  key={name}
+                  onClick={() => setSelectedModule(name)}
+                  className={`w-full text-left px-3 py-2 rounded text-sm transition-colors ${
+                    selectedModule === name
+                      ? 'bg-blue-50 text-blue-700 font-medium'
+                      : 'hover:bg-gray-50 text-gray-700'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="capitalize">{name}</span>
+                    <span className="text-xs text-gray-500">({count})</span>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Right Content - Permissions */}
+          <div className="flex-1 p-6 overflow-y-auto">
+            <div className="mb-4">
+              <h3 className="text-lg font-semibold capitalize">
+                {selectedModule || 'All'} Permissions
+              </h3>
+              <p className="text-sm text-gray-600">
+                {selectedPermissions.size} of {allPermissions.length} permissions selected
+              </p>
+            </div>
+
+            <div className="space-y-3">
+              {filteredPermissions.map((permission) => (
+                <div
+                  key={permission.id}
+                  className="flex items-start justify-between p-4 border rounded-lg hover:bg-gray-50 transition-colors"
+                >
+                  <div className="flex-1">
+                    <div className="font-medium text-gray-900">
+                      {permission.permission_name}
+                    </div>
+                    {permission.description && (
+                      <div className="text-sm text-gray-600 mt-1">
+                        {permission.description}
+                      </div>
+                    )}
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer ml-4">
+                    <input
+                      type="checkbox"
+                      checked={selectedPermissions.has(permission.id)}
+                      onChange={() => togglePermission(permission.id)}
+                      className="sr-only peer"
+                    />
+                    <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                  </label>
+                </div>
+              ))}
+
+              {filteredPermissions.length === 0 && (
+                <div className="text-center py-12 text-gray-500">
+                  No permissions found matching your search.
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="p-6 border-t flex justify-end gap-3">
           <button
             onClick={onClose}
-            className="px-4 py-2 border rounded hover:bg-gray-50"
+            className="px-6 py-2 border rounded-lg hover:bg-gray-50 transition-colors"
             disabled={saving}
           >
             Cancel
           </button>
           <button
             onClick={handleCreate}
-            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
-            disabled={saving}
+            className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
+            disabled={saving || !roleName.trim()}
           >
             {saving ? 'Creating...' : 'Create Role'}
           </button>

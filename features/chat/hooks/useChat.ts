@@ -140,6 +140,18 @@ export function useChat() {
           debounceTimer = setTimeout(() => loadConversations(), 300)
         }
       )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'conversation_labels'
+        },
+        () => {
+          clearTimeout(debounceTimer)
+          debounceTimer = setTimeout(() => loadConversations(), 300)
+        }
+      )
       .subscribe()
 
     return () => {

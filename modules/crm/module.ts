@@ -17,7 +17,7 @@ export class CRMModule extends BaseModule {
   getRoutes(): RouteDefinition[] {
     return [
       {
-        path: '/api/crm/contacts',
+        path: '/api/contacts',
         method: 'GET',
         handler: async (req) => {
           const tenantId = req.headers.get('x-tenant-id');
@@ -30,7 +30,7 @@ export class CRMModule extends BaseModule {
         },
       },
       {
-        path: '/api/crm/contacts',
+        path: '/api/contacts',
         method: 'POST',
         handler: async (req) => {
           const tenantId = req.headers.get('x-tenant-id');

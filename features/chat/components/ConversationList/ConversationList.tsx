@@ -62,11 +62,8 @@ export function ConversationList({
   const [sortBy, setSortBy] = useState<SortType>('newest')
   const [advancedFilters, setAdvancedFilters] = useState({
     unrespondedChat: false,
-    sessionOpen: false,
-    sessionExpiring: false,
-    sessionExpired: false,
-    selectedDivision: '',
-    selectedChannel: '',
+    workflowStatuses: [] as string[],
+    assignedAgents: [] as string[],
     selectedTags: [] as string[],
     untagged: false,
   })
@@ -93,28 +90,40 @@ export function ConversationList({
     return true
   }).filter(conv => {
     // Apply advanced filters
-    if (advancedFilters.unrespondedChat && conv.read_status === 'read') {
+    
+    // Unresponded chat: no first_response_at (agent hasn't replied yet)
+    if (advancedFilters.unrespondedChat && conv.first_response_at) {
       return false
     }
-    // Session filters would need backend data
-    if (advancedFilters.sessionOpen || advancedFilters.sessionExpiring || advancedFilters.sessionExpired) {
-      // Placeholder for session filtering
+    
+    // Workflow status filter
+    if (advancedFilters.workflowStatuses.length > 0) {
+      if (!advancedFilters.workflowStatuses.includes(conv.workflow_status || 'incoming')) {
+        return false
+      }
     }
-    if (advancedFilters.selectedDivision && (conv as any).assigned_to_user?.division !== advancedFilters.selectedDivision) {
-      return false
+    
+    // Assigned agent filter
+    if (advancedFilters.assignedAgents.length > 0) {
+      if (!conv.assigned_to || !advancedFilters.assignedAgents.includes(conv.assigned_to)) {
+        return false
+      }
     }
-    if (advancedFilters.selectedChannel && (conv as any).channel !== advancedFilters.selectedChannel) {
-      return false
-    }
+    
+    // Tags filter
     if (advancedFilters.selectedTags.length > 0) {
-      const hasSelectedTag = conv.labels?.some(label => 
-        advancedFilters.selectedTags.includes(label.id)
-      )
+      const hasSelectedTag = conv.labels?.some(labelItem => {
+        const label = labelItem.label || labelItem
+        return advancedFilters.selectedTags.includes(label.id)
+      })
       if (!hasSelectedTag) return false
     }
+    
+    // Untagged filter
     if (advancedFilters.untagged && conv.labels && conv.labels.length > 0) {
       return false
     }
+    
     return true
   })
 
@@ -148,31 +157,37 @@ export function ConversationList({
 
   const activeFilterCount = 
     (advancedFilters.unrespondedChat ? 1 : 0) +
-    (advancedFilters.sessionOpen ? 1 : 0) +
-    (advancedFilters.sessionExpiring ? 1 : 0) +
-    (advancedFilters.sessionExpired ? 1 : 0) +
-    (advancedFilters.selectedDivision ? 1 : 0) +
-    (advancedFilters.selectedChannel ? 1 : 0) +
-    (advancedFilters.selectedTags.length) +
+    advancedFilters.workflowStatuses.length +
+    advancedFilters.assignedAgents.length +
+    advancedFilters.selectedTags.length +
     (advancedFilters.untagged ? 1 : 0)
+
+  // Get unique agents for filter dropdown
+  const availableAgents = Array.from(
+    new Map(
+      conversations
+        .filter(c => c.assigned_agent)
+        .map(c => [c.assigned_agent.id, c.assigned_agent])
+    ).values()
+  )
 
   // Get unique labels for filter dropdown
   const availableLabels = Array.from(
     new Map(
       conversations
         .flatMap(c => c.labels || [])
-        .map(label => [label.id, label])
+        .map(labelItem => {
+          const label = labelItem.label || labelItem
+          return [label.id, label]
+        })
     ).values()
   )
 
   const resetFilters = () => {
     setAdvancedFilters({
       unrespondedChat: false,
-      sessionOpen: false,
-      sessionExpiring: false,
-      sessionExpired: false,
-      selectedDivision: '',
-      selectedChannel: '',
+      workflowStatuses: [],
+      assignedAgents: [],
       selectedTags: [],
       untagged: false,
     })
@@ -318,86 +333,105 @@ export function ConversationList({
                     setAdvancedFilters(prev => ({ ...prev, unrespondedChat: checked }))
                   }
                 >
-                  Unresponded chat
+                  Belum dibalas agent
                 </DropdownMenuCheckboxItem>
               </div>
 
               <DropdownMenuSeparator />
               
-              {/* Session */}
+              {/* Workflow Status */}
               <div className="px-2 py-1">
-                <div className="text-xs font-semibold text-gray-700 mb-1.5">Session</div>
+                <div className="text-xs font-semibold text-gray-700 mb-1.5">Status Workflow</div>
                 <div className="space-y-1">
                   <DropdownMenuCheckboxItem
-                    checked={advancedFilters.sessionOpen}
-                    onCheckedChange={(checked) => 
-                      setAdvancedFilters(prev => ({ ...prev, sessionOpen: checked }))
-                    }
+                    checked={advancedFilters.workflowStatuses.includes('incoming')}
+                    onCheckedChange={(checked) => {
+                      setAdvancedFilters(prev => ({
+                        ...prev,
+                        workflowStatuses: checked
+                          ? [...prev.workflowStatuses, 'incoming']
+                          : prev.workflowStatuses.filter(s => s !== 'incoming')
+                      }))
+                    }}
                   >
-                    Open
+                    Masuk
                   </DropdownMenuCheckboxItem>
                   <DropdownMenuCheckboxItem
-                    checked={advancedFilters.sessionExpiring}
-                    onCheckedChange={(checked) => 
-                      setAdvancedFilters(prev => ({ ...prev, sessionExpiring: checked }))
-                    }
+                    checked={advancedFilters.workflowStatuses.includes('waiting')}
+                    onCheckedChange={(checked) => {
+                      setAdvancedFilters(prev => ({
+                        ...prev,
+                        workflowStatuses: checked
+                          ? [...prev.workflowStatuses, 'waiting']
+                          : prev.workflowStatuses.filter(s => s !== 'waiting')
+                      }))
+                    }}
                   >
-                    Expiring
+                    Menunggu
                   </DropdownMenuCheckboxItem>
                   <DropdownMenuCheckboxItem
-                    checked={advancedFilters.sessionExpired}
-                    onCheckedChange={(checked) => 
-                      setAdvancedFilters(prev => ({ ...prev, sessionExpired: checked }))
-                    }
+                    checked={advancedFilters.workflowStatuses.includes('in_progress')}
+                    onCheckedChange={(checked) => {
+                      setAdvancedFilters(prev => ({
+                        ...prev,
+                        workflowStatuses: checked
+                          ? [...prev.workflowStatuses, 'in_progress']
+                          : prev.workflowStatuses.filter(s => s !== 'in_progress')
+                      }))
+                    }}
                   >
-                    Expired
+                    Sedang Dikerjakan
+                  </DropdownMenuCheckboxItem>
+                  <DropdownMenuCheckboxItem
+                    checked={advancedFilters.workflowStatuses.includes('done')}
+                    onCheckedChange={(checked) => {
+                      setAdvancedFilters(prev => ({
+                        ...prev,
+                        workflowStatuses: checked
+                          ? [...prev.workflowStatuses, 'done']
+                          : prev.workflowStatuses.filter(s => s !== 'done')
+                      }))
+                    }}
+                  >
+                    Selesai
                   </DropdownMenuCheckboxItem>
                 </div>
               </div>
 
               <DropdownMenuSeparator />
 
-              {/* Division */}
+              {/* Assigned Agent */}
               <div className="px-2 py-2">
-                <div className="text-xs font-semibold text-gray-700 mb-1.5">Division</div>
-                <select
-                  value={advancedFilters.selectedDivision}
-                  onChange={(e) => 
-                    setAdvancedFilters(prev => ({ ...prev, selectedDivision: e.target.value }))
-                  }
-                  className="w-full h-8 px-2 text-xs border rounded bg-white"
-                >
-                  <option value="">Select division</option>
-                  <option value="sales">Sales</option>
-                  <option value="support">Support</option>
-                  <option value="marketing">Marketing</option>
-                </select>
-              </div>
-
-              <DropdownMenuSeparator />
-
-              {/* Channel */}
-              <div className="px-2 py-2">
-                <div className="text-xs font-semibold text-gray-700 mb-1.5">Channel</div>
-                <select
-                  value={advancedFilters.selectedChannel}
-                  onChange={(e) => 
-                    setAdvancedFilters(prev => ({ ...prev, selectedChannel: e.target.value }))
-                  }
-                  className="w-full h-8 px-2 text-xs border rounded bg-white"
-                >
-                  <option value="">Select channel</option>
-                  <option value="whatsapp">WhatsApp</option>
-                  <option value="telegram">Telegram</option>
-                  <option value="instagram">Instagram</option>
-                </select>
+                <div className="text-xs font-semibold text-gray-700 mb-1.5">Agent</div>
+                <div className="max-h-32 overflow-y-auto space-y-1">
+                  {availableAgents.length > 0 ? (
+                    availableAgents.map((agent) => (
+                      <DropdownMenuCheckboxItem
+                        key={agent.id}
+                        checked={advancedFilters.assignedAgents.includes(agent.id)}
+                        onCheckedChange={(checked) => {
+                          setAdvancedFilters(prev => ({
+                            ...prev,
+                            assignedAgents: checked
+                              ? [...prev.assignedAgents, agent.id]
+                              : prev.assignedAgents.filter(id => id !== agent.id)
+                          }))
+                        }}
+                      >
+                        {agent.full_name || agent.email}
+                      </DropdownMenuCheckboxItem>
+                    ))
+                  ) : (
+                    <div className="text-xs text-gray-500 py-2">No agents assigned</div>
+                  )}
+                </div>
               </div>
 
               <DropdownMenuSeparator />
 
               {/* Tags */}
               <div className="px-2 py-2">
-                <div className="text-xs font-semibold text-gray-700 mb-1.5">Tags</div>
+                <div className="text-xs font-semibold text-gray-700 mb-1.5">Label</div>
                 <div className="max-h-32 overflow-y-auto space-y-1">
                   {availableLabels.length > 0 ? (
                     availableLabels.map((label) => (
@@ -416,7 +450,7 @@ export function ConversationList({
                         <div className="flex items-center gap-2">
                           {label.color && (
                             <div 
-                              className="w-3 h-3 rounded-full" 
+                              className="w-3 h-2 rounded-sm" 
                               style={{ backgroundColor: label.color }}
                             />
                           )}
@@ -425,7 +459,7 @@ export function ConversationList({
                       </DropdownMenuCheckboxItem>
                     ))
                   ) : (
-                    <div className="text-xs text-gray-500 py-2">No tags available</div>
+                    <div className="text-xs text-gray-500 py-2">Tidak ada label</div>
                   )}
                 </div>
                 <DropdownMenuCheckboxItem
@@ -435,7 +469,7 @@ export function ConversationList({
                   }
                   className="mt-1"
                 >
-                  Untagged
+                  Tanpa label
                 </DropdownMenuCheckboxItem>
               </div>
             </DropdownMenuContent>

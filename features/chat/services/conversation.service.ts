@@ -27,8 +27,12 @@ export class ConversationService extends BaseService {
         .select(`
           *,
           contact:contacts!inner(id, name, phone_number, email, metadata),
-          whatsapp_session:whatsapp_sessions(id),
-          assigned_agent:profiles!conversations_assigned_to_fkey(id, full_name, email)
+          whatsapp_session:whatsapp_sessions(id, phone_number, session_name, status),
+          assigned_agent:profiles!conversations_assigned_to_fkey(id, full_name, email),
+          labels:conversation_labels(
+            id,
+            label:labels(id, name, color)
+          )
         `)
 
       // Apply role-based filtering
@@ -99,7 +103,7 @@ export class ConversationService extends BaseService {
         .select(`
           *,
           contact:contacts!inner(id, name, phone_number, email, metadata),
-          whatsapp_session:whatsapp_sessions(id),
+          whatsapp_session:whatsapp_sessions(id, phone_number, session_name, status),
           assigned_agent:profiles!conversations_assigned_to_fkey(id, full_name, email)
         `)
         .eq('id', conversationId)

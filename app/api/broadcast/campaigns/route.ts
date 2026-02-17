@@ -1,150 +1,262 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { getCurrentTenant } from '@/core/tenant';
 
 /**
  * GET /api/broadcast/campaigns
- * Get all campaigns for current tenant
+ * Get all broadcast campaigns for the current tenant
  */
 export async function GET(req: NextRequest) {
   try {
-    const tenant = await getCurrentTenant();
-    if (!tenant) {
+    const supabase = await createClient();
+    
+    // Get current user
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    if (userError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const supabase = await createClient();
-    const searchParams = req.nextUrl.searchParams;
-    const status = searchParams.get('status');
+    // Get user's tenant
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('tenant_id')
+      .eq('id', user.id)
+      .single();
 
-    let query = supabase
+    if (!profile) {
+      return NextResponse.json({ error: 'Profile not found' }, { status: 404 });
+    }
+
+    // Get campaigns
+    const { data: campaigns, error: campaignsError } = await supabase
       .from('broadcast_campaigns')
       .select('*')
-      .eq('tenant_id', tenant.id)
+      .eq('tenant_id', profile.tenant_id)
       .order('created_at', { ascending: false });
 
-    // Filter by status if provided
-    if (status) {
-      query = query.eq('status', status);
+    if (campaignsError) {
+      console.error('Error fetching campaigns:', campaignsError);
+      return NextResponse.json(
+        { error: 'Failed to fetch campaigns' },
+        { status: 500 }
+      );
     }
 
-    const { data, error } = await query;
+    return NextResponse.json({ campaigns: campaigns || [] });
 
-    if (error) {
-      console.error('Error fetching campaigns:', error);
-      return NextResponse.json({ error: 'Failed to fetch campaigns' }, { status: 500 });
-    }
-
-    return NextResponse.json({ campaigns: data || [] });
   } catch (error) {
     console.error('Error in GET /api/broadcast/campaigns:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
   }
 }
 
 /**
  * POST /api/broadcast/campaigns
- * Create a new campaign
+ * Create a new broadcast campaign
  */
 export async function POST(req: NextRequest) {
   try {
-    const tenant = await getCurrentTenant();
-    if (!tenant) {
+    const supabase = await createClient();
+    
+    // Get current user
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    if (userError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const body = await req.json();
-    const { 
-      name, 
-      message_template, 
-      description,
-      scheduled_at, 
-      send_now, 
-      target_contacts,
-      target_type,
-      target_labels,
-      media_url,
-      media_type,
-      send_rate,
-      metadata
-    } = body;
+    // Check permission
+    const { data: permissions } = await supabase
+      .from('user_roles')
+      .select(`
+        role:roles!inner(
+          role_permissions!inner(
+            permission:permissions!inner(resource, action)
+          )
+        )
+      `)
+      .eq('user_id', user.id);
 
-    // Validation
+    const hasBroadcastPermission = permissions?.some((p: any) => 
+      p.role?.role_permissions?.some((rp: any) => 
+        rp.permission?.resource === 'broadcast' && rp.permission?.action === 'manage'
+      )
+    );
+
+    if (!hasBroadcastPermission) {
+      return NextResponse.json(
+        { error: 'Insufficient permissions' },
+        { status: 403 }
+      );
+    }
+
+    // Get user's tenant
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('tenant_id')
+      .eq('id', user.id)
+      .single();
+
+    if (!profile) {
+      return NextResponse.json({ error: 'Profile not found' }, { status: 404 });
+    }
+
+    const body = await req.json();
+    const { name, message_template, scheduled_at, send_now, target_filter, recipient_list_id, whatsapp_account, sender_id } = body;
+
+    // Validate required fields
     if (!name || !message_template) {
       return NextResponse.json(
-        { error: 'Name and message template are required' },
+        { error: 'Campaign name and message are required' },
         { status: 400 }
       );
     }
 
-    const supabase = await createClient();
-
-    // Get recipients count
-    let total_recipients = 0;
-    if (target_contacts && target_contacts.length > 0) {
-      total_recipients = target_contacts.length;
+    // Get target contacts
+    let contacts: any[] = [];
+    
+    if (recipient_list_id) {
+      // Get contacts from recipient list
+      const { data: listContacts, error: listError } = await supabase
+        .from('recipient_list_contacts')
+        .select('contact:contacts(id, phone_number)')
+        .eq('list_id', recipient_list_id);
+      
+      if (listError) {
+        console.error('Error fetching list contacts:', listError);
+        return NextResponse.json(
+          { error: 'Failed to fetch list contacts' },
+          { status: 500 }
+        );
+      }
+      
+      contacts = listContacts?.map((lc: any) => lc.contact).filter(Boolean) || [];
     } else {
-      // If no specific recipients, count all contacts
-      const { count } = await supabase
+      // Get all contacts or filtered contacts
+      let contactsQuery = supabase
         .from('contacts')
-        .select('*', { count: 'exact', head: true })
-        .eq('tenant_id', tenant.id);
-      total_recipients = count || 0;
+        .select('id, phone_number')
+        .eq('tenant_id', profile.tenant_id);
+
+      // Apply filters if provided
+      if (target_filter?.tags && target_filter.tags.length > 0) {
+        contactsQuery = contactsQuery.contains('tags', target_filter.tags);
+      }
+
+      const { data: allContacts, error: contactsError } = await contactsQuery;
+      
+      if (contactsError) {
+        console.error('Error fetching contacts:', contactsError);
+        return NextResponse.json(
+          { error: 'Failed to fetch contacts' },
+          { status: 500 }
+        );
+      }
+      
+      contacts = allContacts || [];
     }
 
-    // Determine status
+    const contactsError = contacts.length === 0 ? new Error('No contacts found') : null;
+
+    if (contactsError) {
+      return NextResponse.json(
+        { error: 'No contacts found matching the criteria' },
+        { status: 400 }
+      );
+    }
+
+    // Determine campaign status
     let status = 'draft';
+    let scheduledAt = null;
+
     if (send_now) {
       status = 'sending';
     } else if (scheduled_at) {
       status = 'scheduled';
+      scheduledAt = scheduled_at;
     }
 
-    // Get current user ID
-    const { data: { user } } = await supabase.auth.getUser();
-
     // Create campaign
-    const { data, error } = await supabase
+    const { data: campaign, error: campaignError } = await supabase
       .from('broadcast_campaigns')
       .insert({
-        tenant_id: tenant.id,
+        tenant_id: profile.tenant_id,
+        created_by: user.id,
         name,
-        description: description || null,
         message_template,
         status,
-        scheduled_at: scheduled_at || null,
-        target_type: target_type || 'all',
-        target_contacts: target_contacts || null,
-        target_labels: target_labels || null,
-        media_url: media_url || null,
-        media_type: media_type || null,
-        total_recipients,
-        sent_count: 0,
-        delivered_count: 0,
-        read_count: 0,
-        failed_count: 0,
-        send_rate: send_rate || 10,
-        retry_failed: true,
-        metadata: metadata || {},
-        created_by: user?.id || null,
+        scheduled_at: scheduledAt,
+        total_recipients: contacts.length,
+        target_filter: target_filter || {},
+        metadata: {
+          whatsapp_account: whatsapp_account,
+          sender_id: sender_id,
+        },
       })
       .select()
       .single();
 
-    if (error) {
-      console.error('Error creating campaign:', error);
-      return NextResponse.json({ error: 'Failed to create campaign' }, { status: 500 });
+    if (campaignError) {
+      console.error('Error creating campaign:', campaignError);
+      return NextResponse.json(
+        { error: 'Failed to create campaign' },
+        { status: 500 }
+      );
     }
 
-    // If send_now, trigger sending (queue job)
+    // Create recipients
+    const recipients = contacts.map(contact => ({
+      campaign_id: campaign.id,
+      contact_id: contact.id,
+      phone_number: contact.phone_number,
+      status: 'pending',
+    }));
+
+    const { error: recipientsError } = await supabase
+      .from('broadcast_recipients')
+      .insert(recipients);
+
+    if (recipientsError) {
+      console.error('Error creating recipients:', recipientsError);
+      // Rollback campaign creation
+      await supabase
+        .from('broadcast_campaigns')
+        .delete()
+        .eq('id', campaign.id);
+      
+      return NextResponse.json(
+        { error: 'Failed to create campaign recipients' },
+        { status: 500 }
+      );
+    }
+
+    // If send_now, trigger immediate sending
     if (send_now) {
-      // TODO: Queue broadcast job
-      console.log('Queueing broadcast job for campaign:', data.id);
+      try {
+        // Import and queue broadcast campaign
+        const { queueBroadcastCampaign } = await import('@/lib/queue/workers/broadcast-send.worker');
+        await queueBroadcastCampaign(campaign.id);
+      } catch (error) {
+        console.error('Failed to queue broadcast:', error);
+        // Don't fail the request, campaign is created
+      }
     }
 
-    return NextResponse.json({ campaign: data }, { status: 201 });
+    return NextResponse.json({ 
+      campaign,
+      message: send_now 
+        ? 'Campaign created and queued for sending' 
+        : scheduled_at 
+        ? 'Campaign scheduled successfully' 
+        : 'Campaign created as draft'
+    });
+
   } catch (error) {
     console.error('Error in POST /api/broadcast/campaigns:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
   }
 }

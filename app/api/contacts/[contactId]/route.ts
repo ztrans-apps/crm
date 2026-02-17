@@ -1,124 +1,155 @@
-/**
- * API Route: Contact by ID
- * Single contact operations
- */
-
 import { NextRequest, NextResponse } from 'next/server';
-import { requireTenantIdFromHeaders } from '@core/tenant';
-import { ContactService } from '@modules/crm/contacts';
 import { createClient } from '@/lib/supabase/server';
+import { getCurrentTenant } from '@/core/tenant';
 
 /**
  * GET /api/contacts/[contactId]
- * Get contact by ID
+ * Get a specific contact
  */
 export async function GET(
-  request: NextRequest,
-  { params }: { params: { contactId: string } }
+  req: NextRequest,
+  context: { params: Promise<{ contactId: string }> }
 ) {
   try {
-    const tenantId = requireTenantIdFromHeaders(request.headers);
-
-    const supabase = createClient();
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-    if (authError || !user) {
+    const params = await context.params;
+    const tenant = await getCurrentTenant();
+    if (!tenant) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const contactService = new ContactService(tenantId);
-    const contact = await contactService.getById(params.contactId);
+    const supabase = await createClient();
+    const { data, error } = await supabase
+      .from('contacts')
+      .select('*')
+      .eq('id', params.contactId)
+      .eq('tenant_id', tenant.id)
+      .single();
 
-    if (!contact) {
+    if (error || !data) {
       return NextResponse.json({ error: 'Contact not found' }, { status: 404 });
     }
 
-    return NextResponse.json({
-      success: true,
-      data: contact,
-    });
-  } catch (error: any) {
-    console.error('Error fetching contact:', error);
-    return NextResponse.json(
-      { error: error.message || 'Failed to fetch contact' },
-      { status: 500 }
-    );
+    return NextResponse.json({ contact: data });
+  } catch (error) {
+    console.error('Error in GET /api/contacts/[contactId]:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
 
 /**
- * PATCH /api/contacts/[contactId]
- * Update contact
+ * PUT /api/contacts/[contactId]
+ * Update a contact
  */
-export async function PATCH(
-  request: NextRequest,
-  { params }: { params: { contactId: string } }
+export async function PUT(
+  req: NextRequest,
+  context: { params: Promise<{ contactId: string }> }
 ) {
   try {
-    const tenantId = requireTenantIdFromHeaders(request.headers);
-
-    const supabase = createClient();
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-    if (authError || !user) {
+    const params = await context.params;
+    const tenant = await getCurrentTenant();
+    if (!tenant) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const body = await request.json();
-    const { name, email, avatar_url, tags, metadata } = body;
+    const body = await req.json();
+    const { name, phone_number, email, notes, tags, avatar_url, metadata } = body;
 
-    const contactService = new ContactService(tenantId);
-    const contact = await contactService.update(params.contactId, {
-      name,
-      email,
-      avatar_url,
-      tags,
-      metadata,
-    });
+    // Validation
+    if (!phone_number) {
+      return NextResponse.json(
+        { error: 'Phone number is required' },
+        { status: 400 }
+      );
+    }
 
-    return NextResponse.json({
-      success: true,
-      data: contact,
-    });
-  } catch (error: any) {
-    console.error('Error updating contact:', error);
-    return NextResponse.json(
-      { error: error.message || 'Failed to update contact' },
-      { status: 500 }
-    );
+    const supabase = await createClient();
+
+    // Check if contact exists and belongs to tenant
+    const { data: existing } = await supabase
+      .from('contacts')
+      .select('id')
+      .eq('id', params.contactId)
+      .eq('tenant_id', tenant.id)
+      .single();
+
+    if (!existing) {
+      return NextResponse.json({ error: 'Contact not found' }, { status: 404 });
+    }
+
+    // Update contact
+    const { data, error } = await supabase
+      .from('contacts')
+      .update({
+        name: name || null,
+        phone_number,
+        email: email || null,
+        notes: notes || null,
+        tags: tags || [],
+        avatar_url: avatar_url || null,
+        metadata: metadata || {},
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', params.contactId)
+      .eq('tenant_id', tenant.id)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error updating contact:', error);
+      return NextResponse.json({ error: 'Failed to update contact' }, { status: 500 });
+    }
+
+    return NextResponse.json({ contact: data });
+  } catch (error) {
+    console.error('Error in PUT /api/contacts/[contactId]:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
 
 /**
  * DELETE /api/contacts/[contactId]
- * Delete contact
+ * Delete a contact
  */
 export async function DELETE(
-  request: NextRequest,
-  { params }: { params: { contactId: string } }
+  req: NextRequest,
+  context: { params: Promise<{ contactId: string }> }
 ) {
   try {
-    const tenantId = requireTenantIdFromHeaders(request.headers);
-
-    const supabase = createClient();
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-    if (authError || !user) {
+    const params = await context.params;
+    const tenant = await getCurrentTenant();
+    if (!tenant) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const contactService = new ContactService(tenantId);
-    await contactService.delete(params.contactId);
+    const supabase = await createClient();
 
-    return NextResponse.json({
-      success: true,
-      message: 'Contact deleted successfully',
-    });
-  } catch (error: any) {
-    console.error('Error deleting contact:', error);
-    return NextResponse.json(
-      { error: error.message || 'Failed to delete contact' },
-      { status: 500 }
-    );
+    // Check if contact exists and belongs to tenant
+    const { data: existing } = await supabase
+      .from('contacts')
+      .select('id')
+      .eq('id', params.contactId)
+      .eq('tenant_id', tenant.id)
+      .single();
+
+    if (!existing) {
+      return NextResponse.json({ error: 'Contact not found' }, { status: 404 });
+    }
+
+    // Delete contact
+    const { error } = await supabase
+      .from('contacts')
+      .delete()
+      .eq('id', params.contactId)
+      .eq('tenant_id', tenant.id);
+
+    if (error) {
+      console.error('Error deleting contact:', error);
+      return NextResponse.json({ error: 'Failed to delete contact' }, { status: 500 });
+    }
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error('Error in DELETE /api/contacts/[contactId]:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

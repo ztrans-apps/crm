@@ -15,6 +15,7 @@
 - [WhatsApp Service](#whatsapp-service)
 - [Queue System](#queue-system)
 - [RBAC System](#rbac-system)
+- [Broadcast System](#broadcast-system)
 - [Development](#development)
 - [Deployment](#deployment)
 - [Troubleshooting](#troubleshooting)
@@ -120,7 +121,19 @@ app/
   - 80+ granular permissions
   - Role hierarchy and inheritance
   - Permission templates
+- **Broadcast System**:
+  - Send messages to multiple contacts simultaneously
+  - Schedule broadcasts for future delivery (timezone-aware: WIB → UTC)
+  - Template management with WhatsApp categories (MARKETING, UTILITY, AUTHENTICATION)
+  - Recipient list management (Excel import with variables, CRM integration)
+  - Real-time campaign tracking and analytics
+  - Queue-based sending with rate limiting (10 msg/sec)
+  - Auto-retry mechanism (3x with exponential backoff)
+  - Auto-completion status tracking
+  - Real-time WhatsApp-style message preview
+  - Campaign scheduler (auto-check every 1 minute)
 - **Chatbot Integration**: Automated responses and workflows
+- **Quick Replies**: Pre-defined message templates with categories
 - **Analytics & Reporting**: Track messages, conversations, and performance
 - **Audit Logging**: Complete audit trail for all actions
 - **Module System**: Enable/disable features per tenant
@@ -392,7 +405,21 @@ The WhatsApp service runs separately from the main Next.js app:
 
 ## 🏃 Running the Application
 
-### Development Mode
+### Quick Start (All Services)
+
+Start all services at once:
+```bash
+./scripts/start-all-services.sh
+```
+
+Stop all services:
+```bash
+./scripts/stop-all-services.sh
+```
+
+### Development Mode (Manual)
+
+**⚠️ IMPORTANT: All 3 services must be running for the system to work properly!**
 
 **1. Start the main Next.js application:**
 ```bash
@@ -406,10 +433,17 @@ Application will run on `http://localhost:3000`
 ```
 Service will run on `http://localhost:3001`
 
-**3. Start queue workers:**
+**3. Start queue workers (REQUIRED for sending messages!):**
 ```bash
 npm run workers
 ```
+**Without workers, messages will be saved to database but NOT sent to WhatsApp!**
+
+**Workers include:**
+- Message send worker
+- Broadcast send worker (with rate limiting)
+- Broadcast scheduler (auto-checks every 1 minute)
+- Webhook delivery worker
 
 ### Production Mode
 
@@ -496,6 +530,21 @@ Use the provided script for easy management:
 
 ### Troubleshooting WhatsApp
 
+**Messages not being sent to WhatsApp:**
+1. Check if workers are running:
+   ```bash
+   ps aux | grep "start-workers"
+   ```
+2. If not running, start workers:
+   ```bash
+   npm run workers
+   ```
+3. Check worker logs for errors:
+   ```bash
+   tail -f logs/workers.log
+   ```
+4. Messages appear in CRM but not in WhatsApp = Workers not running!
+
 **QR Code appears again after restart:**
 - Check phone: WhatsApp > Settings > Linked Devices
 - If device not listed, scan QR again
@@ -538,11 +587,20 @@ Message Request → API → Queue → Worker → WhatsApp Service → WhatsApp
 npm run workers
 ```
 
+This starts all workers including the broadcast scheduler.
+
 **Available workers:**
 - `whatsapp-send`: Send WhatsApp messages
-- `broadcast`: Process broadcast campaigns
+- `broadcast-send`: Process broadcast campaigns with rate limiting
+- `webhook-delivery`: Deliver webhooks to external services
 - `message-status`: Update message status
 - `delivery-tracking`: Track delivery metrics
+
+**Broadcast Scheduler:**
+- Auto-starts with workers
+- Checks for scheduled campaigns every 1 minute
+- Converts WIB scheduled time to UTC for processing
+- Automatically triggers campaigns when scheduled time arrives
 
 ### Queue Management
 
@@ -563,6 +621,18 @@ npm run retry-failed
 - Waiting jobs
 - Delayed jobs
 
+**Monitor workers:**
+```bash
+# Check worker health
+curl http://localhost:3000/api/health/workers
+
+# Check queue debug info
+curl http://localhost:3000/api/broadcast/debug/queue
+
+# Check scheduled campaigns
+curl http://localhost:3000/api/broadcast/debug/scheduled
+```
+
 ### Queue Configuration
 
 Edit `lib/queue/config.ts`:
@@ -579,6 +649,38 @@ export const queueConfig = {
   },
 }
 ```
+
+### Broadcast Worker Configuration
+
+The broadcast worker has special rate limiting to prevent WhatsApp bans:
+
+```typescript
+// lib/queue/workers/broadcast-send.worker.ts
+const worker = new Worker('broadcast-send', async (job) => {
+  // Process job
+}, {
+  connection: redis,
+  limiter: {
+    max: 10,        // Max 10 jobs
+    duration: 1000, // Per 1 second
+  },
+})
+```
+
+**Rate Limiting:**
+- 10 messages per second maximum
+- Prevents WhatsApp rate limit violations
+- Automatic backoff on errors
+
+**Retry Logic:**
+- 3 attempts per message
+- Exponential backoff (2s, 4s, 8s)
+- Failed messages marked in database
+
+**Auto-Completion:**
+- Worker checks campaign progress after each message
+- Auto-completes campaign when all messages processed
+- Updates campaign status in real-time
 
 ## 🔐 RBAC System
 
@@ -667,6 +769,270 @@ if (canAll(['contacts.view', 'contacts.export'])) {
 2. Create/edit roles
 3. Assign permissions to roles
 4. Assign roles to users
+
+
+## 📢 Broadcast System
+
+### Overview
+
+The broadcast system allows sending messages to multiple contacts simultaneously with advanced features:
+
+- **Campaign Management**: Create, schedule, and track broadcast campaigns
+- **Template System**: Pre-defined message templates with WhatsApp categories
+- **Recipient Lists**: Import from Excel or use CRM contacts
+- **Scheduling**: Schedule broadcasts for future delivery with timezone support
+- **Rate Limiting**: Automatic rate limiting to prevent WhatsApp bans
+- **Progress Tracking**: Real-time campaign progress and statistics
+- **Auto-Retry**: Failed messages automatically retried up to 3 times
+
+### Campaign Creation
+
+**1. Navigate to Broadcasts:**
+```
+Dashboard → Broadcasts → Buat Campaign
+```
+
+**2. Fill Campaign Details:**
+- Campaign Name
+- Template (select from pre-defined templates)
+- Sender (Agent who will send)
+- WhatsApp Account (session to use)
+- Recipient List (select or create new)
+- Schedule (optional - for future delivery)
+
+**3. Preview:**
+- Real-time WhatsApp-style preview
+- Shows exactly how message will appear
+- Mobile phone POV (customer receiving message)
+
+**4. Send:**
+- **Kirim Sekarang** (Send Now): Immediate sending
+- **Jadwalkan Kirim** (Schedule Send): Send at specified time
+
+### Template Management
+
+**Template Categories (WhatsApp Business API Standard):**
+- **MARKETING**: Promotional messages, offers, announcements
+- **UTILITY**: Account updates, order status, reminders
+- **AUTHENTICATION**: OTP, verification codes, security alerts
+
+**Creating Templates:**
+```
+Broadcasts → Template → Add Template
+```
+
+**Template Variables:**
+- Use `{{1}}`, `{{2}}`, `{{3}}` for dynamic content
+- Variables replaced with recipient data during sending
+- Example: "Hello {{1}}, your order {{2}} is ready!"
+
+### Recipient Lists
+
+**Three Import Methods:**
+
+**1. Import Excel:**
+- Simple contact list with name and phone
+- CSV format: `contacts_name,phone_number`
+- Phone format: 6289xxx (no +, -, or spaces)
+
+**2. Import Excel Dengan Variabel:**
+- Contact list with custom variables for templates
+- CSV format: `contacts_name,phone_number,var1,var2,var3`
+- Variables used to personalize messages
+- Example: `John Doe,6289123456789,Premium,ORD-123,2024-02-17`
+
+**3. Dari Kontak CRM:**
+- Use existing contacts from CRM
+- Filter by labels, tags, or segments
+- No import needed
+
+**CSV Template Download:**
+```
+Broadcasts → Daftar Penerima → Download Template
+```
+
+### Scheduling Broadcasts
+
+**Timezone Handling:**
+- Input time in WIB (Waktu Indonesia Barat)
+- Automatically converted to UTC for storage
+- Displayed back in WIB in UI
+
+**Scheduler:**
+- Runs automatically with workers
+- Checks every 1 minute for scheduled campaigns
+- Triggers campaigns when scheduled time arrives
+- No manual intervention needed
+
+**Manual Trigger (for testing):**
+```bash
+curl -X POST http://localhost:3000/api/broadcast/scheduler/trigger
+```
+
+### Campaign Tracking
+
+**Campaign Status:**
+- **Draft**: Not yet sent
+- **Scheduled**: Waiting for scheduled time
+- **Sending**: Currently being sent
+- **Completed**: All messages sent
+- **Failed**: Campaign failed
+
+**Recipient Status:**
+- **Pending**: Waiting to be sent
+- **Sent**: Successfully sent to WhatsApp
+- **Failed**: Failed to send (will retry)
+- **Delivered**: Delivered to recipient
+- **Read**: Read by recipient
+
+**Statistics:**
+- Total recipients
+- Sent count
+- Failed count
+- Delivery rate
+- Read rate
+- Progress percentage
+
+### API Endpoints
+
+**Campaign Management:**
+```bash
+# Create campaign
+POST /api/broadcast/campaigns
+Body: {
+  name, template_id, sender_id, session_id,
+  recipient_list_id, scheduled_at (optional)
+}
+
+# List campaigns
+GET /api/broadcast/campaigns?status=sending&page=1&limit=10
+
+# Get campaign detail
+GET /api/broadcast/campaigns/[id]
+
+# Trigger completion check
+POST /api/broadcast/campaigns/[id]/complete
+```
+
+**Template Management:**
+```bash
+# List templates
+GET /api/broadcast/templates
+
+# Create template
+POST /api/broadcast/templates
+Body: { name, content, category, variables }
+
+# Update template
+PUT /api/broadcast/templates/[id]
+
+# Delete template
+DELETE /api/broadcast/templates/[id]
+```
+
+**Recipient Lists:**
+```bash
+# List recipient lists
+GET /api/broadcast/recipient-lists
+
+# Create list
+POST /api/broadcast/recipient-lists
+Body: { name, source, file (CSV) }
+
+# Get list detail
+GET /api/broadcast/recipient-lists/[id]
+
+# Delete list
+DELETE /api/broadcast/recipient-lists/[id]
+```
+
+**Scheduler Control:**
+```bash
+# Start scheduler
+POST /api/broadcast/scheduler/start
+
+# Stop scheduler
+POST /api/broadcast/scheduler/stop
+
+# Manual trigger
+POST /api/broadcast/scheduler/trigger
+```
+
+**Debug Endpoints:**
+```bash
+# Queue status
+GET /api/broadcast/debug/queue
+
+# Scheduled campaigns
+GET /api/broadcast/debug/scheduled
+
+# Worker health
+GET /api/health/workers
+```
+
+### Rate Limiting
+
+**WhatsApp Rate Limits:**
+- Tier 1: 1,000 messages/day
+- Tier 2: 10,000 messages/day
+- Tier 3: 100,000 messages/day
+
+**System Rate Limiting:**
+- 10 messages per second maximum
+- Prevents rate limit violations
+- Automatic backoff on errors
+- Queue-based processing
+
+**Best Practices:**
+- Don't send more than your tier limit
+- Space out large campaigns
+- Monitor delivery rates
+- Use templates approved by WhatsApp
+
+### Troubleshooting Broadcasts
+
+**Messages not sending:**
+1. Check if workers are running:
+   ```bash
+   ps aux | grep "start-workers"
+   ```
+2. Check queue status:
+   ```bash
+   curl http://localhost:3000/api/broadcast/debug/queue
+   ```
+3. Check worker logs for errors
+4. Verify WhatsApp service is running
+
+**Scheduled campaign not triggering:**
+1. Verify scheduler is running:
+   ```bash
+   curl http://localhost:3000/api/broadcast/scheduler/start
+   ```
+2. Check scheduled campaigns:
+   ```bash
+   curl http://localhost:3000/api/broadcast/debug/scheduled
+   ```
+3. Verify timezone conversion (WIB → UTC)
+4. Check worker logs for scheduler activity
+
+**High failure rate:**
+1. Check WhatsApp account status
+2. Verify phone numbers are valid (6289xxx format)
+3. Check if hitting rate limits
+4. Review WhatsApp service logs
+5. Verify templates are approved
+
+**Campaign stuck in "Sending":**
+1. Check if all recipients processed:
+   ```bash
+   curl http://localhost:3000/api/broadcast/campaigns/[id]
+   ```
+2. Manually trigger completion:
+   ```bash
+   curl -X POST http://localhost:3000/api/broadcast/campaigns/[id]/complete
+   ```
+3. Check for failed jobs in queue
+4. Restart workers if needed
 
 
 ## 👨‍💻 Development
@@ -919,12 +1285,28 @@ sudo systemctl enable redis
 - [ ] Database migrations applied
 - [ ] RLS policies enabled
 - [ ] Realtime enabled
-- [ ] Redis configured
+- [ ] Redis configured with persistence
 - [ ] WhatsApp service running
-- [ ] Queue workers running
+- [ ] Queue workers running (including scheduler)
 - [ ] SSL certificates installed
 - [ ] Monitoring setup (Sentry)
 - [ ] Backup strategy in place
+- [ ] Rate limiting configured
+- [ ] Broadcast templates approved by WhatsApp
+
+**Broadcast System Requirements:**
+- Redis with persistence enabled (for queue durability)
+- Workers running 24/7 (for scheduled broadcasts)
+- Sufficient memory for queue processing
+- WhatsApp Business API tier limits configured
+- Timezone properly configured (for scheduling)
+
+**Scaling Considerations:**
+- Use Redis Cluster for high availability
+- Run multiple worker instances for load balancing
+- Monitor queue depth and processing time
+- Set up alerts for failed jobs
+- Configure auto-scaling based on queue size
 
 
 ## 🔧 Troubleshooting
@@ -1085,6 +1467,71 @@ ON messages(conversation_id);
 # Check Redis memory
 redis-cli info memory
 ```
+
+### Broadcast Issues
+
+**Campaign not sending:**
+1. Verify all 3 services are running:
+   - Next.js app (port 3000)
+   - WhatsApp service (port 3001)
+   - Queue workers (npm run workers)
+2. Check queue status:
+   ```bash
+   curl http://localhost:3000/api/broadcast/debug/queue
+   ```
+3. Check worker health:
+   ```bash
+   curl http://localhost:3000/api/health/workers
+   ```
+
+**Scheduled broadcast not triggering:**
+1. Check if scheduler is running:
+   ```bash
+   # Should show "running" status
+   curl http://localhost:3000/api/broadcast/scheduler/start
+   ```
+2. Verify scheduled time is in future (UTC)
+3. Check scheduled campaigns:
+   ```bash
+   curl http://localhost:3000/api/broadcast/debug/scheduled
+   ```
+4. Review worker logs for scheduler activity
+
+**Messages stuck in queue:**
+1. Check Redis connection:
+   ```bash
+   redis-cli ping
+   ```
+2. Check failed jobs:
+   ```bash
+   npm run check-queue
+   ```
+3. Retry failed jobs:
+   ```bash
+   npm run retry-failed
+   ```
+4. Restart workers:
+   ```bash
+   pkill -f "start-workers"
+   npm run workers
+   ```
+
+**High failure rate in broadcast:**
+1. Verify phone number format (6289xxx, no +/-)
+2. Check WhatsApp account tier limits
+3. Review rate limiting settings
+4. Check WhatsApp service logs:
+   ```bash
+   ./scripts/whatsapp-service.sh logs
+   ```
+5. Verify templates are approved by WhatsApp
+
+**Timezone issues:**
+- Input time should be in WIB
+- System converts to UTC for storage
+- Display converts back to WIB
+- Check browser timezone settings
+- Verify server timezone is set correctly
 
 ### Logs Location
 

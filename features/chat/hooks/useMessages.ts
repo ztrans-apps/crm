@@ -98,7 +98,16 @@ export function useMessages({
       return
     }
 
-    if (!userId || !sessionId) {
+    // Get session ID from conversation, not from global sessionId
+    const conversationSessionId = conversation.whatsapp_session_id || sessionId
+    
+    console.log('📤 Sending message:')
+    console.log('  Conversation ID:', conversation.id)
+    console.log('  Contact:', conversation.contact.name, conversation.contact.phone_number)
+    console.log('  Conversation Session ID:', conversation.whatsapp_session_id)
+    console.log('  Using Session ID:', conversationSessionId)
+    
+    if (!userId || !conversationSessionId) {
       alert('Session tidak ditemukan. Pastikan WhatsApp sudah terhubung.')
       return
     }
@@ -150,7 +159,7 @@ export function useMessages({
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            sessionId,
+            sessionId: conversationSessionId,
             to: whatsappNumber,
             latitude: locationData.latitude,
             longitude: locationData.longitude,
@@ -220,7 +229,7 @@ export function useMessages({
         
         // Create FormData
         const formData = new FormData()
-        formData.append('sessionId', sessionId)
+        formData.append('sessionId', conversationSessionId)
         formData.append('to', whatsappNumber)
         formData.append('caption', media.caption || tempMessage || '') // Use media caption if provided, otherwise use message input
         formData.append('media', mediaBlob, mediaFilename!)
@@ -249,7 +258,7 @@ export function useMessages({
       } else {
         // Send text message (original flow)
         const body: any = {
-          sessionId: sessionId,
+          sessionId: conversationSessionId,
           to: whatsappNumber,
           message: tempMessage,
           conversationId: conversation.id,

@@ -117,21 +117,32 @@ export function ConversationItem({
             {conversation.last_message || 'No messages'}
           </p>
 
-          {/* Labels/Tags if any */}
+          {/* Labels/Tags - Small rectangles with hover tooltip */}
           {conversation.labels && conversation.labels.length > 0 && (
-            <div className="flex flex-wrap gap-1 mt-1">
-              {conversation.labels.slice(0, 2).map((label: any) => (
-                <span
-                  key={label.id}
-                  className="text-[10px] px-1.5 py-0.5 rounded"
-                  style={{
-                    backgroundColor: label.color ? `${label.color}20` : '#e5e7eb',
-                    color: label.color || '#374151',
-                  }}
-                >
-                  {label.name}
+            <div className="flex items-center gap-1 mt-1.5">
+              {conversation.labels.slice(0, 3).map((labelItem: any) => {
+                // Handle nested structure: labelItem.label contains the actual label data
+                const label = labelItem.label || labelItem
+                return (
+                  <div
+                    key={labelItem.id}
+                    className="w-3 h-2 rounded-sm relative group cursor-default"
+                    style={{
+                      backgroundColor: label.color || '#9ca3af',
+                    }}
+                  >
+                    {/* Tooltip on hover */}
+                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 bg-gray-900 text-white text-[10px] rounded whitespace-nowrap opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-opacity z-10">
+                      {label.name}
+                    </div>
+                  </div>
+                )
+              })}
+              {conversation.labels.length > 3 && (
+                <span className="text-[9px] text-gray-400 ml-0.5">
+                  +{conversation.labels.length - 3}
                 </span>
-              ))}
+              )}
             </div>
           )}
 

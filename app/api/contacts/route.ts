@@ -1,94 +1,87 @@
-/**
- * API Route: Contacts
- * Contact management endpoints
- */
-
 import { NextRequest, NextResponse } from 'next/server';
-import { requireTenantIdFromHeaders } from '@core/tenant';
-import { ContactService } from '@modules/crm/contacts';
 import { createClient } from '@/lib/supabase/server';
 
 /**
  * GET /api/contacts
- * List all contacts for tenant
+ * Get all contacts for current tenant
  */
-export async function GET(request: NextRequest) {
+export async function GET(req: NextRequest) {
   try {
-    // Get tenant ID
-    const tenantId = requireTenantIdFromHeaders(request.headers);
-
-    // Check authentication
-    const supabase = createClient();
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
+    const supabase = await createClient();
+    
+    // Get current user
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    if (userError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Get query params
-    const { searchParams } = new URL(request.url);
-    const search = searchParams.get('search') || undefined;
-    const tags = searchParams.get('tags')?.split(',') || undefined;
-    const limit = parseInt(searchParams.get('limit') || '100');
-    const offset = parseInt(searchParams.get('offset') || '0');
+    // Get default tenant (simplified for now)
+    const { data: tenant } = await supabase
+      .from('tenants')
+      .select('id')
+      .limit(1)
+      .single();
+    
+    if (!tenant) {
+      return NextResponse.json({ error: 'No tenant found' }, { status: 404 });
+    }
+    const searchParams = req.nextUrl.searchParams;
+    const search = searchParams.get('search');
 
-    // Get contacts using service
-    const contactService = new ContactService(tenantId);
-    const contacts = await contactService.list({
-      search,
-      tags,
-      limit,
-      offset,
-    });
+    let query = supabase
+      .from('contacts')
+      .select('*')
+      .eq('tenant_id', tenant.id)
+      .order('created_at', { ascending: false });
 
-    return NextResponse.json({
-      success: true,
-      data: contacts,
-      meta: {
-        limit,
-        offset,
-        count: contacts.length,
-      },
-    });
-  } catch (error: any) {
-    console.error('Error fetching contacts:', error);
-    return NextResponse.json(
-      { 
-        success: false,
-        error: error.message || 'Failed to fetch contacts' 
-      },
-      { status: error.message === 'Tenant ID is required' ? 400 : 500 }
-    );
+    // Add search filter if provided
+    if (search) {
+      query = query.or(`name.ilike.%${search}%,phone_number.ilike.%${search}%,email.ilike.%${search}%`);
+    }
+
+    const { data, error } = await query;
+
+    if (error) {
+      console.error('Error fetching contacts:', error);
+      return NextResponse.json({ error: 'Failed to fetch contacts' }, { status: 500 });
+    }
+
+    return NextResponse.json({ contacts: data || [] });
+  } catch (error) {
+    console.error('Error in GET /api/contacts:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
 
 /**
  * POST /api/contacts
- * Create new contact
+ * Create a new contact
  */
-export async function POST(request: NextRequest) {
+export async function POST(req: NextRequest) {
   try {
-    // Get tenant ID
-    const tenantId = requireTenantIdFromHeaders(request.headers);
-
-    // Check authentication
-    const supabase = createClient();
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      );
+    const supabase = await createClient();
+    
+    // Get current user
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    if (userError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Get request body
-    const body = await request.json();
-    const { phone_number, name, email, avatar_url, tags, metadata } = body;
+    // Get default tenant
+    const { data: tenant } = await supabase
+      .from('tenants')
+      .select('id')
+      .limit(1)
+      .single();
+    
+    if (!tenant) {
+      return NextResponse.json({ error: 'No tenant found' }, { status: 404 });
+    }
 
+    const body = await req.json();
+    const { name, phone_number, email, notes, tags, avatar_url, metadata } = body;
+
+    // Validation
     if (!phone_number) {
       return NextResponse.json(
         { error: 'Phone number is required' },
@@ -96,29 +89,45 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Create contact using service
-    const contactService = new ContactService(tenantId);
-    const contact = await contactService.create({
-      phone_number,
-      name,
-      email,
-      avatar_url,
-      tags,
-      metadata,
-    });
+    // Check if contact with same phone already exists
+    const { data: existing } = await supabase
+      .from('contacts')
+      .select('id')
+      .eq('tenant_id', tenant.id)
+      .eq('phone_number', phone_number)
+      .single();
 
-    return NextResponse.json({
-      success: true,
-      data: contact,
-    }, { status: 201 });
-  } catch (error: any) {
-    console.error('Error creating contact:', error);
-    return NextResponse.json(
-      { 
-        success: false,
-        error: error.message || 'Failed to create contact' 
-      },
-      { status: error.message === 'Tenant ID is required' ? 400 : 500 }
-    );
+    if (existing) {
+      return NextResponse.json(
+        { error: 'Contact with this phone number already exists' },
+        { status: 409 }
+      );
+    }
+
+    // Create contact
+    const { data, error } = await supabase
+      .from('contacts')
+      .insert({
+        tenant_id: tenant.id,
+        name: name || null,
+        phone_number,
+        email: email || null,
+        notes: notes || null,
+        tags: tags || [],
+        avatar_url: avatar_url || null,
+        metadata: metadata || {},
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error creating contact:', error);
+      return NextResponse.json({ error: 'Failed to create contact' }, { status: 500 });
+    }
+
+    return NextResponse.json({ contact: data }, { status: 201 });
+  } catch (error) {
+    console.error('Error in POST /api/contacts:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }

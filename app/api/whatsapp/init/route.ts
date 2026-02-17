@@ -11,7 +11,7 @@ export async function POST(request: Request) {
   try {
     const supabase = await createClient();
     const body = await request.json();
-    const { phoneNumber } = body;
+    const { phoneNumber, name } = body;
 
     // Get current user
     const { data: { user } } = await supabase.auth.getUser();
@@ -33,7 +33,7 @@ export async function POST(request: Request) {
       id: sessionId,
       user_id: user.id,
       phone_number: phoneNumber || 'Connecting...',
-      session_name: sessionName,
+      session_name: name || sessionName, // Use name if provided, otherwise use auto-generated
       status: 'connecting',
     };
 
