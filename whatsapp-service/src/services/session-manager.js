@@ -189,28 +189,35 @@ class SessionManager {
     
     const allSessions = this.getAllSessions()
     const now = new Date()
-    const inactiveThreshold = 5 * 60 * 1000 // 5 minutes
+    // Increased threshold to 30 minutes to avoid marking idle sessions as inactive
+    const inactiveThreshold = 30 * 60 * 1000 // 30 minutes
     
     for (const session of allSessions) {
       const timeSinceActivity = now - session.lastActivity
       
-      // Mark as inactive if no activity for threshold
+      // Only mark as inactive if no activity for a long time AND socket is closed
+      // Don't mark as inactive just because there's no message activity
       if (timeSinceActivity > inactiveThreshold && session.status === 'active') {
-        console.log(`[SessionManager] Session ${session.tenantId}:${session.sessionId} inactive for ${Math.round(timeSinceActivity / 1000)}s`)
-        this.updateStatus(session.tenantId, session.sessionId, 'inactive')
-        
-        // Update database
-        try {
-          await supabase
-            .from('whatsapp_sessions')
-            .update({ 
-              status: 'inactive',
-              metadata: { lastHealthCheck: now.toISOString(), reason: 'No activity' }
-            })
-            .eq('id', session.sessionId)
-            .eq('tenant_id', session.tenantId)
-        } catch (error) {
-          console.error('[SessionManager] Failed to update session status:', error)
+        // Check if socket is actually closed
+        if (!session.sock || session.sock.ws?.readyState === 3) { // 3 = CLOSED
+          console.log(`[SessionManager] Session ${session.tenantId}:${session.sessionId} inactive for ${Math.round(timeSinceActivity / 1000)}s and socket closed`)
+          this.updateStatus(session.tenantId, session.sessionId, 'inactive')
+          
+          // Update database
+          try {
+            await supabase
+              .from('whatsapp_sessions')
+              .update({ 
+                status: 'disconnected',
+                metadata: { lastHealthCheck: now.toISOString(), reason: 'Socket closed' }
+              })
+              .eq('id', session.sessionId)
+              .eq('tenant_id', session.tenantId)
+          } catch (error) {
+            console.error('[SessionManager] Failed to update session status:', error)
+          }
+        } else {
+          console.log(`[SessionManager] Session ${session.tenantId}:${session.sessionId} idle for ${Math.round(timeSinceActivity / 1000)}s but socket still open`)
         }
       }
       

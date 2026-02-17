@@ -84,8 +84,8 @@ export default function DynamicSidebar({ userRole }: DynamicSidebarProps) {
     },
     { 
       icon: UserCog, 
-      label: 'Agents', 
-      href: '/agents',
+      label: 'Users', 
+      href: '/users',
       permission: 'agent.view'
     },
     { 

@@ -1,86 +1,83 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Button } from '@/components/ui/button';
-import { Plus } from 'lucide-react';
-import { CampaignList, CampaignForm, CampaignStats } from '@/modules/broadcast/components';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Radio, FileText, Users, History } from 'lucide-react';
+import { PermissionGuard } from '@/lib/rbac/components/PermissionGuard';
+import { CampaignHistory } from '@/modules/broadcast/components/CampaignHistory';
+import { TemplateManagement } from '@/modules/broadcast/components/TemplateManagement';
+import { RecipientLists } from '@/modules/broadcast/components/RecipientLists';
+import { CreateCampaign } from '@/modules/broadcast/components/CreateCampaign';
 
 export default function BroadcastsPage() {
-  const [showAddModal, setShowAddModal] = useState(false);
+  const [activeTab, setActiveTab] = useState('history');
   const [refreshKey, setRefreshKey] = useState(0);
-  const [stats, setStats] = useState({
-    total_campaigns: 0,
-    total_sent: 0,
-    total_delivered: 0,
-    total_failed: 0,
-    pending: 0,
-    success_rate: 0,
-  });
 
-  // Fetch stats
+  // Check URL params for tab
   useEffect(() => {
-    async function fetchStats() {
-      try {
-        const response = await fetch('/api/broadcast/stats');
-        if (response.ok) {
-          const data = await response.json();
-          setStats(data.stats);
-        }
-      } catch (error) {
-        console.error('Failed to fetch stats:', error);
-      }
+    const params = new URLSearchParams(window.location.search);
+    const tab = params.get('tab');
+    if (tab && ['history', 'create', 'templates', 'recipients'].includes(tab)) {
+      setActiveTab(tab);
     }
+  }, []);
 
-    fetchStats();
-  }, [refreshKey]);
-
-  const handleAddCampaign = () => {
-    setShowAddModal(true);
-  };
-
-  const handleCampaignCreated = () => {
+  const handleRefresh = () => {
     setRefreshKey(prev => prev + 1);
   };
 
-  const handleSelectCampaign = (campaign: any) => {
-    console.log('Selected campaign:', campaign);
-    // TODO: Show campaign details
-  };
-
   return (
-    <div className="space-y-6 p-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Broadcast Campaigns</h1>
-          <p className="text-gray-600 mt-1">Send messages to multiple contacts at once</p>
+    <PermissionGuard permission={['broadcast.manage']}>
+      <div className="h-full bg-gray-50 p-6">
+        {/* Header */}
+        <div className="mb-6">
+          <div className="flex items-center gap-2 mb-2">
+            <Radio className="h-6 w-6 text-purple-600" />
+            <h1 className="text-2xl font-bold text-gray-900">Broadcast System</h1>
+          </div>
+          <p className="text-sm text-gray-600">
+            Kelola campaign, template, dan daftar penerima broadcast
+          </p>
         </div>
-        <Button
-          onClick={handleAddCampaign}
-          size="lg"
-          className="bg-purple-600 hover:bg-purple-700"
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          New Campaign
-        </Button>
+
+        {/* Tabs */}
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+          <TabsList className="bg-white border">
+            <TabsTrigger value="history" className="gap-2">
+              <History className="h-4 w-4" />
+              Riwayat Broadcast
+            </TabsTrigger>
+            <TabsTrigger value="create" className="gap-2">
+              <Radio className="h-4 w-4" />
+              Buat Campaign
+            </TabsTrigger>
+            <TabsTrigger value="templates" className="gap-2">
+              <FileText className="h-4 w-4" />
+              Template
+            </TabsTrigger>
+            <TabsTrigger value="recipients" className="gap-2">
+              <Users className="h-4 w-4" />
+              Daftar Penerima
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="history" className="space-y-4">
+            <CampaignHistory key={refreshKey} />
+          </TabsContent>
+
+          <TabsContent value="create" className="space-y-4">
+            <CreateCampaign onSuccess={handleRefresh} />
+          </TabsContent>
+
+          <TabsContent value="templates" className="space-y-4">
+            <TemplateManagement />
+          </TabsContent>
+
+          <TabsContent value="recipients" className="space-y-4">
+            <RecipientLists />
+          </TabsContent>
+        </Tabs>
       </div>
-
-      {/* Stats */}
-      <CampaignStats stats={stats} />
-
-      {/* Campaign List */}
-      <CampaignList
-        key={refreshKey}
-        onAddCampaign={handleAddCampaign}
-        onSelectCampaign={handleSelectCampaign}
-      />
-
-      {/* Add Campaign Modal */}
-      <CampaignForm
-        open={showAddModal}
-        onOpenChange={setShowAddModal}
-        onSuccess={handleCampaignCreated}
-      />
-    </div>
+    </PermissionGuard>
   );
 }

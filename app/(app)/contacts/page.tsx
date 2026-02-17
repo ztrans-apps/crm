@@ -1,29 +1,106 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { PermissionGuard } from '@/lib/rbac/components/PermissionGuard';
-import { ContactList, ContactForm, ContactDetail } from '@/modules/crm/components';
+import { ContactForm, ContactDetail } from '@/modules/crm/components';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { 
+  Search, 
+  Plus, 
+  Users, 
+  MessageSquare, 
+  Calendar,
+  Edit,
+  Trash2,
+  Mail,
+  Phone,
+  Send
+} from 'lucide-react';
 
 interface Contact {
   id: string;
   name: string;
-  phone: string;
+  phone_number: string;
   email?: string;
   notes?: string;
   tags?: string[];
   last_message?: string;
   last_message_at?: string;
   created_at: string;
+  metadata?: any;
 }
 
 export default function ContactsPage() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [selectedContact, setSelectedContact] = useState<Contact | null>(null);
-  const [refreshKey, setRefreshKey] = useState(0);
+  const [contacts, setContacts] = useState<Contact[]>([]);
+  const [filteredContacts, setFilteredContacts] = useState<Contact[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState({
+    total: 0,
+    withConversations: 0,
+    recentlyActive: 0,
+  });
+
+  // Load contacts
+  const loadContacts = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch('/api/contacts');
+      if (response.ok) {
+        const result = await response.json();
+        // API returns { contacts: [...] }
+        const contactsArray = Array.isArray(result.contacts) ? result.contacts : [];
+        setContacts(contactsArray);
+        setFilteredContacts(contactsArray);
+        
+        // Calculate stats
+        const now = new Date();
+        const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        
+        setStats({
+          total: contactsArray.length,
+          withConversations: contactsArray.filter((c: Contact) => c.last_message).length,
+          recentlyActive: contactsArray.filter((c: Contact) => 
+            c.last_message_at && new Date(c.last_message_at) > sevenDaysAgo
+          ).length,
+        });
+      }
+    } catch (error) {
+      console.error('Failed to load contacts:', error);
+      setContacts([]);
+      setFilteredContacts([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadContacts();
+  }, []);
+
+  // Search filter
+  useEffect(() => {
+    if (!searchQuery.trim()) {
+      setFilteredContacts(contacts);
+      return;
+    }
+
+    const query = searchQuery.toLowerCase();
+    const filtered = contacts.filter(contact =>
+      contact.name?.toLowerCase().includes(query) ||
+      contact.phone_number?.includes(query) ||
+      contact.email?.toLowerCase().includes(query)
+    );
+    setFilteredContacts(filtered);
+  }, [searchQuery, contacts]);
 
   const handleAddContact = () => {
+    setSelectedContact(null);
     setShowAddModal(true);
   };
 
@@ -33,55 +110,236 @@ export default function ContactsPage() {
   };
 
   const handleContactSaved = () => {
-    setRefreshKey(prev => prev + 1);
+    loadContacts();
+    setShowAddModal(false);
+    setSelectedContact(null);
   };
 
-  const handleEditContact = () => {
-    setShowDetailModal(false);
+  const handleEditContact = (contact: Contact) => {
+    setSelectedContact(contact);
     setShowAddModal(true);
   };
 
-  const handleDeleteContact = async () => {
-    if (!selectedContact) return;
-    
-    if (!confirm(`Are you sure you want to delete ${selectedContact.name}?`)) {
+  const handleSendMessage = (contact: Contact) => {
+    // TODO: Navigate to chat with this contact
+    console.log('Send message to:', contact);
+    // You can navigate to /chats with contact filter or open compose modal
+  };
+
+  const handleDeleteContact = async (contact: Contact) => {
+    if (!confirm(`Yakin ingin menghapus ${contact.name}?`)) {
       return;
     }
 
     try {
-      const response = await fetch(`/api/crm/contacts/${selectedContact.id}`, {
+      const response = await fetch(`/api/contacts/${contact.id}`, {
         method: 'DELETE',
       });
 
       if (response.ok) {
-        setShowDetailModal(false);
-        setSelectedContact(null);
-        setRefreshKey(prev => prev + 1);
+        loadContacts();
       }
     } catch (error) {
       console.error('Failed to delete contact:', error);
     }
   };
 
-  const handleSendMessage = () => {
-    // TODO: Navigate to chat with this contact
-    console.log('Send message to:', selectedContact);
+  const getInitial = (name: string) => {
+    return name ? name.charAt(0).toUpperCase() : '?';
+  };
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('id-ID', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric'
+    });
   };
 
   return (
     <PermissionGuard permission={['contact.view']}>
-      <div className="space-y-6 p-6">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Contacts</h1>
-          <p className="text-gray-600 mt-1">Manage your customer contacts</p>
+      <div className="h-full bg-gray-50 p-6">
+        {/* Header */}
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold text-gray-900">Contacts</h1>
+          <p className="text-sm text-gray-600 mt-1">Kelola kontak customer Anda</p>
         </div>
 
-        <ContactList
-          key={refreshKey}
-          onAddContact={handleAddContact}
-          onSelectContact={handleSelectContact}
-        />
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+          <div className="bg-white rounded-lg shadow-sm p-5 border border-gray-200">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Total Kontak</p>
+                <p className="text-3xl font-bold text-gray-900 mt-1">{stats.total}</p>
+              </div>
+              <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                <Users className="h-6 w-6 text-blue-600" />
+              </div>
+            </div>
+          </div>
 
+          <div className="bg-white rounded-lg shadow-sm p-5 border border-gray-200">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Punya Percakapan</p>
+                <p className="text-3xl font-bold text-gray-900 mt-1">{stats.withConversations}</p>
+              </div>
+              <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
+                <MessageSquare className="h-6 w-6 text-green-600" />
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-lg shadow-sm p-5 border border-gray-200">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Aktif 7 Hari</p>
+                <p className="text-3xl font-bold text-gray-900 mt-1">{stats.recentlyActive}</p>
+              </div>
+              <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
+                <Calendar className="h-6 w-6 text-purple-600" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Search and Actions */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-4">
+          <div className="p-4 flex items-center gap-3">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <Input
+                placeholder="Cari kontak..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+            <Button onClick={handleAddContact} className="bg-blue-600 hover:bg-blue-700">
+              <Plus className="h-4 w-4 mr-2" />
+              Tambah Kontak
+            </Button>
+          </div>
+        </div>
+
+        {/* Contacts Table */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+          {loading ? (
+            <div className="flex items-center justify-center h-64">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+            </div>
+          ) : filteredContacts.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-64 text-gray-500">
+              <Users className="h-12 w-12 mb-3 opacity-50" />
+              <p className="text-sm">
+                {searchQuery ? 'Tidak ada kontak yang ditemukan' : 'Belum ada kontak'}
+              </p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-gray-50 border-b border-gray-200">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Kontak
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Telepon
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Email
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Dibuat
+                    </th>
+                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Aksi
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {filteredContacts.map((contact) => (
+                    <tr 
+                      key={contact.id} 
+                      className="hover:bg-gray-50 transition-colors cursor-pointer"
+                      onClick={() => handleSelectContact(contact)}
+                    >
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center">
+                          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white font-semibold text-sm">
+                            {getInitial(contact.name)}
+                          </div>
+                          <div className="ml-3">
+                            <p className="text-sm font-medium text-gray-900">{contact.name}</p>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center text-sm text-gray-600">
+                          <Phone className="h-3.5 w-3.5 mr-1.5 text-gray-400" />
+                          {contact.phone_number}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        {contact.email ? (
+                          <div className="flex items-center text-sm text-gray-600">
+                            <Mail className="h-3.5 w-3.5 mr-1.5 text-gray-400" />
+                            {contact.email}
+                          </div>
+                        ) : (
+                          <span className="text-sm text-gray-400">-</span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className="text-xs text-gray-500">
+                          {formatDate(contact.created_at)}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                        <div className="flex items-center justify-end gap-2">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleSendMessage(contact);
+                            }}
+                            className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                            title="Kirim Pesan"
+                          >
+                            <Send className="h-4 w-4" />
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleEditContact(contact);
+                            }}
+                            className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                            title="Edit"
+                          >
+                            <Edit className="h-4 w-4" />
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteContact(contact);
+                            }}
+                            className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                            title="Delete"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
+        {/* Add/Edit Contact Modal */}
         <ContactForm
           open={showAddModal}
           onOpenChange={(open) => {
@@ -92,14 +350,24 @@ export default function ContactsPage() {
           contact={selectedContact || undefined}
         />
 
+        {/* Contact Detail Modal */}
         <Dialog open={showDetailModal} onOpenChange={setShowDetailModal}>
           <DialogContent className="sm:max-w-[600px]">
             {selectedContact && (
               <ContactDetail
                 contact={selectedContact}
-                onEdit={handleEditContact}
-                onDelete={handleDeleteContact}
-                onMessage={handleSendMessage}
+                onEdit={() => {
+                  setShowDetailModal(false);
+                  handleEditContact(selectedContact);
+                }}
+                onDelete={() => {
+                  setShowDetailModal(false);
+                  handleDeleteContact(selectedContact);
+                }}
+                onMessage={() => {
+                  // TODO: Navigate to chat
+                  console.log('Send message to:', selectedContact);
+                }}
               />
             )}
           </DialogContent>

@@ -34,14 +34,10 @@ export class MessageService extends BaseService {
         .eq('id', conversationId)
         .single()
 
-      // Then get messages with sender info and quoted message (ordered DESC for pagination, then reverse)
-      // @ts-ignore - Supabase type issue
+      // Get messages without join first
       const { data, error } = await this.supabase
         .from('messages')
-        .select(`
-          *,
-          sent_by_user:profiles(id, full_name, email, avatar_url)
-        `)
+        .select('*')
         .eq('conversation_id', conversationId)
         .order('created_at', { ascending: false })
         .range(offset, offset + limit - 1)
@@ -50,43 +46,88 @@ export class MessageService extends BaseService {
         this.handleError(error, 'MessageService.getMessages')
       }
 
-      console.log('📋 getMessages result:', {
-        conversationId,
-        totalMessages: data?.length || 0,
-        sampleMessage: data?.[0] ? {
-          id: data[0].id,
-          sender_id: data[0].sender_id,
-          sent_by_user: data[0].sent_by_user,
-          has_sent_by_user: !!data[0].sent_by_user
-        } : null
-      })
-
       // Reverse to show oldest first (for chat display)
       const reversedData = (data || []).reverse()
 
+      // Get unique sender IDs
+      const senderIds = [...new Set(reversedData.map(m => m.sender_id).filter(Boolean))]
+      
+      // Fetch sender profiles separately
+      let senderProfiles: Record<string, any> = {}
+      if (senderIds.length > 0) {
+        const { data: profiles } = await this.supabase
+          .from('profiles')
+          .select('id, full_name, email, avatar_url')
+          .in('id', senderIds)
+        
+        if (profiles) {
+          senderProfiles = profiles.reduce((acc, profile) => {
+            acc[profile.id] = profile
+            return acc
+          }, {} as Record<string, any>)
+        }
+      }
+
+      // Attach sender info to messages
+      const messagesWithSenders = reversedData.map(msg => ({
+        ...msg,
+        sent_by_user: msg.sender_id ? senderProfiles[msg.sender_id] : null
+      }))
+
+      console.log('📋 getMessages result:', {
+        conversationId,
+        totalMessages: messagesWithSenders.length,
+        sampleMessage: messagesWithSenders[0] ? {
+          id: messagesWithSenders[0].id,
+          sender_id: messagesWithSenders[0].sender_id,
+          sent_by_user: messagesWithSenders[0].sent_by_user,
+          has_sent_by_user: !!messagesWithSenders[0].sent_by_user
+        } : null
+      })
+
       // Fetch quoted messages if any
       const messagesWithQuoted = await Promise.all(
-        reversedData.map(async (msg) => {
+        messagesWithSenders.map(async (msg) => {
           let quotedMessage = null
           
           if (msg.quoted_message_id) {
-            // Find quoted message by whatsapp_message_id
-            const { data: quoted } = await this.supabase
+            // Find quoted message by whatsapp_message_id OR by id
+            // Use maybeSingle() to avoid 406 error when not found
+            let { data: quoted } = await this.supabase
               .from('messages')
-              .select(`
-                id,
-                content,
-                sender_type,
-                is_from_me,
-                sent_by_user:profiles(full_name)
-              `)
+              .select('id, content, sender_type, is_from_me, sender_id')
               .eq('whatsapp_message_id', msg.quoted_message_id)
               .eq('conversation_id', conversationId)
-              .single()
+              .maybeSingle()
+            
+            // If not found by whatsapp_message_id, try by id (for CRM messages)
+            if (!quoted) {
+              const result = await this.supabase
+                .from('messages')
+                .select('id, content, sender_type, is_from_me, sender_id')
+                .eq('id', msg.quoted_message_id)
+                .eq('conversation_id', conversationId)
+                .maybeSingle()
+              
+              quoted = result.data
+            }
             
             if (quoted) {
+              // Get sender profile if exists
+              let quotedSentByUser = null
+              if (quoted.sender_id) {
+                const { data: profile } = await this.supabase
+                  .from('profiles')
+                  .select('id, full_name')
+                  .eq('id', quoted.sender_id)
+                  .single()
+                
+                quotedSentByUser = profile
+              }
+              
               quotedMessage = {
                 ...quoted,
+                sent_by_user: quotedSentByUser,
                 contact: conversation?.contact || null
               }
             }
@@ -113,14 +154,10 @@ export class MessageService extends BaseService {
     try {
       this.log('MessageService', 'Getting single message', { messageId })
 
-      // Get message with sender info
-      // @ts-ignore - Supabase type issue
+      // Get message without join
       const { data: message, error } = await this.supabase
         .from('messages')
-        .select(`
-          *,
-          sent_by_user:profiles(id, full_name, email, avatar_url)
-        `)
+        .select('*')
         .eq('id', messageId)
         .single()
 
@@ -129,11 +166,23 @@ export class MessageService extends BaseService {
         return null
       }
 
+      // Get sender profile separately if sender_id exists
+      let sentByUser = null
+      if (message.sender_id) {
+        const { data: profile } = await this.supabase
+          .from('profiles')
+          .select('id, full_name, email, avatar_url')
+          .eq('id', message.sender_id)
+          .single()
+        
+        sentByUser = profile
+      }
+
       console.log('🔍 getMessage result:', {
         messageId,
         sender_id: message?.sender_id,
-        sent_by_user: message?.sent_by_user,
-        has_sent_by_user: !!message?.sent_by_user
+        sent_by_user: sentByUser,
+        has_sent_by_user: !!sentByUser
       })
 
       // Get conversation to get contact info
@@ -146,30 +195,52 @@ export class MessageService extends BaseService {
       // Fetch quoted message if any
       let quotedMessage = null
       if (message.quoted_message_id) {
-        const { data: quoted } = await this.supabase
+        // Find quoted message by whatsapp_message_id OR by id
+        // Use maybeSingle() to avoid 406 error when not found
+        let { data: quoted } = await this.supabase
           .from('messages')
-          .select(`
-            id,
-            content,
-            sender_type,
-            is_from_me,
-            sent_by_user:profiles(full_name)
-          `)
+          .select('id, content, sender_type, is_from_me, sender_id')
           .eq('whatsapp_message_id', message.quoted_message_id)
           .eq('conversation_id', message.conversation_id)
-          .single()
+          .maybeSingle()
+        
+        // If not found by whatsapp_message_id, try by id (for CRM messages)
+        if (!quoted) {
+          const result = await this.supabase
+            .from('messages')
+            .select('id, content, sender_type, is_from_me, sender_id')
+            .eq('id', message.quoted_message_id)
+            .eq('conversation_id', message.conversation_id)
+            .maybeSingle()
+          
+          quoted = result.data
+        }
         
         if (quoted) {
+          // Get sender profile if exists
+          let quotedSentByUser = null
+          if (quoted.sender_id) {
+            const { data: profile } = await this.supabase
+              .from('profiles')
+              .select('id, full_name')
+              .eq('id', quoted.sender_id)
+              .maybeSingle()
+            
+            quotedSentByUser = profile
+          }
+          
           quotedMessage = {
             ...quoted,
+            sent_by_user: quotedSentByUser,
             contact: conversation?.contact || null
           }
         }
       }
 
-      // Add contact info and quoted message to message
+      // Add contact info, sender info, and quoted message to message
       return {
         ...message,
+        sent_by_user: sentByUser,
         contact: conversation?.contact || null,
         quoted_message: quotedMessage
       }
@@ -208,6 +279,21 @@ export class MessageService extends BaseService {
         status: 'sent',
         tenant_id: this.defaultTenantId,
         created_at: new Date().toISOString(),
+        // Create temporary raw_message structure for immediate quoting
+        // This will be updated with actual WhatsApp message ID later by worker
+        metadata: {
+          raw_message: {
+            key: {
+              id: `temp_${Date.now()}`, // Temporary ID, will be replaced
+              fromMe: true,
+              remoteJid: params.whatsappNumber
+            },
+            message: {
+              conversation: params.content
+            },
+            messageTimestamp: Math.floor(Date.now() / 1000)
+          }
+        }
       }
 
       // @ts-ignore

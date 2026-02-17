@@ -319,34 +319,6 @@ export function RightSidebar({
             </div>
           </div>
         </div>
-
-        {/* Quick Actions - Hidden for owner */}
-        {userRole !== 'owner' && (
-          <div className="mt-3 flex gap-2 max-w-sm mx-auto">
-            {onAssignAgent && (
-              <Button 
-                size="sm" 
-                variant="outline" 
-                className="flex-1 h-8 text-xs"
-                onClick={() => toggleSection('agents')}
-              >
-                <Users className="h-3.5 w-3.5 mr-1" />
-                Assign
-              </Button>
-            )}
-            {onCloseConversation && conversation.status === 'open' && (
-              <Button 
-                size="sm" 
-                variant="outline" 
-                className="flex-1 h-8 text-xs text-red-600 hover:text-red-700 hover:bg-red-50"
-                onClick={onCloseConversation}
-              >
-                <XCircle className="h-3.5 w-3.5 mr-1" />
-                Close
-              </Button>
-            )}
-          </div>
-        )}
       </div>
 
       {/* SLA Alert */}
@@ -420,6 +392,50 @@ export function RightSidebar({
         {/* Details Content */}
         {expandedSections.details && (
           <div className="px-6 py-3 space-y-4 bg-gray-50">
+            {/* WhatsApp Session Info */}
+            {conversation.whatsapp_session && (
+              <div className="space-y-2 pb-2 border-b">
+                <p className="text-[10px] font-semibold text-gray-700 mb-2">WhatsApp Session</p>
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-gray-600 flex items-center gap-1">
+                    <Phone className="h-3 w-3" />
+                    Nomor WhatsApp
+                  </span>
+                  <span className="font-medium text-gray-900">
+                    {conversation.whatsapp_session.phone_number || 'Connecting...'}
+                  </span>
+                </div>
+                {conversation.whatsapp_session.session_name && (
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-gray-600 flex items-center gap-1">
+                      <MessageSquare className="h-3 w-3" />
+                      Device Name
+                    </span>
+                    <span className="font-medium text-gray-900">
+                      {conversation.whatsapp_session.session_name}
+                    </span>
+                  </div>
+                )}
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-gray-600 flex items-center gap-1">
+                    <AlertCircle className="h-3 w-3" />
+                    Status
+                  </span>
+                  <span className={`font-medium ${
+                    conversation.whatsapp_session.status === 'connected' 
+                      ? 'text-green-600' 
+                      : conversation.whatsapp_session.status === 'connecting'
+                      ? 'text-yellow-600'
+                      : 'text-red-600'
+                  }`}>
+                    {conversation.whatsapp_session.status === 'connected' ? 'Connected' : 
+                     conversation.whatsapp_session.status === 'connecting' ? 'Connecting' : 
+                     'Disconnected'}
+                  </span>
+                </div>
+              </div>
+            )}
+            
             {/* Timeline - Waktu Penting */}
             <div className="space-y-2">
               <p className="text-[10px] font-semibold text-gray-700 mb-2">Timeline</p>
@@ -735,7 +751,7 @@ export function RightSidebar({
             {/* Rating & Review Section */}
             <button
               onClick={() => toggleSection('reviews')}
-              className="w-full px-6 py-3 flex items-center gap-3 hover:bg-gray-50 transition-colors text-left group border-t"
+              className="w-full px-6 py-3 flex items-center gap-3 hover:bg-gray-50 transition-colors text-left group"
             >
               <div className="w-8 h-8 rounded-lg bg-yellow-50 flex items-center justify-center group-hover:bg-yellow-100 transition-colors">
                 <Star className="h-4 w-4 text-yellow-600" />

@@ -11,19 +11,46 @@ import qrcodeTerminal from 'qrcode-terminal'
 import QRCode from 'qrcode'
 import fs from 'fs'
 import path from 'path'
+import { fileURLToPath } from 'url'
+import { dirname } from 'path'
 import { supabase } from '../config/supabase.js'
 import reconnectManager from './reconnect-manager.js'
 import sessionManager from './session-manager.js'
+import sessionStateRegistry from './session-state-registry.js'
+
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = dirname(__filename)
 
 class BaileysWhatsAppService {
   constructor() {
     this.sessions = new Map() // sessionKey (tenantId:sessionId) -> { sock, store, state, tenantId }
     this.qrCodes = new Map() // sessionKey -> qrCode
-    this.authDir = '.baileys_auth'
     
-    // Create auth directory if not exists
-    if (!fs.existsSync(this.authDir)) {
-      fs.mkdirSync(this.authDir, { recursive: true })
+    // Use dedicated folder for auth sessions
+    // Try /var/wa-sessions first, fallback to project root .baileys_auth
+    const preferredPath = '/var/wa-sessions'
+    // Use __dirname to get whatsapp-service/src/services, then go up 3 levels to project root
+    const projectRoot = path.join(__dirname, '..', '..', '..')
+    const fallbackPath = path.join(projectRoot, '.baileys_auth')
+    
+    console.log('🔍 Using auth directory - fallback:', fallbackPath)
+    
+    try {
+      if (!fs.existsSync(preferredPath)) {
+        fs.mkdirSync(preferredPath, { recursive: true, mode: 0o755 })
+      }
+      // Test write permission
+      const testFile = path.join(preferredPath, '.test')
+      fs.writeFileSync(testFile, 'test')
+      fs.unlinkSync(testFile)
+      this.authDir = preferredPath
+      console.log('✅ Using dedicated auth directory:', preferredPath)
+    } catch (error) {
+      console.warn('⚠️  Cannot use /var/wa-sessions, using fallback:', fallbackPath)
+      this.authDir = fallbackPath
+      if (!fs.existsSync(this.authDir)) {
+        fs.mkdirSync(this.authDir, { recursive: true })
+      }
     }
   }
 
@@ -160,11 +187,12 @@ class BaileysWhatsAppService {
         printQRInTerminal: false,
         logger: pino({ level: 'silent' }),
         browser: Browsers.ubuntu('Chrome'),
-        connectTimeoutMs: 60000, // 60 seconds timeout
-        defaultQueryTimeoutMs: 60000, // 60 seconds for queries
-        retryRequestDelayMs: 250, // Retry delay
-        maxMsgRetryCount: 3, // Max retry for messages
-        keepAliveIntervalMs: 30000, // Keep alive every 30s
+        connectTimeoutMs: 60000,
+        defaultQueryTimeoutMs: 60000,
+        retryRequestDelayMs: 250,
+        maxMsgRetryCount: 3,
+        keepAliveIntervalMs: 10000, // Keep alive every 10s (more aggressive)
+        markOnlineOnConnect: true, // Mark as online when connecting
       })
 
       console.log(`🔌 Socket created for ${sessionKey}`)
@@ -186,6 +214,10 @@ class BaileysWhatsAppService {
       sock.ev.on('error', (error) => {
         console.error(`❌ Socket error for ${sessionKey}:`, error)
         
+        // Update state registry on error
+        sessionStateRegistry.setState(sessionId, 'ERROR')
+        sessionStateRegistry.incrementErrorCount(sessionId)
+        
         // Handle timeout errors specifically
         if (error.message?.includes('Timed Out') || error.message?.includes('timeout')) {
           console.log(`⏱️ Timeout detected for ${sessionKey}, will auto-reconnect`)
@@ -202,6 +234,11 @@ class BaileysWhatsAppService {
           hasQR: !!qr,
           hasLastDisconnect: !!lastDisconnect
         })
+
+        // Update state registry based on connection status
+        if (connection === 'connecting') {
+          sessionStateRegistry.setState(sessionId, 'CONNECTING')
+        }
 
         // Handle QR code
         if (qr) {
@@ -241,6 +278,36 @@ class BaileysWhatsAppService {
             : null
 
           console.log(`❌ Connection closed for ${sessionKey}, status: ${statusCode}, shouldReconnect: ${shouldReconnect}`)
+
+          // Update state registry based on disconnect reason
+          if (statusCode === DisconnectReason.loggedOut) {
+            sessionStateRegistry.setState(sessionId, 'LOGGED_OUT')
+            
+            // Auto-generate new QR code for re-authentication
+            console.log(`🔄 Session logged out, generating new QR code for re-authentication...`)
+            
+            // Delete old auth files
+            const authPath = path.join(this.authDir, sessionId)
+            if (fs.existsSync(authPath)) {
+              console.log(`🗑️ Deleting old auth files for: ${sessionId}`)
+              fs.rmSync(authPath, { recursive: true, force: true })
+            }
+            
+            // Initialize new session with QR
+            setTimeout(async () => {
+              try {
+                console.log(`🔄 Re-initializing session ${sessionId} for QR scan...`)
+                await this.initializeClient(sessionId, true, tenantId)
+              } catch (error) {
+                console.error(`❌ Failed to re-initialize session:`, error.message)
+              }
+            }, 2000) // Wait 2 seconds before re-initializing
+          } else if (shouldReconnect) {
+            sessionStateRegistry.setState(sessionId, 'DISCONNECTED')
+          } else {
+            sessionStateRegistry.setState(sessionId, 'ERROR')
+            sessionStateRegistry.incrementErrorCount(sessionId)
+          }
 
           // Update session manager
           sessionManager.updateStatus(tenantId, sessionId, 'disconnected')
@@ -322,6 +389,10 @@ class BaileysWhatsAppService {
         } else if (connection === 'open') {
           console.log(`✅ Session connected: ${sessionKey}`)
           console.log(`📊 Updating database for session: ${sessionId}, tenant: ${tenantId}`)
+          
+          // Update state registry to CONNECTED
+          sessionStateRegistry.setState(sessionId, 'CONNECTED')
+          sessionStateRegistry.resetErrorCount(sessionId)
           
           // Reset reconnect attempts on successful connection
           reconnectManager.resetAttempts(sessionId)
@@ -414,11 +485,22 @@ class BaileysWhatsAppService {
           sessionManager.updateActivity(tenantId, sessionId, 'message')
 
           // Save to database
+          let savedConversationId = null
           try {
-            await this.saveIncomingMessage(sessionId, msg, tenantId)
+            savedConversationId = await this.saveIncomingMessage(sessionId, msg, tenantId)
           } catch (error) {
             console.error('❌ Error processing message:', error)
             sessionManager.updateActivity(tenantId, sessionId, 'error')
+          }
+
+          // Trigger chatbot if message was saved successfully
+          if (savedConversationId) {
+            try {
+              await this.triggerChatbot(sessionId, msg, savedConversationId, tenantId)
+            } catch (error) {
+              console.error('❌ Error triggering chatbot:', error)
+              // Don't fail the whole flow if chatbot fails
+            }
           }
 
           // Emit via Socket.IO
@@ -501,17 +583,53 @@ class BaileysWhatsAppService {
     }
 
     const sessionKey = this.getSessionKey(tenantId, sessionId)
-    const session = this.sessions.get(sessionKey)
+    let session = this.sessions.get(sessionKey)
     
+    // If session not found, try to find any active session for this tenant
     if (!session) {
-      console.error(`❌ Session not found: ${sessionKey}`)
+      console.warn(`❌ Session not found: ${sessionKey}`)
       console.log(`📋 Available sessions:`, Array.from(this.sessions.keys()))
-      throw new Error('Session not found: ' + sessionId)
+      
+      // Try to find any active session for this tenant
+      const availableSessions = Array.from(this.sessions.keys()).filter(key => key.startsWith(`${tenantId}:`))
+      
+      if (availableSessions.length > 0) {
+        const fallbackSessionKey = availableSessions[0]
+        console.log(`🔄 Using fallback session: ${fallbackSessionKey}`)
+        session = this.sessions.get(fallbackSessionKey)
+        
+        // Update conversation in database to use the correct session
+        if (supabase) {
+          const fallbackSessionId = fallbackSessionKey.split(':')[1]
+          try {
+            // Find conversation by phone number and update session
+            await supabase
+              .from('conversations')
+              .update({ whatsapp_session_id: fallbackSessionId })
+              .eq('contact_id', supabase.rpc('get_contact_id_by_phone', { phone: to }))
+              .eq('status', 'open')
+            
+            console.log(`✅ Updated conversation to use session: ${fallbackSessionId}`)
+          } catch (err) {
+            console.warn(`⚠️  Failed to update conversation session:`, err.message)
+          }
+        }
+      } else {
+        throw new Error('Session not found: ' + sessionId)
+      }
     }
 
     const { sock } = session
 
     try {
+      console.log('📤 sendMessage called:', {
+        sessionId,
+        to,
+        messageLength: message?.length,
+        hasQuoted: !!quotedMessageId,
+        tenantId
+      })
+
       // Format phone number (remove @c.us if present)
       let phoneNumber = to.replace('@c.us', '').replace(/\D/g, '')
       
@@ -529,12 +647,55 @@ class BaileysWhatsAppService {
       // Add quoted message if provided
       if (quotedMessageId && supabase) {
         try {
-          // Get the original message from database to get the raw message object
-          const { data: quotedMsg } = await supabase
+          // Try to get the original message from database
+          // Strategy:
+          // 1. Try by whatsapp_message_id (for messages from WhatsApp)
+          // 2. Try by id (for CRM messages using database ID)
+          // 3. Try by raw_message.key.id in metadata (for CRM messages using WhatsApp ID)
+          
+          let quotedMsg = null
+          
+          // Try 1: by whatsapp_message_id
+          let { data } = await supabase
             .from('messages')
-            .select('metadata, content, is_from_me, whatsapp_message_id, message_type')
+            .select('metadata, content, is_from_me, whatsapp_message_id, message_type, id')
             .eq('whatsapp_message_id', quotedMessageId)
-            .single()
+            .maybeSingle()
+          
+          if (data) {
+            quotedMsg = data
+          }
+          
+          // Try 2: by id (if quotedMessageId is a UUID)
+          if (!quotedMsg && quotedMessageId.includes('-')) {
+            const result = await supabase
+              .from('messages')
+              .select('metadata, content, is_from_me, whatsapp_message_id, message_type, id')
+              .eq('id', quotedMessageId)
+              .maybeSingle()
+            
+            quotedMsg = result.data
+          }
+          
+          // Try 3: by raw_message.key.id in metadata (for CRM messages)
+          if (!quotedMsg) {
+            // Search in metadata->raw_message->key->id
+            const { data: messages } = await supabase
+              .from('messages')
+              .select('metadata, content, is_from_me, whatsapp_message_id, message_type, id')
+              .not('metadata', 'is', null)
+              .limit(100) // Limit to avoid performance issues
+            
+            if (messages) {
+              quotedMsg = messages.find(msg => {
+                try {
+                  return msg.metadata?.raw_message?.key?.id === quotedMessageId
+                } catch {
+                  return false
+                }
+              })
+            }
+          }
           
           if (quotedMsg && quotedMsg.metadata?.raw_message) {
             // Use the stored raw message for proper quoting
@@ -547,17 +708,39 @@ class BaileysWhatsAppService {
               participant: rawMsg.key.fromMe ? undefined : rawMsg.key.remoteJid,
               quotedMessage: rawMsg.message
             }
+            
+            console.log('  📎 Quoting message with raw_message:', {
+              stanzaId: rawMsg.key.id,
+              fromMe: rawMsg.key.fromMe,
+              hasQuotedMessage: !!rawMsg.message
+            })
           } else if (quotedMsg) {
-            // Fallback: create a simple quoted message using contextInfo
-            messageContent.contextInfo = {
-              stanzaId: quotedMessageId,
-              participant: quotedMsg.is_from_me ? undefined : jid,
-              quotedMessage: {
-                conversation: quotedMsg.content || ''
+            // Fallback: only use if whatsapp_message_id is a valid WhatsApp ID (not UUID)
+            // WhatsApp message IDs are alphanumeric without dashes
+            const stanzaId = quotedMsg.whatsapp_message_id
+            const isValidWhatsAppId = stanzaId && !stanzaId.includes('-')
+            
+            if (isValidWhatsAppId) {
+              console.log('  📎 Quoting message without raw_message (fallback):', {
+                stanzaId,
+                hasWhatsappId: !!quotedMsg.whatsapp_message_id
+              })
+              
+              messageContent.contextInfo = {
+                stanzaId: stanzaId,
+                participant: quotedMsg.is_from_me ? undefined : jid,
+                quotedMessage: {
+                  conversation: quotedMsg.content || ''
+                }
               }
+            } else {
+              console.log('  ⚠️  Cannot quote message: invalid WhatsApp ID (probably CRM message without raw_message):', stanzaId)
             }
+          } else {
+            console.log('  ⚠️  Quoted message not found:', quotedMessageId)
           }
         } catch (err) {
+          console.error('  ❌ Error getting quoted message:', err)
           // Silent fail - just send without quote if error
         }
       }
@@ -567,7 +750,8 @@ class BaileysWhatsAppService {
 
       return {
         success: true,
-        messageId: result.key.id
+        messageId: result.key.id,
+        key: result.key // Return full key for metadata storage
       }
     } catch (error) {
       console.error('❌ Failed to send message:', error)
@@ -980,10 +1164,16 @@ class BaileysWhatsAppService {
   /**
    * Save incoming message to database
    */
-  async saveIncomingMessage(sessionId, msg) {
-    if (!supabase) return
+  async saveIncomingMessage(sessionId, msg, tenantId) {
+    if (!supabase) return null
 
     try {
+      // Skip group messages - CRM only handles 1-on-1 chats
+      if (msg.key.remoteJid.endsWith('@g.us')) {
+        console.log('  ⏭️  Skipping group message')
+        return
+      }
+      
       // Get session user_id
       const { data: session, error: sessionError } = await supabase
         .from('whatsapp_sessions')
@@ -999,9 +1189,15 @@ class BaileysWhatsAppService {
       const userId = session.user_id
       console.log(`  👤 User ID: ${userId}`)
 
-      // Extract phone number from JID (format: 6285xxx@s.whatsapp.net)
+      // Extract phone number from JID (direct messages only)
       const phoneNumber = msg.key.remoteJid.split('@')[0]
       const formattedPhone = phoneNumber.startsWith('62') ? `+${phoneNumber}` : `+62${phoneNumber}`
+      
+      // Debug logging
+      console.log('  📱 Remote JID:', msg.key.remoteJid)
+      console.log('  📱 Phone Number:', phoneNumber)
+      console.log('  📱 Formatted Phone:', formattedPhone)
+      console.log('  📱 Push Name:', msg.pushName)
 
       // Get pushname (contact name from WhatsApp)
       const pushname = msg.pushName || null
@@ -1012,10 +1208,11 @@ class BaileysWhatsAppService {
         .select('id, name')
         .eq('phone_number', formattedPhone)
         .eq('user_id', userId)
-        .single()
+        .maybeSingle()
 
       if (!contact) {
-        // Get default tenant ID from environment
+        // Create new contact
+        console.log('  ➕ Creating new contact:', formattedPhone, pushname)
         const defaultTenantId = process.env.DEFAULT_TENANT_ID || '00000000-0000-0000-0000-000000000001';
         
         const { data: newContact } = await supabase
@@ -1029,11 +1226,19 @@ class BaileysWhatsAppService {
           .select()
           .single()
         contact = newContact
-      } else if (pushname && !contact.name) {
-        await supabase
-          .from('contacts')
-          .update({ name: pushname })
-          .eq('id', contact.id)
+      } else {
+        // Update contact name if:
+        // 1. Contact has no name, OR
+        // 2. Pushname is different from current name (WhatsApp name changed)
+        if (pushname && (!contact.name || contact.name !== pushname)) {
+          console.log(`  ✏️  Updating contact name: "${contact.name}" → "${pushname}"`)
+          await supabase
+            .from('contacts')
+            .update({ name: pushname })
+            .eq('id', contact.id)
+          
+          contact.name = pushname
+        }
       }
 
       // Find or create conversation
@@ -1072,7 +1277,24 @@ class BaileysWhatsAppService {
       // Extract quoted message ID if this is a reply
       let quotedMessageId = null
       if (msg.message?.extendedTextMessage?.contextInfo?.stanzaId) {
-        quotedMessageId = msg.message.extendedTextMessage.contextInfo.stanzaId
+        const stanzaId = msg.message.extendedTextMessage.contextInfo.stanzaId
+        console.log('  📎 This is a quoted message!')
+        console.log('  📎 Quoted stanzaId:', stanzaId)
+        
+        // Find the quoted message in database by whatsapp_message_id
+        const { data: quotedMsg } = await supabase
+          .from('messages')
+          .select('id')
+          .eq('whatsapp_message_id', stanzaId)
+          .maybeSingle()
+        
+        if (quotedMsg) {
+          quotedMessageId = quotedMsg.id // Use database ID
+          console.log('  📎 Found quoted message in database:', quotedMessageId)
+        } else {
+          console.log('  ⚠️  Quoted message not found in database, using stanzaId:', stanzaId)
+          quotedMessageId = stanzaId // Fallback to stanzaId
+        }
       }
 
       if (!conversation) {
@@ -1144,11 +1366,33 @@ class BaileysWhatsAppService {
       }
 
       // Check for media and download
-      const session_sock = this.sessions.get(sessionId)
+      // Session is stored with tenantId:sessionId format, need to find it
+      let session_sock = null
+      for (const [key, session] of this.sessions.entries()) {
+        if (key.endsWith(`:${sessionId}`) || key === sessionId) {
+          session_sock = session
+          break
+        }
+      }
+      
+      if (!session_sock) {
+        console.error('  ❌ Session socket not found for media download!')
+        console.error('     Session ID:', sessionId)
+        console.error('     Available sessions:', Array.from(this.sessions.keys()))
+      }
       
       // Helper function to download and upload media
       const downloadAndUploadMedia = async (msg, type, mimetype, filename = null) => {
+        if (!session_sock) {
+          console.error(`  ❌ Cannot download ${type}: session socket not available`)
+          return null
+        }
+        
         try {
+          console.log(`  📥 Downloading ${type}...`)
+          console.log(`     Mimetype: ${mimetype}`)
+          console.log(`     Filename: ${filename || 'auto-generated'}`)
+          
           // Download media using Baileys downloadMediaMessage
           const { downloadMediaMessage } = await import('@whiskeysockets/baileys')
           const buffer = await downloadMediaMessage(
@@ -1160,6 +1404,8 @@ class BaileysWhatsAppService {
               reuploadRequest: session_sock.sock.updateMediaMessage
             }
           )
+          
+          console.log(`  ✅ Downloaded ${buffer.length} bytes`)
           
           if (buffer) {
             // Generate filename if not provided
@@ -1177,6 +1423,8 @@ class BaileysWhatsAppService {
               generatedFilename = `${type}_${timestamp}.${ext}`
             }
             
+            console.log(`  📤 Uploading to Supabase: ${generatedFilename}`)
+            
             // Upload to Supabase Storage
             const filePath = `${userId}/${conversation.id}/${generatedFilename}`
             
@@ -1191,6 +1439,7 @@ class BaileysWhatsAppService {
               console.error('  ❌ Upload error:', uploadError)
               return null
             } else {
+              console.log(`  ✅ Uploaded successfully`)
               const { data: urlData } = supabase.storage
                 .from('chat-media')
                 .getPublicUrl(filePath)
@@ -1372,15 +1621,277 @@ class BaileysWhatsAppService {
         id: messageData.whatsapp_message_id,
         type: messageType,
         hasMedia: !!mediaUrl,
-        content: messageText || '[no text]'
+        content: messageText || '[no text]',
+        quoted_message_id: quotedMessageId
       })
 
-      if (mediaUrl) {
-      }
+      // Return conversation ID for chatbot trigger
+      return conversation.id
+
     } catch (error) {
       console.error('❌ Error saving message:', error)
+      return null
     }
   }
+
+  /**
+   * Trigger chatbot for incoming message
+   */
+  async triggerChatbot(sessionId, msg, conversationId, tenantId) {
+    if (!supabase) return
+
+    try {
+      // Extract message text
+      const messageText = msg.message?.conversation || 
+                         msg.message?.extendedTextMessage?.text ||
+                         null
+
+      if (!messageText) {
+        console.log('  ⏭️  No text content, skipping chatbot trigger')
+        return
+      }
+
+      console.log('🤖 Checking for chatbot triggers...')
+      console.log('  📝 Message:', messageText)
+      console.log('  💬 Conversation:', conversationId)
+
+      // Get active chatbots for this tenant, ordered by priority
+      const { data: chatbots, error } = await supabase
+        .from('chatbots')
+        .select('id, name, trigger_type, trigger_config, priority')
+        .eq('tenant_id', tenantId)
+        .eq('is_active', true)
+        .order('priority', { ascending: false })
+
+      if (error) {
+        console.error('  ❌ Error fetching chatbots:', error)
+        return
+      }
+
+      if (!chatbots || chatbots.length === 0) {
+        console.log('  ℹ️  No active chatbots found')
+        return
+      }
+
+      console.log(`  📋 Found ${chatbots.length} active chatbot(s)`)
+
+      // Find matching chatbot
+      let matchedChatbot = null
+      for (const chatbot of chatbots) {
+        const isMatch = await this.checkChatbotTrigger(chatbot, messageText, conversationId)
+        if (isMatch) {
+          matchedChatbot = chatbot
+          console.log(`  ✅ Matched chatbot: ${chatbot.name} (${chatbot.trigger_type})`)
+          break
+        }
+      }
+
+      if (!matchedChatbot) {
+        console.log('  ℹ️  No matching chatbot found')
+        return
+      }
+
+      // Get chatbot response from trigger_config
+      const response = matchedChatbot.trigger_config?.response_message
+      if (!response) {
+        console.log('  ⚠️  Chatbot has no response message configured')
+        return
+      }
+
+      // Send response via Next.js API (which uses queue system)
+      console.log('  📤 Sending chatbot response via API...')
+      const phoneNumber = msg.key.remoteJid.split('@')[0]
+      const to = `${phoneNumber}@c.us`
+
+      try {
+        // Call Next.js API to send message (which will use queue)
+        const apiUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+        const response_api = await fetch(`${apiUrl}/api/send-message`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            sessionId: sessionId,
+            to: to,
+            message: response,
+            conversationId: conversationId,
+            userId: 'bot', // Mark as bot message
+            quotedMessageId: null,
+            chatbotMetadata: {
+              chatbot_id: matchedChatbot.id,
+              chatbot_name: matchedChatbot.name,
+              trigger_type: matchedChatbot.trigger_type
+            }
+          })
+        })
+
+        if (!response_api.ok) {
+          const errorData = await response_api.json()
+          throw new Error(errorData.error || 'Failed to send via API')
+        }
+
+        const result = await response_api.json()
+        console.log('  ✅ Chatbot response queued via API:', result)
+
+        // Update the saved message metadata
+        if (result.messageId && supabase) {
+          try {
+            await supabase
+              .from('messages')
+              .update({
+                metadata: {
+                  chatbot_id: matchedChatbot.id,
+                  chatbot_name: matchedChatbot.name,
+                  trigger_type: matchedChatbot.trigger_type,
+                  queueJobId: result.jobId
+                }
+              })
+              .eq('id', result.messageId)
+
+            console.log('  ✅ Bot message metadata updated')
+          } catch (updateError) {
+            console.error('  ❌ Failed to update message metadata:', updateError)
+          }
+        }
+      } catch (sendError) {
+        console.error('  ❌ Failed to send chatbot response via API:', sendError)
+        
+        // Fallback: send directly if API fails
+        console.log('  🔄 Falling back to direct send...')
+        try {
+          const jid = `${phoneNumber}@s.whatsapp.net`
+          const directResult = await this.sendMessage(sessionId, jid, response, null, tenantId)
+          console.log('  ✅ Chatbot response sent directly (fallback):', directResult)
+
+          // Save bot message to database
+          if (directResult.success && supabase) {
+            const defaultTenantId = process.env.DEFAULT_TENANT_ID || '00000000-0000-0000-0000-000000000001'
+            
+            const botMessageData = {
+              conversation_id: conversationId,
+              sender_type: 'bot',
+              content: response,
+              is_from_me: true,
+              status: 'sent',
+              message_type: 'text',
+              whatsapp_message_id: directResult.messageId,
+              tenant_id: defaultTenantId,
+              created_at: new Date().toISOString(),
+              metadata: {
+                chatbot_id: matchedChatbot.id,
+                chatbot_name: matchedChatbot.name,
+                trigger_type: matchedChatbot.trigger_type,
+                fallback: true,
+                raw_message: directResult.key ? {
+                  key: directResult.key,
+                  message: { conversation: response },
+                  messageTimestamp: Math.floor(Date.now() / 1000)
+                } : null
+              }
+            }
+
+            await supabase
+              .from('messages')
+              .insert(botMessageData)
+
+            // Update conversation last_message
+            await supabase
+              .from('conversations')
+              .update({
+                last_message: response,
+                last_message_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+              })
+              .eq('id', conversationId)
+
+            console.log('  ✅ Bot message saved to database (fallback)')
+          }
+        } catch (fallbackError) {
+          console.error('  ❌ Fallback also failed:', fallbackError)
+          throw fallbackError
+        }
+      }
+
+      // Log analytics
+      await supabase
+        .from('chatbot_analytics')
+        .insert({
+          chatbot_id: matchedChatbot.id,
+          event_type: 'triggered',
+          event_data: {
+            conversation_id: conversationId,
+            message_text: messageText,
+            response_sent: response
+          }
+        })
+
+    } catch (error) {
+      console.error('❌ Error in triggerChatbot:', error)
+    }
+  }
+
+  /**
+   * Check if chatbot trigger matches the message
+   */
+  async checkChatbotTrigger(chatbot, messageText, conversationId) {
+    const { trigger_type, trigger_config } = chatbot
+
+    switch (trigger_type) {
+      case 'keyword':
+        // Check if message contains any of the keywords
+        const keywords = trigger_config?.keywords || []
+        if (!Array.isArray(keywords) || keywords.length === 0) return false
+        
+        const lowerMessage = messageText.toLowerCase()
+        return keywords.some(keyword => 
+          lowerMessage.includes(keyword.toLowerCase())
+        )
+
+      case 'greeting':
+        // Check if message is a greeting
+        const greetings = ['halo', 'hai', 'hello', 'hi', 'hey', 'selamat', 'pagi', 'siang', 'sore', 'malam']
+        const lowerMsg = messageText.toLowerCase().trim()
+        return greetings.some(greeting => lowerMsg.startsWith(greeting))
+
+      case 'always':
+        // Always trigger (for testing or catch-all)
+        return true
+
+      case 'schedule':
+        // Check if current time matches schedule
+        const schedule = trigger_config?.schedule
+        if (!schedule) return false
+        
+        const now = new Date()
+        const currentHour = now.getHours()
+        const currentDay = now.getDay() // 0 = Sunday, 6 = Saturday
+        
+        // Check if current time is within schedule
+        if (schedule.days && !schedule.days.includes(currentDay)) return false
+        if (schedule.start_hour && currentHour < schedule.start_hour) return false
+        if (schedule.end_hour && currentHour >= schedule.end_hour) return false
+        
+        return true
+
+      case 'intent':
+        // Simple intent matching (can be enhanced with NLP)
+        const intents = trigger_config?.intents || []
+        if (!Array.isArray(intents) || intents.length === 0) return false
+        
+        const msgLower = messageText.toLowerCase()
+        return intents.some(intent => {
+          const patterns = intent.patterns || []
+          return patterns.some(pattern => 
+            msgLower.includes(pattern.toLowerCase())
+          )
+        })
+
+      default:
+        return false
+    }
+  }
+
 }
 
 export default new BaileysWhatsAppService()

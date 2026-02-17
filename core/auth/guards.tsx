@@ -4,7 +4,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import type { UserRole } from '@/lib/permissions/roles'
+import type { UserRole } from '@/lib/rbac/chat-permissions'
 
 interface RouteGuardProps {
   children: React.ReactNode

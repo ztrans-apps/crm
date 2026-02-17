@@ -55,9 +55,9 @@ export function startSessionStatusSync(whatsappService) {
 
         console.log(`🔄 Session ${sessionId}: DB=${dbSession.status}, Manager=${sessionStatus}`)
 
-        // If SessionManager says active but DB says connecting, update DB
-        if (sessionStatus === 'active' && dbSession.status === 'connecting') {
-          console.log(`🔄 Syncing status for session ${sessionId}: connecting → connected`)
+        // If SessionManager says active but DB is not connected, update DB
+        if (sessionStatus === 'active' && dbSession.status !== 'connected') {
+          console.log(`🔄 Syncing status for session ${sessionId}: ${dbSession.status} → connected`)
           
           // Get phone number from session if not in DB
           let phone = dbSession.phone_number
@@ -93,26 +93,34 @@ export function startSessionStatusSync(whatsappService) {
           }
         }
 
-        // If SessionManager says inactive but DB says connected, update DB
+        // IMPORTANT: Don't sync 'inactive' to 'disconnected'
+        // 'inactive' means no activity, not disconnected
+        // Only sync if sock is actually closed/null
         if (sessionStatus === 'inactive' && dbSession.status === 'connected') {
-          console.log(`🔄 Syncing status for session ${sessionId}: connected → disconnected`)
-          
-          const { error: updateError } = await supabase
-            .from('whatsapp_sessions')
-            .update({
-              status: 'disconnected',
-              metadata: { 
-                lastDisconnected: new Date().toISOString(),
-                syncedBy: 'status-sync-job'
-              }
-            })
-            .eq('id', sessionId)
-            .eq('tenant_id', tenantId)
+          // Check if socket is actually disconnected
+          if (!sock || sock.ws?.readyState === 3) { // 3 = CLOSED
+            console.log(`🔄 Syncing status for session ${sessionId}: connected → disconnected (socket closed)`)
+            
+            const { error: updateError } = await supabase
+              .from('whatsapp_sessions')
+              .update({
+                status: 'disconnected',
+                metadata: { 
+                  lastDisconnected: new Date().toISOString(),
+                  syncedBy: 'status-sync-job',
+                  reason: 'socket-closed'
+                }
+              })
+              .eq('id', sessionId)
+              .eq('tenant_id', tenantId)
 
-          if (updateError) {
-            console.error(`❌ Failed to sync status for ${sessionId}:`, updateError)
+            if (updateError) {
+              console.error(`❌ Failed to sync status for ${sessionId}:`, updateError)
+            } else {
+              console.log(`✅ Status synced for ${sessionId}: disconnected`)
+            }
           } else {
-            console.log(`✅ Status synced for ${sessionId}: disconnected`)
+            console.log(`ℹ️  Session ${sessionId} is inactive but socket still open, keeping DB status as connected`)
           }
         }
       }

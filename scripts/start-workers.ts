@@ -4,8 +4,10 @@
  * Run: npx tsx scripts/start-workers.ts
  */
 
+import '../lib/queue/workers/load-env'; // Load environment variables first
 import { startAllWorkers, stopAllWorkers } from '../lib/queue/workers';
 import { startAutoRetry, stopAutoRetry } from '../lib/queue/failed-job-retry';
+import { startBroadcastScheduler } from '../lib/queue/jobs/broadcast-scheduler';
 
 console.log('🚀 Starting queue workers...');
 console.log('📋 Workers:');
@@ -14,6 +16,8 @@ console.log('  - whatsapp:receive (incoming messages)');
 console.log('  - webhook:delivery (webhook deliveries)');
 console.log('  - broadcast:send (broadcast campaigns)');
 console.log('');
+
+let schedulerInterval: NodeJS.Timeout | null = null;
 
 try {
   startAllWorkers();
@@ -29,6 +33,11 @@ try {
   console.log('✅ Auto-retry for failed jobs started');
   console.log('');
   
+  // Start broadcast scheduler
+  schedulerInterval = startBroadcastScheduler();
+  console.log('✅ Broadcast scheduler started');
+  console.log('');
+  
   console.log('Press Ctrl+C to stop workers');
 } catch (error) {
   console.error('❌ Failed to start workers:', error);
@@ -40,6 +49,10 @@ process.on('SIGTERM', async () => {
   console.log('\n🛑 Stopping workers...');
   try {
     stopAutoRetry();
+    if (schedulerInterval) {
+      clearInterval(schedulerInterval);
+      console.log('✅ Broadcast scheduler stopped');
+    }
     await stopAllWorkers();
     console.log('✅ All workers stopped');
     process.exit(0);
@@ -53,6 +66,10 @@ process.on('SIGINT', async () => {
   console.log('\n🛑 Stopping workers...');
   try {
     stopAutoRetry();
+    if (schedulerInterval) {
+      clearInterval(schedulerInterval);
+      console.log('✅ Broadcast scheduler stopped');
+    }
     await stopAllWorkers();
     console.log('✅ All workers stopped');
     process.exit(0);

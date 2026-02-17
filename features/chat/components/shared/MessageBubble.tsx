@@ -112,11 +112,14 @@ export function MessageBubble({
           </div>
         )}
 
-        {/* Agent name for outgoing messages - only show for first message in group */}
+        {/* Agent/Bot name for outgoing messages - only show for first message in group */}
         {message.is_from_me && showSender && (
           <div className="px-2 mb-1">
-            <span className="text-[11px] text-blue-600 font-medium">
-              {message.sent_by_user?.full_name || 'Agent'}
+            <span className={`text-[11px] font-medium ${message.sender_type === 'bot' ? 'text-purple-600' : 'text-blue-600'}`}>
+              {message.sender_type === 'bot' 
+                ? `🤖 ${message.metadata?.chatbot_name || 'Bot'}`
+                : (message.sent_by_user?.full_name || 'Agent')
+              }
             </span>
           </div>
         )}
@@ -126,7 +129,9 @@ export function MessageBubble({
           <div
             className={`rounded-lg px-2 py-1 shadow-sm relative ${
               message.is_from_me
-                ? 'bg-[#d9fdd3] text-gray-900'
+                ? message.sender_type === 'bot'
+                  ? 'bg-purple-100 text-gray-900'
+                  : 'bg-[#d9fdd3] text-gray-900'
                 : 'bg-white text-gray-900'
             }`}
             style={{ maxWidth: '450px', minWidth: '60px' }}
@@ -145,7 +150,7 @@ export function MessageBubble({
                   }
                 </div>
                 <div className="text-[12px] text-gray-600 line-clamp-2">
-                  {message.quoted_message.content || '[Media]'}
+                  {message.quoted_message.content?.replace(/\\n/g, '\n') || '[Media]'}
                 </div>
               </div>
             )}
@@ -260,7 +265,7 @@ export function MessageBubble({
             {/* Message content with word wrap */}
             {message.content && (
               <p className="text-[13px] leading-[1.4] break-words whitespace-pre-wrap pr-12">
-                {message.content}
+                {message.content.replace(/\\n/g, '\n')}
               </p>
             )}
 

@@ -7,16 +7,17 @@ class ReconnectManager {
   constructor() {
     this.reconnectAttempts = new Map(); // sessionId -> attempt count
     this.reconnectTimers = new Map(); // sessionId -> timer
-    this.maxAttempts = 5;
-    this.baseDelay = 1000; // 1 second
+    this.maxAttempts = 10; // Increased to 10 attempts
+    // Custom delays: 3s, 10s, 30s, 60s, 120s, then 300s (5min)
+    this.delays = [3000, 10000, 30000, 60000, 120000, 300000, 300000, 300000, 300000, 300000]
   }
 
   /**
-   * Calculate exponential backoff delay
+   * Get backoff delay for attempt
    */
   getBackoffDelay(attempt) {
-    // Exponential backoff: 1s, 2s, 4s, 8s, 16s
-    return Math.min(this.baseDelay * Math.pow(2, attempt), 30000); // Max 30s
+    // Use predefined delays, or last delay if exceeded
+    return this.delays[attempt] || this.delays[this.delays.length - 1]
   }
 
   /**

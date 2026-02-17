@@ -31,7 +31,7 @@ export function ContactList({ onAddContact, onSelectContact }: ContactListProps)
 
   const fetchContacts = async () => {
     try {
-      const response = await fetch('/api/crm/contacts');
+      const response = await fetch('/api/contacts');
       if (response.ok) {
         const data = await response.json();
         setContacts(data.contacts || []);

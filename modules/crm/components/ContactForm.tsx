@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -31,6 +31,27 @@ export function ContactForm({ open, onOpenChange, onSuccess, contact }: ContactF
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Update form data when contact prop changes
+  useEffect(() => {
+    if (contact) {
+      setFormData({
+        name: contact.name || '',
+        phone_number: contact.phone_number || '',
+        email: contact.email || '',
+        notes: contact.notes || '',
+      });
+    } else {
+      // Reset form when adding new contact
+      setFormData({
+        name: '',
+        phone_number: '',
+        email: '',
+        notes: '',
+      });
+    }
+    setError(null);
+  }, [contact, open]);
+
   const handleSubmit = async () => {
     if (!formData.phone_number.trim()) {
       setError('Phone number is required');
@@ -41,7 +62,7 @@ export function ContactForm({ open, onOpenChange, onSuccess, contact }: ContactF
       setError(null);
       setLoading(true);
 
-      const url = contact ? `/api/crm/contacts/${contact.id}` : '/api/crm/contacts';
+      const url = contact ? `/api/contacts/${contact.id}` : '/api/contacts';
       const method = contact ? 'PUT' : 'POST';
 
       const response = await fetch(url, {

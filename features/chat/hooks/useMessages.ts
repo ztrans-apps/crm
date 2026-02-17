@@ -10,13 +10,15 @@ interface UseMessagesProps {
   sessionId: string | null
   userId: string | null
   onConversationsRefresh: () => void
+  canSendMessage?: boolean // Permission from parent
 }
 
 export function useMessages({ 
   conversationId, 
   sessionId, 
   userId,
-  onConversationsRefresh 
+  onConversationsRefresh,
+  canSendMessage
 }: UseMessagesProps) {
   const supabase = useMemo(() => createClient(), [])
   const [messages, setMessages] = useState<any[]>([])
@@ -96,15 +98,23 @@ export function useMessages({
       return
     }
 
-    if (!userId || !sessionId) {
-      // Check if it's because conversation is not assigned to agent
-      if (!conversation.assigned_to) {
-        alert('Conversation belum di-assign. Silakan ambil conversation terlebih dahulu.')
-      } else if (conversation.assigned_to !== userId) {
-        alert('Anda tidak memiliki akses untuk mengirim pesan ke conversation ini.')
-      } else {
-        alert('Session tidak ditemukan. Pastikan WhatsApp sudah terhubung.')
-      }
+    // Get session ID from conversation, not from global sessionId
+    const conversationSessionId = conversation.whatsapp_session_id || sessionId
+    
+    console.log('📤 Sending message:')
+    console.log('  Conversation ID:', conversation.id)
+    console.log('  Contact:', conversation.contact.name, conversation.contact.phone_number)
+    console.log('  Conversation Session ID:', conversation.whatsapp_session_id)
+    console.log('  Using Session ID:', conversationSessionId)
+    
+    if (!userId || !conversationSessionId) {
+      alert('Session tidak ditemukan. Pastikan WhatsApp sudah terhubung.')
+      return
+    }
+
+    // Check permission to send message
+    if (canSendMessage === false) {
+      alert('Anda tidak memiliki akses untuk mengirim pesan ke conversation ini.')
       return
     }
 
@@ -149,7 +159,7 @@ export function useMessages({
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            sessionId,
+            sessionId: conversationSessionId,
             to: whatsappNumber,
             latitude: locationData.latitude,
             longitude: locationData.longitude,
@@ -219,7 +229,7 @@ export function useMessages({
         
         // Create FormData
         const formData = new FormData()
-        formData.append('sessionId', sessionId)
+        formData.append('sessionId', conversationSessionId)
         formData.append('to', whatsappNumber)
         formData.append('caption', media.caption || tempMessage || '') // Use media caption if provided, otherwise use message input
         formData.append('media', mediaBlob, mediaFilename!)
@@ -230,6 +240,9 @@ export function useMessages({
         formData.append('mediaType', media.type)
         formData.append('mediaFilename', mediaFilename!)
         formData.append('mediaSize', mediaSize!.toString())
+        if (replyTo?.id) {
+          formData.append('quotedMessageId', replyTo.id) // Use database ID
+        }
         
         const response = await fetch('/api/send-media', {
           method: 'POST',
@@ -244,19 +257,25 @@ export function useMessages({
         result = await response.json()
       } else {
         // Send text message (original flow)
+        const body: any = {
+          sessionId: conversationSessionId,
+          to: whatsappNumber,
+          message: tempMessage,
+          conversationId: conversation.id,
+          userId: userId,
+        }
+        
+        // Only add quotedMessageId if replyTo exists
+        if (replyTo?.id) {
+          body.quotedMessageId = replyTo.id
+        }
+        
         const response = await fetch('/api/send-message', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({
-            sessionId: sessionId,
-            to: whatsappNumber,
-            message: tempMessage,
-            conversationId: conversation.id,
-            userId: userId,
-            quotedMessageId: replyTo?.whatsapp_message_id || undefined,
-          }),
+          body: JSON.stringify(body),
         })
 
         result = await response.json()

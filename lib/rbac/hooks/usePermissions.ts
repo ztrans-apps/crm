@@ -3,7 +3,7 @@
 // React Hook for Permission Checks
 // Hook untuk mengecek permission di client component
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import type { Permission } from '../types'
 
@@ -32,11 +32,14 @@ export function usePermissions(): PermissionContext {
   const [roles, setRoles] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
-  const supabase = createClient()
+  // Create supabase client once, outside of useCallback
+  const supabase = useMemo(() => createClient(), [])
 
   // Load permissions
   const loadPermissions = useCallback(async () => {
     try {
+      setLoading(true)
+      
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) {
         setLoading(false)

@@ -34,6 +34,12 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Convert \n literal string to actual newline for WhatsApp
+    const messageForWhatsApp = message.replace(/\\n/g, '\n')
+
+    // Check if this is a bot message (userId is null or 'bot')
+    const isBotMessage = !userId || userId === 'bot'
+
     // Create Supabase client with service role for server-side operations
     const supabase = createClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -49,8 +55,6 @@ export async function POST(request: NextRequest) {
       }
     )
 
-    console.log('[Send Message API] Supabase client created with service role')
-
     // Get default tenant ID or from request header
     const tenantIdFromHeader = request.headers.get('x-tenant-id')
     let defaultTenantId = tenantIdFromHeader || process.env.DEFAULT_TENANT_ID || '00000000-0000-0000-0000-000000000001'
@@ -63,7 +67,6 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (tenantError || !tenant) {
-      console.log('[Send Message API] Default tenant not found, fetching first available tenant')
       const { data: firstTenant } = await supabase
         .from('tenants')
         .select('id')
@@ -72,7 +75,6 @@ export async function POST(request: NextRequest) {
       
       if (firstTenant) {
         defaultTenantId = firstTenant.id
-        console.log('[Send Message API] Using tenant:', defaultTenantId)
       } else {
         return NextResponse.json(
           { error: 'No tenant found in database. Please create a tenant first.' },
@@ -104,8 +106,8 @@ export async function POST(request: NextRequest) {
 
       const messageData: any = {
         conversation_id: conversationId,
-        sender_type: 'agent',
-        sender_id: userId,
+        sender_type: isBotMessage ? 'bot' : 'agent',
+        sender_id: isBotMessage ? null : userId,
         content: message,
         is_from_me: true,
         status: 'sent', // Use 'sent' instead of 'pending' until constraint is fixed
@@ -118,15 +120,6 @@ export async function POST(request: NextRequest) {
       if (quotedMessageId) {
         messageData.quoted_message_id = quotedMessageId
       }
-
-      console.log('[Send Message API] Saving message to database:', {
-        conversation_id: messageData.conversation_id,
-        sender_type: messageData.sender_type,
-        sender_id: messageData.sender_id,
-        tenant_id: messageData.tenant_id,
-        message_type: messageData.message_type,
-        content_length: messageData.content?.length || 0
-      })
       
       const { data, error: dbError } = await supabase
         .from('messages')
@@ -153,23 +146,19 @@ export async function POST(request: NextRequest) {
         )
       }
 
-      console.log('[Send Message API] Message saved successfully:', data.id)
-
       savedMessage = data
     }
 
     try {
-      // Send message via queue (instead of direct call)
-      console.log('[Send Message API] Queueing message via Baileys adapter')
+      // Send message via queue
       const { jobId } = await baileysAdapter.sendMessage(
         sessionId,
         to,
-        message,
+        messageForWhatsApp, // Use converted message with actual newlines
         quotedMessageId,
-        defaultTenantId
+        defaultTenantId,
+        savedMessage?.id || undefined // Only pass if valid, otherwise undefined
       )
-
-      console.log('[Send Message API] Message queued successfully, job ID:', jobId)
 
       // Update message status to queued
       if (savedMessage) {

@@ -194,10 +194,8 @@ async function loadActiveSessions() {
 
     for (const session of sessions) {
       try {
-        // Check if auth files exist (in whatsapp-service directory)
-        // __dirname is whatsapp-service/src, so go up one level
-        const serviceRoot = path.join(__dirname, '..')
-        const authPath = path.join(serviceRoot, '.baileys_auth', session.id)
+        // Get auth path from whatsappService (it knows the correct path)
+        const authPath = path.join(whatsappService.authDir, session.id)
         const credsPath = path.join(authPath, 'creds.json')
         
         if (!fs.existsSync(credsPath)) {
@@ -435,11 +433,13 @@ process.on('unhandledRejection', (reason, promise) => {
 process.on('SIGTERM', async () => {
   console.log('📴 SIGTERM received, shutting down gracefully...')
   
-  // Close all WhatsApp sessions
+  // Close all WhatsApp sessions WITHOUT logging out
+  // This preserves auth credentials for next restart
   for (const [sessionKey, session] of whatsappService.sessions.entries()) {
     try {
       console.log(`📴 Closing session: ${sessionKey}`)
-      await session.sock.logout()
+      // Use end() instead of logout() to preserve credentials
+      await session.sock.end()
     } catch (error) {
       console.error(`❌ Error closing session ${sessionKey}:`, error.message)
     }
@@ -461,11 +461,13 @@ process.on('SIGTERM', async () => {
 process.on('SIGINT', async () => {
   console.log('📴 SIGINT received, shutting down gracefully...')
   
-  // Close all WhatsApp sessions
+  // Close all WhatsApp sessions WITHOUT logging out
+  // This preserves auth credentials for next restart
   for (const [sessionKey, session] of whatsappService.sessions.entries()) {
     try {
       console.log(`📴 Closing session: ${sessionKey}`)
-      await session.sock.logout()
+      // Use end() instead of logout() to preserve credentials
+      await session.sock.end()
     } catch (error) {
       console.error(`❌ Error closing session ${sessionKey}:`, error.message)
     }

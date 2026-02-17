@@ -21,6 +21,8 @@ interface SendMessageJob {
   longitude?: number;
   quotedMessageId?: string;
   metadata?: Record<string, any>;
+  conversationId?: string;
+  messageDbId?: string; // Database message ID to update after sending
 }
 
 export class BaileysQueueAdapter {
@@ -32,7 +34,8 @@ export class BaileysQueueAdapter {
     to: string,
     message: string,
     quotedMessageId?: string,
-    tenantId: string = process.env.DEFAULT_TENANT_ID || '00000000-0000-0000-0000-000000000001'
+    tenantId: string = process.env.DEFAULT_TENANT_ID || '00000000-0000-0000-0000-000000000001',
+    messageDbId?: string
   ): Promise<{ jobId: string }> {
     // Check rate limit
     if (rateLimiter.isRateLimited(tenantId, sessionId)) {
@@ -41,6 +44,13 @@ export class BaileysQueueAdapter {
         `Rate limit exceeded. Try again in ${Math.ceil(resetTime / 1000)} seconds`
       );
     }
+
+    // Validate messageDbId if provided
+    const validMessageDbId = messageDbId && 
+                             messageDbId !== 'undefined' && 
+                             /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(messageDbId)
+                             ? messageDbId 
+                             : undefined;
 
     // Add to queue
     const job = await queueManager.addJob<SendMessageJob>(
@@ -53,6 +63,7 @@ export class BaileysQueueAdapter {
         message,
         type: 'text',
         quotedMessageId,
+        messageDbId: validMessageDbId,
       }
     );
 

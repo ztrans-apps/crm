@@ -5,9 +5,40 @@
 
 import express from 'express'
 import sessionManager from '../services/session-manager.js'
+import sessionStateRegistry from '../services/session-state-registry.js'
 import { supabase } from '../config/supabase.js'
 
 const router = express.Router()
+
+/**
+ * Get session states from state registry
+ * GET /api/sessions/states
+ * Returns real-time connection states for all sessions
+ */
+router.get('/states', async (req, res) => {
+  try {
+    const states = sessionStateRegistry.getAllStates()
+    
+    res.json({
+      success: true,
+      timestamp: new Date().toISOString(),
+      sessionCount: states.length,
+      states: states.map(state => ({
+        sessionId: state.sessionId,
+        state: state.state,
+        lastUpdate: state.lastUpdate,
+        errorCount: state.errorCount,
+        metadata: state.metadata
+      }))
+    })
+  } catch (error) {
+    console.error('[Sessions] Error getting session states:', error)
+    res.status(500).json({
+      success: false,
+      error: error.message
+    })
+  }
+})
 
 /**
  * Get all sessions for a tenant
@@ -208,6 +239,40 @@ router.post('/health-check', async (req, res) => {
     })
   } catch (error) {
     console.error('[Sessions] Error performing health check:', error)
+    res.status(500).json({
+      success: false,
+      error: error.message
+    })
+  }
+})
+
+/**
+ * Get specific session state
+ * GET /api/sessions/:sessionId/state
+ */
+router.get('/:sessionId/state', async (req, res) => {
+  try {
+    const { sessionId } = req.params
+    
+    const state = sessionStateRegistry.getState(sessionId)
+    
+    if (!state) {
+      return res.status(404).json({
+        success: false,
+        error: 'Session state not found'
+      })
+    }
+    
+    res.json({
+      success: true,
+      sessionId,
+      state: state.state,
+      lastUpdate: state.lastUpdate,
+      errorCount: state.errorCount,
+      metadata: state.metadata
+    })
+  } catch (error) {
+    console.error('[Sessions] Error getting session state:', error)
     res.status(500).json({
       success: false,
       error: error.message

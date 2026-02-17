@@ -15,12 +15,18 @@ interface AddSessionModalProps {
 
 export function AddSessionModal({ open, onOpenChange, onSuccess }: AddSessionModalProps) {
   const [phoneNumber, setPhoneNumber] = useState('');
+  const [name, setName] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = async () => {
     if (!phoneNumber.trim()) {
       setError('Please enter a phone number');
+      return;
+    }
+
+    if (!name.trim()) {
+      setError('Please enter a name for this device');
       return;
     }
 
@@ -31,12 +37,13 @@ export function AddSessionModal({ open, onOpenChange, onSuccess }: AddSessionMod
       const response = await fetch('/api/whatsapp/init', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phoneNumber }),
+        body: JSON.stringify({ phoneNumber, name }),
       });
 
       if (response.ok) {
         const data = await response.json();
         setPhoneNumber('');
+        setName('');
         onOpenChange(false);
         onSuccess?.(data.sessionId);
       } else {
@@ -60,6 +67,19 @@ export function AddSessionModal({ open, onOpenChange, onSuccess }: AddSessionMod
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4 py-4">
+          <div className="space-y-2">
+            <Label htmlFor="name">Device Name</Label>
+            <Input
+              id="name"
+              placeholder="e.g., Customer Service, Sales Team"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              disabled={loading}
+            />
+            <p className="text-sm text-gray-500">
+              A friendly name to identify this WhatsApp device
+            </p>
+          </div>
           <div className="space-y-2">
             <Label htmlFor="phone">Phone Number</Label>
             <Input
@@ -90,7 +110,7 @@ export function AddSessionModal({ open, onOpenChange, onSuccess }: AddSessionMod
           </Button>
           <Button
             onClick={handleSubmit}
-            disabled={!phoneNumber.trim() || loading}
+            disabled={!phoneNumber.trim() || !name.trim() || loading}
             className="bg-green-600 hover:bg-green-700"
           >
             {loading ? (

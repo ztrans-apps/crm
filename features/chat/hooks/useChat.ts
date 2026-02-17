@@ -1,8 +1,7 @@
 // Main chat logic hook
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { io, Socket } from 'socket.io-client'
-import { UserRole } from '@/lib/permissions/roles'
-import { canViewConversation } from '@/lib/permissions/chat'
+import { UserRole, canViewConversation, getUserRole } from '@/lib/rbac/chat-permissions'
 import { chatService } from '../services'
 import { createClient } from '@/lib/supabase/client'
 
@@ -43,15 +42,8 @@ export function useChat() {
 
       setUserId(user.id)
 
-      // Get user profile to check role
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('role')
-        .eq('id', user.id)
-        .single()
-
-      // @ts-ignore
-      const role = (profile?.role || 'agent') as UserRole
+      // Get user role from RBAC system
+      const role = await getUserRole(user.id)
       setUserRole(role)
 
       // Use service to get session
@@ -142,6 +134,18 @@ export function useChat() {
           event: '*',
           schema: 'public',
           table: 'conversations'
+        },
+        () => {
+          clearTimeout(debounceTimer)
+          debounceTimer = setTimeout(() => loadConversations(), 300)
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'conversation_labels'
         },
         () => {
           clearTimeout(debounceTimer)
