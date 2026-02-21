@@ -143,10 +143,11 @@ app/
 - **Session Management**: Auto-reconnect, health monitoring
 - **Media Support**: Images, videos, documents, audio
 - **Location Sharing**: Send and receive location data
-- **Message Status**: Sent, delivered, read tracking
-- **Delivery Tracking**: Monitor message delivery rates
+- **Message Status Tracking**: Real-time sent, delivered, read tracking with WhatsApp-style indicators
+- **Delivery Tracking**: Monitor message delivery rates with timestamps
 - **Circuit Breaker**: Automatic failure recovery
 - **Message Deduplication**: Prevent duplicate messages
+- **Real-time Updates**: Socket.IO integration for instant status updates
 
 ## 🛠️ Tech Stack
 
@@ -506,6 +507,307 @@ pm2 save
 # Setup auto-start on boot
 pm2 startup
 ```
+
+## 📊 Message Tracking System
+
+### Overview
+
+The message tracking system provides real-time status updates for all messages sent through the platform, including both chat messages and broadcast campaigns. Messages are tracked from the moment they're sent until they're read by the recipient.
+
+### Message Status Lifecycle
+
+```
+Pending → Sent → Delivered → Read
+   ↓
+Failed (if error occurs)
+```
+
+**Status Indicators:**
+- ⏰ **Pending**: Message queued, waiting to be sent
+- ✓ **Sent**: Message sent to WhatsApp successfully
+- ✓✓ **Delivered** (gray): Message delivered to recipient's device
+- ✓✓ **Read** (blue): Message read by recipient
+- ✗ **Failed** (red): Message failed to send
+
+### How It Works
+
+**1. Message Creation:**
+- User sends message via chat or broadcast
+- Message saved to database with `whatsapp_message_id`
+- Initial status: `pending`
+
+**2. WhatsApp Sending:**
+- Queue worker picks up message
+- Sends to WhatsApp service
+- Status updated to `sent` with `sent_at` timestamp
+- WhatsApp returns message ID for tracking
+
+**3. Status Updates:**
+- WhatsApp service listens for `messages.update` events
+- When recipient receives message: status → `delivered` with `delivered_at` timestamp
+- When recipient reads message: status → `read` with `read_at` timestamp
+- Status updates broadcast via Socket.IO to all connected clients
+
+**4. Real-time UI Updates:**
+- Frontend connects to WhatsApp service via Socket.IO
+- Receives status updates in real-time
+- Updates message status icons without page refresh
+- Status persists across page refreshes (stored in database)
+
+### Status Priority System
+
+The system implements status priority to prevent regression:
+
+```typescript
+Status Priority (highest to lowest):
+1. read (5)
+2. delivered (4)
+3. sent (3)
+4. sending (2)
+5. pending (1)
+6. failed (0)
+```
+
+**Why Priority Matters:**
+- Prevents "read" status from being overwritten by "sent"
+- Handles out-of-order status updates from WhatsApp
+- Ensures data consistency across database and UI
+- Applied in both backend and frontend
+
+**Example:**
+```
+Message status: read
+New update arrives: sent
+Result: Status remains "read" (higher priority)
+```
+
+### Broadcast Message Tracking
+
+**Campaign Statistics:**
+- **Total**: Total recipients in campaign
+- **Terkirim** (Sent): Count of sent + delivered + read messages
+- **Terbaca** (Read): Count of read messages only
+- **Gagal** (Failed): Count of failed messages
+
+**Real-time Progress:**
+- Campaign detail page shows live progress
+- Status counters update as messages are sent/read
+- Progress bar shows completion percentage
+- Individual recipient status visible in table
+
+**Status Synchronization:**
+- On page load, fetches latest status from `messages` table
+- Syncs broadcast_recipients status with messages status
+- Ensures accuracy even after page refresh
+
+### Technical Implementation
+
+**Database Schema:**
+```sql
+-- messages table
+ALTER TABLE messages ADD COLUMN sent_at TIMESTAMPTZ;
+ALTER TABLE messages ADD COLUMN delivered_at TIMESTAMPTZ;
+ALTER TABLE messages ADD COLUMN read_at TIMESTAMPTZ;
+ALTER TABLE messages ADD COLUMN failed_at TIMESTAMPTZ;
+ALTER TABLE messages ADD COLUMN whatsapp_message_id TEXT;
+```
+
+**WhatsApp Service Event Handler:**
+```javascript
+// whatsapp-service/src/services/whatsapp.js
+sock.ev.on('messages.update', async (updates) => {
+  for (const update of updates) {
+    if (update.update.status) {
+      const status = mapBaileysStatus(update.update.status)
+      const messageId = update.key.id
+      
+      // Check current status priority
+      const currentMessage = await getMessageFromDB(messageId)
+      if (newPriority > currentPriority) {
+        // Update database with new status and timestamp
+        await updateMessageStatus(messageId, status)
+        
+        // Broadcast via Socket.IO
+        io.emit('message_status_update', {
+          messageId,
+          status,
+          timestamp: new Date().toISOString()
+        })
+      }
+    }
+  }
+})
+```
+
+**Frontend Hook:**
+```typescript
+// hooks/useMessageTracking.ts
+export function useMessageTracking(options: UseMessageTrackingOptions) {
+  const socket = io(whatsappServiceUrl)
+  
+  socket.on('message_status_update', (data) => {
+    // Update message status in UI
+    onStatusUpdate(data)
+  })
+  
+  return { isConnected: socket.connected }
+}
+```
+
+**Usage in Components:**
+```typescript
+// features/chat/hooks/useMessages.ts
+const handleStatusUpdate = useCallback((data) => {
+  setMessages(prev => prev.map(msg => {
+    if (msg.whatsapp_message_id === data.messageId) {
+      // Apply status priority check
+      if (newPriority > currentPriority) {
+        return { ...msg, status: data.status }
+      }
+    }
+    return msg
+  }))
+}, [])
+
+useMessageTracking({
+  enabled: true,
+  onStatusUpdate: handleStatusUpdate
+})
+```
+
+### Configuration
+
+**Environment Variables:**
+```env
+# WhatsApp Service URL for Socket.IO connection
+NEXT_PUBLIC_WHATSAPP_SERVICE_URL=http://localhost:3001
+```
+
+**Required Services:**
+All 3 services must be running for message tracking to work:
+1. Next.js app (port 3000) - Frontend UI
+2. WhatsApp service (port 3001) - Status updates
+3. Queue workers - Message processing
+
+### Monitoring Message Status
+
+**Check Message Status:**
+```sql
+-- View message with all timestamps
+SELECT 
+  id,
+  content,
+  status,
+  sent_at,
+  delivered_at,
+  read_at,
+  failed_at,
+  whatsapp_message_id
+FROM messages
+WHERE id = 'message-id';
+```
+
+**Check Broadcast Campaign Progress:**
+```sql
+-- Campaign statistics
+SELECT 
+  c.name,
+  COUNT(*) as total,
+  COUNT(*) FILTER (WHERE r.status IN ('sent', 'delivered', 'read')) as sent,
+  COUNT(*) FILTER (WHERE r.status = 'read') as read,
+  COUNT(*) FILTER (WHERE r.status = 'failed') as failed
+FROM broadcast_campaigns c
+JOIN broadcast_recipients r ON r.campaign_id = c.id
+WHERE c.id = 'campaign-id'
+GROUP BY c.id, c.name;
+```
+
+**Monitor Socket.IO Connection:**
+```bash
+# Check if Socket.IO is working
+curl http://localhost:3001/socket.io/?EIO=4&transport=polling
+```
+
+### Troubleshooting
+
+**Status not updating in UI:**
+1. Check Socket.IO connection:
+   - Open browser console
+   - Look for "Connected to WhatsApp service" message
+   - Check for WebSocket connection errors
+2. Verify WhatsApp service is running:
+   ```bash
+   ./scripts/whatsapp-service.sh status
+   ```
+3. Check browser console for errors
+4. Refresh page to sync from database
+
+**Status updates after page refresh but not real-time:**
+1. Socket.IO connection issue
+2. Check `NEXT_PUBLIC_WHATSAPP_SERVICE_URL` environment variable
+3. Verify firewall allows WebSocket connections
+4. Check browser console for connection errors
+
+**Broadcast status not updating:**
+1. Verify workers are running:
+   ```bash
+   ps aux | grep "start-workers"
+   ```
+2. Check if messages have `whatsapp_message_id`:
+   ```sql
+   SELECT whatsapp_message_id FROM messages 
+   WHERE metadata->>'broadcast_campaign_id' = 'campaign-id';
+   ```
+3. Verify `tenant_id` is set in messages table
+4. Check WhatsApp service logs for status updates
+
+**Status stuck at "sent":**
+1. Message may not be delivered yet (recipient offline)
+2. Check if recipient has blocked the number
+3. Verify phone number is correct
+4. WhatsApp may not send delivery receipts for some numbers
+
+### Performance Considerations
+
+**Database:**
+- Indexed on `whatsapp_message_id` for fast lookups
+- Timestamps stored as TIMESTAMPTZ for timezone support
+- Minimal storage overhead (4 timestamp columns)
+
+**Network:**
+- Socket.IO connection: ~1KB overhead per client
+- Status updates: ~100 bytes per update
+- Automatic reconnection on disconnect
+
+**Scalability:**
+- Socket.IO can handle thousands of concurrent connections
+- Status updates are async (non-blocking)
+- Database updates use efficient queries with indexes
+
+### Best Practices
+
+**For Developers:**
+1. Always save `whatsapp_message_id` when sending messages
+2. Include `tenant_id` in all message records
+3. Use status priority logic when updating status
+4. Handle Socket.IO disconnections gracefully
+5. Cache status updates in component state
+
+**For Users:**
+1. Keep browser tab open for real-time updates
+2. Refresh page if status seems stale
+3. Check recipient's WhatsApp connection if status stuck
+4. Monitor campaign progress in real-time
+
+### Future Enhancements
+
+**Planned Features:**
+- Supabase realtime subscriptions for broadcast campaigns
+- Message delivery analytics dashboard
+- Status update history and audit trail
+- Bulk status check API endpoint
+- Webhook notifications for status changes
+- Message retry mechanism for failed messages
 
 ## 📱 WhatsApp Service
 

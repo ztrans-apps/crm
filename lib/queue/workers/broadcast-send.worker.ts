@@ -39,7 +39,6 @@ const worker = new Worker<BroadcastJob>(
   async (job: Job<BroadcastJob>) => {
     const { campaignId, recipientId, phoneNumber, message, sessionId, templateData } = job.data;
 
-    console.log(`📤 [Broadcast] Processing message for ${phoneNumber}`);
 
     try {
       // Update recipient status to sending
@@ -194,7 +193,6 @@ const worker = new Worker<BroadcastJob>(
         }
       }
 
-      console.log(`✅ [Broadcast] Message sent to ${phoneNumber}`);
       return { success: true, messageId: result.messageId };
 
     } catch (error: any) {
@@ -284,7 +282,6 @@ async function sendTextMessage(
 
 // Worker event handlers
 worker.on('completed', async (job) => {
-  console.log(`✅ Broadcast job ${job.id} completed`);
   
   // Check if campaign is complete
   if (job.data.campaignId) {
@@ -307,7 +304,6 @@ worker.on('error', (err) => {
 
 // Function to queue broadcast campaign
 export async function queueBroadcastCampaign(campaignId: string) {
-  console.log(`📋 Queuing broadcast campaign: ${campaignId}`);
 
   try {
     // Get campaign details
@@ -341,11 +337,9 @@ export async function queueBroadcastCampaign(campaignId: string) {
       throw new Error('No pending recipients found');
     }
 
-    console.log(`📤 Queuing ${recipients.length} messages for campaign ${campaignId}`);
 
     // Get template data from campaign metadata
     const templateData = campaign.metadata?.template_data || null;
-    console.log(`   Template data: ${templateData ? 'Available' : 'Not available'}`);
 
     // Queue each recipient
     const jobs = recipients.map((recipient) => ({
@@ -369,7 +363,6 @@ export async function queueBroadcastCampaign(campaignId: string) {
 
     await broadcastQueue.addBulk(jobs);
 
-    console.log(`✅ Queued ${jobs.length} broadcast messages`);
 
     return { success: true, queuedCount: jobs.length };
 
@@ -397,7 +390,6 @@ export async function checkCampaignCompletion(campaignId: string) {
       .eq('campaign_id', campaignId);
 
     if (!recipients || recipients.length === 0) {
-      console.log(`⚠️ No recipients found for campaign ${campaignId}`);
       return;
     }
 
@@ -408,7 +400,6 @@ export async function checkCampaignCompletion(campaignId: string) {
     const failed = recipients.filter((r) => r.status === 'failed').length;
     const total = recipients.length;
 
-    console.log(`📊 Campaign ${campaignId} status: ${sent} sent, ${delivered} delivered, ${read} read, ${failed} failed, ${pending} pending (total: ${total})`);
 
     // If all messages processed (no pending), mark campaign as completed
     if (pending === 0) {
@@ -422,7 +413,6 @@ export async function checkCampaignCompletion(campaignId: string) {
         })
         .eq('id', campaignId);
 
-      console.log(`✅ Campaign ${campaignId} marked as ${finalStatus}`);
     }
   } catch (error) {
     console.error(`❌ Error checking campaign completion:`, error);
@@ -431,7 +421,6 @@ export async function checkCampaignCompletion(campaignId: string) {
 
 // Graceful shutdown
 process.on('SIGTERM', async () => {
-  console.log('📴 Shutting down broadcast worker...');
   await worker.close();
   process.exit(0);
 });

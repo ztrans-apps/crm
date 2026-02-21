@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -9,6 +9,8 @@ import {
   ArrowLeft, Download, Users, CheckCircle, XCircle, Clock, 
   Eye, Search, Loader2, X 
 } from 'lucide-react';
+import { useMessageTracking } from '@/hooks/useMessageTracking';
+import { createClient } from '@/lib/supabase/client';
 
 interface Campaign {
   id: string;
@@ -46,8 +48,12 @@ interface Recipient {
   read_at?: string;
   failed_at?: string;
   error_message?: string;
+  message_id?: string;
   contact?: {
     name: string;
+  };
+  message?: {
+    whatsapp_message_id: string;
   };
 }
 
@@ -63,9 +69,83 @@ export function CampaignDetail({ campaign, onBack, onRefresh }: CampaignDetailPr
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [showPreview, setShowPreview] = useState(false);
+  const [stats, setStats] = useState({
+    sent: 0,
+    delivered: 0,
+    read: 0,
+    failed: 0,
+  });
+  const supabase = createClient();
+
+  // Handle message status updates for broadcast
+  const handleStatusUpdate = useCallback(async (data: any) => {
+    
+    // Check if this message belongs to current campaign
+    const { data: message } = await supabase
+      .from('messages')
+      .select('id, metadata')
+      .eq('whatsapp_message_id', data.messageId)
+      .single();
+    
+    
+    if (message?.metadata?.broadcast_campaign_id === campaign.id) {
+      
+      // Update recipient and stats together
+      setRecipients((prevRecipients) => {
+        let oldStatus: string | null = null;
+        let found = false;
+        
+        const updated = prevRecipients.map((r) => {
+          if (r.message_id === message.id) {
+            oldStatus = r.status;
+            found = true;
+            return {
+              ...r,
+              status: data.status,
+              [`${data.status}_at`]: data.timestamp
+            };
+          }
+          return r;
+        });
+        
+        // Update stats if recipient was found and status changed
+        if (found && oldStatus && oldStatus !== data.status) {
+          setStats((prev) => {
+            const newStats = { ...prev };
+            
+            // Decrement old status count
+            if (oldStatus === 'sent' && newStats.sent > 0) newStats.sent--;
+            else if (oldStatus === 'delivered' && newStats.delivered > 0) newStats.delivered--;
+            else if (oldStatus === 'read' && newStats.read > 0) newStats.read--;
+            else if (oldStatus === 'failed' && newStats.failed > 0) newStats.failed--;
+            
+            // Increment new status count
+            if (data.status === 'sent') newStats.sent++;
+            else if (data.status === 'delivered') newStats.delivered++;
+            else if (data.status === 'read') newStats.read++;
+            else if (data.status === 'failed') newStats.failed++;
+            
+            return newStats;
+          });
+        }
+        
+        return updated;
+      });
+    }
+  }, [campaign.id, supabase]);
+
+  // Subscribe to message tracking
+  useMessageTracking({
+    enabled: true,
+    onStatusUpdate: handleStatusUpdate,
+  });
 
   useEffect(() => {
-    fetchRecipients();
+    const loadData = async () => {
+      await fetchRecipients();
+      await fetchStats(); // Fetch stats after recipients
+    };
+    loadData();
   }, [campaign.id]);
 
   const fetchRecipients = async () => {
@@ -73,12 +153,74 @@ export function CampaignDetail({ campaign, onBack, onRefresh }: CampaignDetailPr
       const response = await fetch(`/api/broadcast/campaigns/${campaign.id}/recipients`);
       if (response.ok) {
         const data = await response.json();
-        setRecipients(data.recipients || []);
+        
+        // Sync recipient status with message status
+        const recipientsWithMessageStatus = await Promise.all(
+          (data.recipients || []).map(async (recipient: Recipient) => {
+            if (recipient.message_id) {
+              // Get message status from messages table
+              const { data: message } = await supabase
+                .from('messages')
+                .select('status, whatsapp_message_id')
+                .eq('id', recipient.message_id)
+                .single();
+              
+              if (message && message.status) {
+                // Update recipient with message status
+                return {
+                  ...recipient,
+                  status: message.status,
+                };
+              }
+            }
+            return recipient;
+          })
+        );
+        
+        setRecipients(recipientsWithMessageStatus);
       }
     } catch (error) {
       console.error('Failed to fetch recipients:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchStats = async () => {
+    try {
+      // Get all messages for this campaign using filter on metadata
+      const { data: messages, error } = await supabase
+        .from('messages')
+        .select('status, metadata')
+        .not('metadata', 'is', null);
+      
+      
+      // Filter messages that belong to this campaign
+      const campaignMessages = messages?.filter(m => 
+        m.metadata?.broadcast_campaign_id === campaign.id
+      ) || [];
+      
+      
+      if (campaignMessages.length > 0) {
+        const newStats = {
+          sent: campaignMessages.filter((m) => m.status === 'sent').length,
+          delivered: campaignMessages.filter((m) => m.status === 'delivered').length,
+          read: campaignMessages.filter((m) => m.status === 'read').length,
+          failed: campaignMessages.filter((m) => m.status === 'failed').length,
+        };
+        
+        setStats(newStats);
+      } else {
+        // Fallback to campaign counts if no messages found
+        setStats({
+          sent: campaign.sent_count || 0,
+          delivered: campaign.delivered_count || 0,
+          read: campaign.read_count || 0,
+          failed: campaign.failed_count || 0,
+        });
+      }
+    } catch (error) {
+      console.error('Failed to fetch stats:', error);
     }
   };
 
@@ -189,17 +331,17 @@ export function CampaignDetail({ campaign, onBack, onRefresh }: CampaignDetailPr
             </div>
             <div className="text-center p-4 bg-blue-50 rounded-lg">
               <CheckCircle className="h-6 w-6 mx-auto mb-2 text-blue-600" />
-              <div className="text-2xl font-bold text-blue-600">{campaign.sent_count}</div>
+              <div className="text-2xl font-bold text-blue-600">{stats.sent + stats.delivered + stats.read}</div>
               <div className="text-sm text-gray-600">Terkirim</div>
             </div>
             <div className="text-center p-4 bg-green-50 rounded-lg">
               <Eye className="h-6 w-6 mx-auto mb-2 text-green-600" />
-              <div className="text-2xl font-bold text-green-600">{campaign.read_count}</div>
+              <div className="text-2xl font-bold text-green-600">{stats.read}</div>
               <div className="text-sm text-gray-600">Dibaca</div>
             </div>
             <div className="text-center p-4 bg-red-50 rounded-lg">
               <XCircle className="h-6 w-6 mx-auto mb-2 text-red-600" />
-              <div className="text-2xl font-bold text-red-600">{campaign.failed_count}</div>
+              <div className="text-2xl font-bold text-red-600">{stats.failed}</div>
               <div className="text-sm text-gray-600">Gagal</div>
             </div>
           </div>

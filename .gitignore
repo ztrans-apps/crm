@@ -39,6 +39,12 @@ yarn-error.log*
 .wwebjs_cache/
 .baileys_auth/
 
+# WhatsApp service runtime files
+whatsapp-service.pid
+whatsapp-service.log
+*.pid
+*.log
+
 # Temporary documentation (fixes, troubleshooting)
 FIX-*.md
 TROUBLESHOOT-*.md
@@ -46,6 +52,10 @@ QUICK-*.md
 TESTING-*.md
 SUMMARY-*.md
 SETUP-*.md
+BUGFIX-*.md
+REVIEW-*.md
+FINAL-*.md
+COMMIT_MESSAGE.md
 
 # Migration scripts (keep in scripts/ folder instead)
 scripts/*-migration.sql

@@ -102,14 +102,19 @@ export class MessageService extends BaseService {
             
             // If not found by whatsapp_message_id, try by id (for CRM messages)
             if (!quoted) {
-              const result = await this.supabase
-                .from('messages')
-                .select('id, content, sender_type, is_from_me, sender_id')
-                .eq('id', msg.quoted_message_id)
-                .eq('conversation_id', conversationId)
-                .maybeSingle()
+              // Only try by id if quoted_message_id looks like a UUID
+              const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(msg.quoted_message_id)
               
-              quoted = result.data
+              if (isUUID) {
+                const result = await this.supabase
+                  .from('messages')
+                  .select('id, content, sender_type, is_from_me, sender_id')
+                  .eq('id', msg.quoted_message_id)
+                  .eq('conversation_id', conversationId)
+                  .maybeSingle()
+                
+                quoted = result.data
+              }
             }
             
             if (quoted) {
@@ -206,14 +211,19 @@ export class MessageService extends BaseService {
         
         // If not found by whatsapp_message_id, try by id (for CRM messages)
         if (!quoted) {
-          const result = await this.supabase
-            .from('messages')
-            .select('id, content, sender_type, is_from_me, sender_id')
-            .eq('id', message.quoted_message_id)
-            .eq('conversation_id', message.conversation_id)
-            .maybeSingle()
+          // Only try by id if quoted_message_id looks like a UUID
+          const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(message.quoted_message_id)
           
-          quoted = result.data
+          if (isUUID) {
+            const result = await this.supabase
+              .from('messages')
+              .select('id, content, sender_type, is_from_me, sender_id')
+              .eq('id', message.quoted_message_id)
+              .eq('conversation_id', message.conversation_id)
+              .maybeSingle()
+            
+            quoted = result.data
+          }
         }
         
         if (quoted) {

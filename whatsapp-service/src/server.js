@@ -83,8 +83,12 @@ app.get('/api/whatsapp/health', (req, res) => {
 // Socket.IO connection
 io.on('connection', (socket) => {
   socket.on('disconnect', () => {
-  })
-})
+  });
+  
+  socket.on('error', (error) => {
+    console.error('❌ [Socket.IO] Socket error:', socket.id, error);
+  });
+});
 
 const PORT = process.env.PORT || 3001
 const STATUS_SYNC_INTERVAL = parseInt(process.env.STATUS_SYNC_INTERVAL || '30000') // 30 seconds
