@@ -1,223 +1,245 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+// app/api/dashboard/kpi/route.ts
+import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@/lib/supabase/server'
+import { withCache, getCacheKey } from '@/lib/cache/redis'
 
-/**
- * GET /api/dashboard/kpi
- * Returns KPI strip metrics for dashboard
- */
-export async function GET(req: NextRequest) {
+export const dynamic = 'force-dynamic'
+
+interface KPIMetric {
+  value: number | string
+  trend: 'up' | 'down' | 'stable'
+  change: number
+  status?: 'good' | 'warning' | 'critical'
+}
+
+interface KPIResponse {
+  activeConversations: KPIMetric & { byStatus: Record<string, number> }
+  avgResponseTime: KPIMetric & { slaStatus: 'good' | 'warning' | 'critical' }
+  whatsappDeliveryRate: KPIMetric
+  openTickets: KPIMetric & { byPriority: { high: number; medium: number; low: number } }
+  messagesToday: KPIMetric
+}
+
+export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient();
+    const supabase = await createClient()
     
     // Get current user
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-    if (userError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Check if user has analytics permission
-    const { data: permissions } = await supabase
-      .from('user_roles')
-      .select(`
-        role:roles!inner(
-          role_permissions!inner(
-            permission:permissions!inner(resource, action)
-          )
-        )
-      `)
-      .eq('user_id', user.id);
+    // Get user profile and role
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role, id')
+      .eq('id', user.id)
+      .single()
 
-    const hasAnalyticsPermission = permissions?.some((p: any) => 
-      p.role?.role_permissions?.some((rp: any) => 
-        rp.permission?.resource === 'analytics' && rp.permission?.action === 'view'
-      )
-    );
+    const userRole = profile?.role || 'agent'
+    const isAgent = userRole === 'agent'
 
-    // Get date range (today vs yesterday for comparison)
-    const now = new Date();
-    const todayStart = new Date(now.setHours(0, 0, 0, 0));
-    const yesterdayStart = new Date(todayStart);
-    yesterdayStart.setDate(yesterdayStart.getDate() - 1);
+    // Use cache with 30 second TTL
+    const cacheKey = getCacheKey('kpi', user.id, userRole)
+    const response = await withCache<KPIResponse>(
+      cacheKey,
+      async () => await fetchKPIMetrics(supabase, user.id, userRole, isAgent),
+      30 // 30 seconds TTL
+    )
+
+    return NextResponse.json(response)
+  } catch (error) {
+    console.error('Error fetching KPI metrics:', error)
+    return NextResponse.json(
+      { error: 'Failed to fetch KPI metrics' },
+      { status: 500 }
+    )
+  }
+}
+
+async function fetchKPIMetrics(
+  supabase: any,
+  userId: string,
+  userRole: string,
+  isAgent: boolean
+): Promise<KPIResponse> {
+    // Date ranges
+    const now = new Date()
+    const today = new Date(now.setHours(0, 0, 0, 0))
+    const yesterday = new Date(today)
+    yesterday.setDate(yesterday.getDate() - 1)
 
     // 1. Active Conversations
-    const { count: activeConversationsToday } = await supabase
+    let activeConvQuery = supabase
+      .from('conversations')
+      .select('status', { count: 'exact' })
+      .eq('status', 'active')
+
+    if (isAgent) {
+      activeConvQuery = activeConvQuery.eq('assigned_to', user.id)
+    }
+
+    const { count: activeCount } = await activeConvQuery
+    
+    // Get previous period for trend
+    const { count: yesterdayActiveCount } = await supabase
       .from('conversations')
       .select('*', { count: 'exact', head: true })
       .eq('status', 'active')
-      .gte('created_at', todayStart.toISOString());
+      .lt('created_at', today.toISOString())
+      .gte('created_at', yesterday.toISOString())
 
-    const { count: activeConversationsYesterday } = await supabase
+    const activeChange = yesterdayActiveCount ? 
+      ((activeCount || 0) - yesterdayActiveCount) / yesterdayActiveCount * 100 : 0
+    
+    // Get by status breakdown
+    const { data: statusBreakdown } = await supabase
       .from('conversations')
-      .select('*', { count: 'exact', head: true })
-      .eq('status', 'active')
-      .gte('created_at', yesterdayStart.toISOString())
-      .lt('created_at', todayStart.toISOString());
+      .select('status')
+      .in('status', ['active', 'pending', 'waiting'])
 
-    const activeConvChange = calculateChange(
-      activeConversationsToday || 0,
-      activeConversationsYesterday || 0
-    );
+    const byStatus = statusBreakdown?.reduce((acc, conv) => {
+      acc[conv.status] = (acc[conv.status] || 0) + 1
+      return acc
+    }, {} as Record<string, number>) || {}
 
     // 2. Average Response Time
     const { data: responseTimeData } = await supabase
-      .from('conversations')
-      .select('first_response_time_seconds')
-      .not('first_response_time_seconds', 'is', null)
-      .gte('created_at', todayStart.toISOString());
+      .from('conversation_metrics')
+      .select('avg_response_time_seconds')
+      .not('avg_response_time_seconds', 'is', null)
+      .gte('created_at', today.toISOString())
 
-    const avgResponseTimeToday = responseTimeData && responseTimeData.length > 0
-      ? responseTimeData.reduce((sum, c: any) => sum + (c.first_response_time_seconds || 0), 0) / responseTimeData.length
-      : 0;
+    const avgResponseTime = responseTimeData && responseTimeData.length > 0
+      ? responseTimeData.reduce((sum, m) => sum + (m.avg_response_time_seconds || 0), 0) / responseTimeData.length
+      : 0
 
-    const { data: responseTimeYesterday } = await supabase
-      .from('conversations')
-      .select('first_response_time_seconds')
-      .not('first_response_time_seconds', 'is', null)
-      .gte('created_at', yesterdayStart.toISOString())
-      .lt('created_at', todayStart.toISOString());
+    // SLA threshold: 5 minutes = 300 seconds
+    const slaThreshold = 300
+    const slaStatus: 'good' | 'warning' | 'critical' = 
+      avgResponseTime <= slaThreshold ? 'good' :
+      avgResponseTime <= slaThreshold * 1.5 ? 'warning' : 'critical'
 
-    const avgResponseTimeYest = responseTimeYesterday && responseTimeYesterday.length > 0
-      ? responseTimeYesterday.reduce((sum, c: any) => sum + (c.first_response_time_seconds || 0), 0) / responseTimeYesterday.length
-      : 0;
+    // Get yesterday's avg for trend
+    const { data: yesterdayResponseTime } = await supabase
+      .from('conversation_metrics')
+      .select('avg_response_time_seconds')
+      .not('avg_response_time_seconds', 'is', null)
+      .gte('created_at', yesterday.toISOString())
+      .lt('created_at', today.toISOString())
 
-    const responseTimeChange = calculateChange(avgResponseTimeToday, avgResponseTimeYest);
-    
-    // SLA threshold: 5 minutes (300 seconds)
-    const slaThreshold = 300;
-    const slaStatus = avgResponseTimeToday <= slaThreshold ? 'good' 
-      : avgResponseTimeToday <= slaThreshold * 1.5 ? 'warning' 
-      : 'critical';
+    const yesterdayAvg = yesterdayResponseTime && yesterdayResponseTime.length > 0
+      ? yesterdayResponseTime.reduce((sum, m) => sum + (m.avg_response_time_seconds || 0), 0) / yesterdayResponseTime.length
+      : avgResponseTime
+
+    const responseTimeChange = yesterdayAvg ? 
+      (avgResponseTime - yesterdayAvg) / yesterdayAvg * 100 : 0
 
     // 3. WhatsApp Delivery Rate
-    const { count: totalMessagesToday } = await supabase
+    const { data: messagesData } = await supabase
       .from('messages')
-      .select('*', { count: 'exact', head: true })
-      .eq('sender_type', 'agent')
-      .gte('created_at', todayStart.toISOString());
+      .select('delivery_status')
+      .eq('is_from_me', true)
+      .gte('created_at', today.toISOString())
 
-    const { count: deliveredMessagesToday } = await supabase
+    const totalSent = messagesData?.length || 0
+    const delivered = messagesData?.filter(m => 
+      ['delivered', 'read'].includes(m.delivery_status || '')
+    ).length || 0
+
+    const deliveryRate = totalSent > 0 ? (delivered / totalSent) * 100 : 100
+
+    // Yesterday's delivery rate
+    const { data: yesterdayMessages } = await supabase
       .from('messages')
-      .select('*', { count: 'exact', head: true })
-      .eq('sender_type', 'agent')
-      .in('delivery_status', ['delivered', 'read'])
-      .gte('created_at', todayStart.toISOString());
+      .select('delivery_status')
+      .eq('is_from_me', true)
+      .gte('created_at', yesterday.toISOString())
+      .lt('created_at', today.toISOString())
 
-    const deliveryRateToday = totalMessagesToday && totalMessagesToday > 0
-      ? (deliveredMessagesToday || 0) / totalMessagesToday * 100
-      : 100;
+    const yesterdayTotal = yesterdayMessages?.length || 0
+    const yesterdayDelivered = yesterdayMessages?.filter(m => 
+      ['delivered', 'read'].includes(m.delivery_status || '')
+    ).length || 0
 
-    const { count: totalMessagesYesterday } = await supabase
-      .from('messages')
-      .select('*', { count: 'exact', head: true })
-      .eq('sender_type', 'agent')
-      .gte('created_at', yesterdayStart.toISOString())
-      .lt('created_at', todayStart.toISOString());
-
-    const { count: deliveredMessagesYesterday } = await supabase
-      .from('messages')
-      .select('*', { count: 'exact', head: true })
-      .eq('sender_type', 'agent')
-      .in('delivery_status', ['delivered', 'read'])
-      .gte('created_at', yesterdayStart.toISOString())
-      .lt('created_at', todayStart.toISOString());
-
-    const deliveryRateYesterday = totalMessagesYesterday && totalMessagesYesterday > 0
-      ? (deliveredMessagesYesterday || 0) / totalMessagesYesterday * 100
-      : 100;
-
-    const deliveryRateChange = calculateChange(deliveryRateToday, deliveryRateYesterday);
+    const yesterdayRate = yesterdayTotal > 0 ? (yesterdayDelivered / yesterdayTotal) * 100 : 100
+    const deliveryChange = yesterdayRate ? (deliveryRate - yesterdayRate) / yesterdayRate * 100 : 0
 
     // 4. Open Tickets
-    const { count: openTicketsToday } = await supabase
-      .from('conversations')
-      .select('*', { count: 'exact', head: true })
-      .eq('status', 'open');
-
-    const { data: ticketsByPriority } = await supabase
-      .from('conversations')
+    let ticketsQuery = supabase
+      .from('tickets')
       .select('priority')
-      .eq('status', 'open');
+      .neq('status', 'closed')
 
-    const priorityBreakdown = {
-      high: ticketsByPriority?.filter((t: any) => t.priority === 'high').length || 0,
-      medium: ticketsByPriority?.filter((t: any) => t.priority === 'medium').length || 0,
-      low: ticketsByPriority?.filter((t: any) => t.priority === 'low').length || 0,
-    };
+    if (isAgent) {
+      ticketsQuery = ticketsQuery.eq('assigned_to', user.id)
+    }
 
-    const { count: openTicketsYesterday } = await supabase
-      .from('conversations')
+    const { data: ticketsData } = await ticketsQuery
+
+    const openTicketsCount = ticketsData?.length || 0
+    const byPriority = {
+      high: ticketsData?.filter(t => t.priority === 'high').length || 0,
+      medium: ticketsData?.filter(t => t.priority === 'medium').length || 0,
+      low: ticketsData?.filter(t => t.priority === 'low').length || 0,
+    }
+
+    // Yesterday's open tickets
+    const { count: yesterdayTickets } = await supabase
+      .from('tickets')
       .select('*', { count: 'exact', head: true })
-      .eq('status', 'open')
-      .lt('created_at', todayStart.toISOString());
+      .neq('status', 'closed')
+      .lt('created_at', today.toISOString())
 
-    const openTicketsChange = calculateChange(
-      openTicketsToday || 0,
-      openTicketsYesterday || 0
-    );
+    const ticketsChange = yesterdayTickets ? 
+      (openTicketsCount - yesterdayTickets) / yesterdayTickets * 100 : 0
 
     // 5. Messages Today
-    const { count: messagesToday } = await supabase
+    const { count: messagesTodayCount } = await supabase
       .from('messages')
       .select('*', { count: 'exact', head: true })
-      .gte('created_at', todayStart.toISOString());
+      .gte('created_at', today.toISOString())
 
-    const { count: messagesYesterday } = await supabase
+    const { count: yesterdayMessagesCount } = await supabase
       .from('messages')
       .select('*', { count: 'exact', head: true })
-      .gte('created_at', yesterdayStart.toISOString())
-      .lt('created_at', todayStart.toISOString());
+      .gte('created_at', yesterday.toISOString())
+      .lt('created_at', today.toISOString())
 
-    const messagesTodayChange = calculateChange(
-      messagesToday || 0,
-      messagesYesterday || 0
-    );
+    const messagesChange = yesterdayMessagesCount ? 
+      ((messagesTodayCount || 0) - yesterdayMessagesCount) / yesterdayMessagesCount * 100 : 0
 
-    return NextResponse.json({
+    // Build response
+    return {
       activeConversations: {
-        value: activeConversationsToday || 0,
-        trend: getTrend(activeConvChange),
-        change: Math.abs(activeConvChange),
+        value: activeCount || 0,
+        trend: activeChange > 5 ? 'up' : activeChange < -5 ? 'down' : 'stable',
+        change: Math.abs(activeChange),
+        byStatus,
       },
       avgResponseTime: {
-        value: Math.round(avgResponseTimeToday),
-        trend: getTrend(-responseTimeChange), // Lower is better
+        value: Math.round(avgResponseTime),
+        trend: responseTimeChange < -5 ? 'up' : responseTimeChange > 5 ? 'down' : 'stable', // Lower is better
         change: Math.abs(responseTimeChange),
         slaStatus,
       },
       whatsappDeliveryRate: {
-        value: Math.round(deliveryRateToday * 10) / 10,
-        trend: getTrend(deliveryRateChange),
-        change: Math.abs(deliveryRateChange),
+        value: Math.round(deliveryRate * 10) / 10,
+        trend: deliveryChange > 2 ? 'up' : deliveryChange < -2 ? 'down' : 'stable',
+        change: Math.abs(deliveryChange),
+        status: deliveryRate >= 95 ? 'good' : deliveryRate >= 90 ? 'warning' : 'critical',
       },
       openTickets: {
-        value: openTicketsToday || 0,
-        trend: getTrend(-openTicketsChange), // Lower is better
-        change: Math.abs(openTicketsChange),
-        byPriority: priorityBreakdown,
+        value: openTicketsCount,
+        trend: ticketsChange > 10 ? 'up' : ticketsChange < -10 ? 'down' : 'stable',
+        change: Math.abs(ticketsChange),
+        byPriority,
       },
       messagesToday: {
-        value: messagesToday || 0,
-        trend: getTrend(messagesTodayChange),
-        change: Math.abs(messagesTodayChange),
+        value: messagesTodayCount || 0,
+        trend: messagesChange > 10 ? 'up' : messagesChange < -10 ? 'down' : 'stable',
+        change: Math.abs(messagesChange),
       },
-    });
-
-  } catch (error) {
-    console.error('Error in GET /api/dashboard/kpi:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    );
-  }
-}
-
-// Helper functions
-function calculateChange(current: number, previous: number): number {
-  if (previous === 0) return current > 0 ? 100 : 0;
-  return ((current - previous) / previous) * 100;
-}
-
-function getTrend(change: number): 'up' | 'down' | 'stable' {
-  if (Math.abs(change) < 5) return 'stable';
-  return change > 0 ? 'up' : 'down';
+    }
 }

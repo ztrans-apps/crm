@@ -354,7 +354,14 @@ SENTRY_DSN=
 # Import supabase/database-schema.sql
 ```
 
-5. **Start Redis**
+5. **Setup storage bucket for broadcast media**
+```bash
+# Run the storage bucket migration
+# This creates the 'broadcast-media' bucket for template images/videos/documents
+# See docs/BROADCAST_MEDIA_STORAGE.md for details
+```
+
+6. **Start Redis**
 ```bash
 redis-server
 ```
@@ -370,6 +377,9 @@ redis-server
    - `20260216100000_rbac_system_complete.sql`
    - `20260216110000_rbac_hierarchy_and_templates.sql`
    - `20260216120000_rbac_update_existing.sql`
+   - `20260221000000_add_template_wizard_fields.sql`
+   - `20260222000000_create_dashboard_analytics_tables.sql`
+   - `20260222100000_create_broadcast_media_bucket.sql` (Storage bucket for media)
 
 3. Enable Row Level Security (RLS) on all tables
 4. Enable Realtime for:
@@ -378,6 +388,12 @@ redis-server
    - contacts
    - conversation_notes
    - conversation_labels
+
+**Storage Setup:**
+- The `broadcast-media` bucket is created automatically by the migration
+- Used for storing template images, videos, and documents
+- Public read access, authenticated write access
+- See `docs/BROADCAST_MEDIA_STORAGE.md` for details
 
 ### Redis Setup
 
@@ -825,6 +841,149 @@ Broadcasts → Template → Add Template
 - Use `{{1}}`, `{{2}}`, `{{3}}` for dynamic content
 - Variables replaced with recipient data during sending
 - Example: "Hello {{1}}, your order {{2}} is ready!"
+
+### Template Creation Flow (Meta Standard)
+
+The template creation follows Meta's 6-step standard process for WhatsApp Business templates:
+
+#### Step 1: Basic Information
+**Purpose**: Set up template identity and basic configuration
+
+**Fields:**
+- **Template Name**: Unique identifier (lowercase, underscores only, no spaces)
+  - Example: `order_confirmation`, `promo_flash_sale`
+  - Guidelines: Descriptive, cannot be changed after submission
+- **Language**: Select template language (English, Indonesian, etc.)
+- **Category**: Choose template category
+  - MARKETING: Promotional content
+  - UTILITY: Transactional updates
+  - AUTHENTICATION: Security codes
+
+**Naming Guidelines:**
+- Use only letters, numbers, and underscores
+- Spaces will be converted to underscores
+- Names cannot be changed after submission
+- Be descriptive of template purpose
+
+#### Step 2: Header Configuration
+**Purpose**: Add optional header to make message more engaging
+
+**Header Format Options:**
+- **None**: No header (text-only message)
+- **Text**: Text header (max 60 characters)
+  - Example: "Special Offer Just for You!"
+- **Media**: Image, video, or document header
+  - **Image**: Clear and relevant (jpg, jpeg, png, max 5MB)
+  - **Video**: Under 16MB, less than 30 seconds
+  - **Document**: PDF format only
+
+**Header Guidelines:**
+- Text headers limited to 60 characters
+- Images should be clear and relevant to message
+- Videos should be under 16MB and less than 30 seconds
+- Documents should be in PDF format
+- Media files enhance engagement but are optional
+
+#### Step 3: Message Body
+**Purpose**: Create the main message content
+
+**Fields:**
+- **Body (Required)**: Main message text (max 1024 characters)
+  - Use clear, concise language
+  - Add variables using `{{1}}`, `{{2}}`, `{{3}}` syntax
+  - Provide examples for all variables in next step
+- **Footer Text (Optional)**: Additional info (max 60 characters)
+  - Example: "Reply STOP to unsubscribe"
+  - Commonly used for disclaimers or opt-out info
+
+**Body Text Guidelines:**
+- Use clear, concise language
+- Add variables using the `{{1}}` syntax for dynamic content
+- Provide examples for all variables in the next step
+- Footer text is optional and limited to 60 characters
+- Maximum 1024 characters for body text
+
+**Variable Syntax:**
+- `{{1}}` for first variable (e.g., customer name)
+- `{{2}}` for second variable (e.g., order number)
+- `{{3}}` for third variable (e.g., date)
+- Example: "Hello {{1}}, your order {{2}} is ready for pickup!"
+
+#### Step 4: Buttons & Actions
+**Purpose**: Add interactive buttons for user engagement
+
+**Button Type Options:**
+
+**1. None**: No buttons (text-only message)
+
+**2. Call to Action (Max 2 buttons):**
+- **Call Phone**: Direct call button
+  - Button Text: Max 20 characters
+  - Phone Number: Include country code (e.g., +6281234567890)
+  - Example: "Call Support"
+- **Visit Website**: URL button
+  - Button Text: Max 20 characters
+  - Website URL: Valid URL with https:// prefix
+  - Example: "Shop Now" → https://example.com
+
+**3. Quick Reply (Max 3 buttons):**
+- Simple response buttons
+- Button Text: Max 20 characters each
+- Example: "Yes", "No", "Maybe"
+- Used for quick user responses
+
+**Button Guidelines:**
+- Quick Reply buttons limited to 3 buttons
+- Call-to-Action buttons limited to 2 buttons
+- Button text limited to 20 characters
+- Phone numbers should include country code (e.g., +6281234567890)
+- URLs should be valid and include https:// prefix
+
+#### Step 5: Variables & Examples
+**Purpose**: Define variable values and provide examples for template approval
+
+**Requirements:**
+- If your message body contains variables (`{{1}}`, `{{2}}`, etc.), you must provide example values
+- Examples help WhatsApp understand your template usage
+- All variables must have corresponding examples
+
+**Example:**
+- Template: "Hello {{1}}, your order {{2}} is ready!"
+- Variable 1 Example: "John Doe"
+- Variable 2 Example: "ORD-12345"
+
+**Guidelines:**
+- No variables detected: This step can be skipped
+- Provide realistic examples that represent actual usage
+- Examples are used for template review and approval
+- Variables will be replaced with actual data during broadcast
+
+#### Step 6: Review & Submit
+**Purpose**: Final review before template submission
+
+**Review Checklist:**
+- **Template Details**: Verify name, language, and category
+- **Template Content**: Review header, body, footer, and buttons
+- **Variables**: Ensure all variables have examples
+- **Preview**: Check how template appears in WhatsApp
+
+**Before You Submit:**
+- Review your template carefully - templates cannot be edited after submission
+- Ensure all variables have appropriate examples
+- Check that your template complies with WhatsApp's guidelines
+- Templates typically take 1-2 days (or more) for review
+
+**Template Approval Process:**
+- Templates must be approved by WhatsApp before use
+- Review typically takes 1-2 days
+- You'll be notified of approval status
+- Rejected templates can be resubmitted with modifications
+
+**Post-Submission:**
+- Template status will show as "Pending" during review
+- Approved templates can be used immediately in broadcasts
+- Rejected templates will show rejection reason
+- You can create new templates while waiting for approval
 
 ### Recipient Lists
 

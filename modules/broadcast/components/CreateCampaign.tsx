@@ -53,6 +53,7 @@ export function CreateCampaign({ onSuccess }: CreateCampaignProps) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showRecipientForm, setShowRecipientForm] = useState(false);
+  const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(null);
   
   const [formData, setFormData] = useState({
     name: '',
@@ -153,6 +154,7 @@ export function CreateCampaign({ onSuccess }: CreateCampaignProps) {
   const handleTemplateSelect = (templateId: string) => {
     const template = templates.find(t => t.id === templateId);
     if (template) {
+      setSelectedTemplate(template);
       setFormData({
         ...formData,
         template_id: templateId,
@@ -212,12 +214,6 @@ export function CreateCampaign({ onSuccess }: CreateCampaignProps) {
         const localDate = new Date(formData.scheduled_at);
         // Convert to UTC ISO string
         scheduledAtUTC = localDate.toISOString();
-        
-        console.log('Scheduling:', {
-          input: formData.scheduled_at,
-          localDate: localDate.toString(),
-          utcISO: scheduledAtUTC
-        });
       }
 
       const response = await fetch('/api/broadcast/campaigns', {
@@ -231,6 +227,7 @@ export function CreateCampaign({ onSuccess }: CreateCampaignProps) {
           recipient_list_id: formData.recipient_list_id,
           sender_id: formData.sender_id,
           whatsapp_account: formData.whatsapp_account,
+          template_id: formData.template_id, // Send template ID
         }),
       });
 
@@ -563,14 +560,60 @@ export function CreateCampaign({ onSuccess }: CreateCampaignProps) {
                 <div className="flex justify-start">
                   <div className="max-w-[80%]">
                     {/* Message Bubble - Customer POV (incoming message) */}
-                    <div className="bg-white rounded-lg rounded-tl-none p-2.5 shadow-sm">
-                      <div className="whitespace-pre-wrap text-[13px] text-gray-900 break-words leading-[1.4]">
-                        {formData.message_content}
-                      </div>
-                      <div className="flex items-center justify-end gap-1 mt-1">
-                        <span className="text-[11px] text-gray-500">
-                          {new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
-                        </span>
+                    <div className="bg-white rounded-lg rounded-tl-none shadow-sm overflow-hidden">
+                      {/* Header Image/Video/Document */}
+                      {selectedTemplate?.header_format === 'IMAGE' && selectedTemplate?.header_media_url && (
+                        <img 
+                          src={selectedTemplate.header_media_url} 
+                          alt="Header" 
+                          className="w-full h-auto"
+                        />
+                      )}
+                      {selectedTemplate?.header_format === 'VIDEO' && selectedTemplate?.header_media_url && (
+                        <video 
+                          src={selectedTemplate.header_media_url} 
+                          className="w-full h-auto"
+                          controls
+                        />
+                      )}
+                      {selectedTemplate?.header_format === 'TEXT' && selectedTemplate?.header_text && (
+                        <div className="px-2.5 pt-2.5 pb-1">
+                          <p className="font-semibold text-sm text-gray-900">{selectedTemplate.header_text}</p>
+                        </div>
+                      )}
+                      
+                      {/* Message Body */}
+                      <div className="p-2.5">
+                        <div className="whitespace-pre-wrap text-[13px] text-gray-900 break-words leading-[1.4]">
+                          {formData.message_content}
+                        </div>
+                        
+                        {/* Footer */}
+                        {selectedTemplate?.footer_text && (
+                          <div className="mt-1 text-[11px] text-gray-500">
+                            {selectedTemplate.footer_text}
+                          </div>
+                        )}
+                        
+                        {/* Buttons */}
+                        {selectedTemplate?.buttons && selectedTemplate.buttons.length > 0 && (
+                          <div className="mt-2 space-y-1">
+                            {selectedTemplate.buttons.map((button: any, index: number) => (
+                              <button
+                                key={index}
+                                className="w-full py-1.5 text-center text-[13px] text-teal-600 font-medium border border-gray-200 rounded hover:bg-gray-50"
+                              >
+                                {button.text}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                        
+                        <div className="flex items-center justify-end gap-1 mt-1">
+                          <span className="text-[11px] text-gray-500">
+                            {new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        </div>
                       </div>
                     </div>
                   </div>

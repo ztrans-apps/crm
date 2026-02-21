@@ -920,6 +920,122 @@ class BaileysWhatsAppService {
   }
 
   /**
+   * Send media message with buttons
+   */
+  async sendMediaWithButtons(sessionId, to, mediaBuffer, options = {}, tenantId = null) {
+    // Get tenant_id from parameter or database
+    if (!tenantId) {
+      if (!supabase) {
+        console.warn(`⚠️  Supabase not configured, using default tenant_id`)
+        tenantId = process.env.DEFAULT_TENANT_ID || '00000000-0000-0000-0000-000000000001'
+      } else {
+        try {
+          const { data, error } = await supabase
+            .from('whatsapp_sessions')
+            .select('tenant_id')
+            .eq('id', sessionId)
+            .single()
+          
+          if (error) {
+            console.warn(`⚠️  Failed to get tenant_id from database, using default:`, error.message)
+            tenantId = process.env.DEFAULT_TENANT_ID || '00000000-0000-0000-0000-000000000001'
+          } else {
+            tenantId = data.tenant_id
+          }
+        } catch (error) {
+          console.warn(`⚠️  Error querying tenant_id, using default:`, error.message)
+          tenantId = process.env.DEFAULT_TENANT_ID || '00000000-0000-0000-0000-000000000001'
+        }
+      }
+    }
+
+    const sessionKey = this.getSessionKey(tenantId, sessionId)
+    const session = this.sessions.get(sessionKey)
+    
+    if (!session) {
+      throw new Error('Session not found: ' + sessionId)
+    }
+
+    const { sock } = session
+
+    try {
+      let phoneNumber = to.replace('@c.us', '').replace(/\D/g, '')
+      const jid = `${phoneNumber}@s.whatsapp.net`
+
+      const { mimetype, caption, filename, footer, buttons } = options
+
+      // Prepare media content
+      let mediaContent = {}
+      if (mimetype.startsWith('image/')) {
+        mediaContent.image = mediaBuffer
+      } else if (mimetype.startsWith('video/')) {
+        mediaContent.video = mediaBuffer
+      } else if (mimetype.startsWith('audio/')) {
+        mediaContent.audio = mediaBuffer
+        mediaContent.mimetype = mimetype
+      } else {
+        mediaContent.document = mediaBuffer
+        mediaContent.mimetype = mimetype
+        mediaContent.fileName = filename || 'document'
+      }
+
+      // Add caption if provided
+      if (caption) {
+        mediaContent.caption = caption
+      }
+
+      // Add footer if provided
+      if (footer) {
+        mediaContent.footer = footer
+      }
+
+      // Add buttons if provided
+      if (buttons && buttons.length > 0) {
+        // Convert buttons to Baileys format
+        const baileysButtons = buttons.map((btn, idx) => {
+          if (btn.type === 'QUICK_REPLY') {
+            return {
+              buttonId: `btn_${idx}`,
+              buttonText: { displayText: btn.text },
+              type: 1
+            }
+          } else if (btn.type === 'URL') {
+            return {
+              buttonId: `btn_${idx}`,
+              buttonText: { displayText: btn.text },
+              type: 1
+            }
+          } else if (btn.type === 'PHONE_NUMBER') {
+            return {
+              buttonId: `btn_${idx}`,
+              buttonText: { displayText: btn.text },
+              type: 1
+            }
+          }
+          return null
+        }).filter(Boolean)
+
+        if (baileysButtons.length > 0) {
+          mediaContent.buttons = baileysButtons
+          mediaContent.headerType = mimetype.startsWith('image/') ? 1 : 
+                                    mimetype.startsWith('video/') ? 2 : 
+                                    mimetype.startsWith('document/') ? 3 : 4
+        }
+      }
+
+      const result = await sock.sendMessage(jid, mediaContent)
+
+      return {
+        success: true,
+        messageId: result.key.id
+      }
+    } catch (error) {
+      console.error('❌ Failed to send media with buttons:', error)
+      throw error
+    }
+  }
+
+  /**
    * Disconnect session
    */
   async disconnectSession(sessionId) {
