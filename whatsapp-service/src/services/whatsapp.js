@@ -477,8 +477,7 @@ class BaileysWhatsAppService {
           console.log('📨 New message received:', {
             from: msg.key.remoteJid,
             messageId: msg.key.id,
-            hasMessage: !!msg.message,
-            messageKeys: msg.message ? Object.keys(msg.message) : []
+            hasMessage: !!msg.message
           })
 
           // Update session activity
@@ -1174,6 +1173,63 @@ class BaileysWhatsAppService {
         return
       }
       
+      // Skip status broadcast
+      if (msg.key.remoteJid === 'status@broadcast') {
+        console.log('  ⏭️  Skipping status broadcast')
+        return
+      }
+      
+      // Handle @lid (can be channel OR direct message with participant/senderPn)
+      if (msg.key.remoteJid.endsWith('@lid')) {
+        // Check if this is a direct message within a channel
+        // Can have either 'participant' or 'senderPn' field
+        const senderJid = msg.key.participant || msg.key.senderPn
+        
+        if (senderJid) {
+          // Extract phone from sender JID instead of remoteJid
+          const modifiedMsg = {
+            ...msg,
+            key: {
+              ...msg.key,
+              remoteJid: senderJid
+            }
+          }
+          
+          // Process as direct message
+          return await this.processDirectMessage(sessionId, modifiedMsg, tenantId)
+        } else {
+          // Pure channel message without sender - skip
+          console.log('  ⏭️  Skipping channel/newsletter message')
+          return
+        }
+      }
+      
+      // Skip WhatsApp Communities/Broadcast
+      if (msg.key.remoteJid.endsWith('@broadcast')) {
+        console.log('  ⏭️  Skipping broadcast message')
+        return
+      }
+      
+      // Only process direct messages (@s.whatsapp.net)
+      if (!msg.key.remoteJid.endsWith('@s.whatsapp.net')) {
+        console.log('  ⏭️  Skipping non-direct message:', msg.key.remoteJid)
+        return
+      }
+      
+      // Process direct message
+      return await this.processDirectMessage(sessionId, msg, tenantId)
+      
+    } catch (error) {
+      console.error('❌ Error in saveIncomingMessage:', error)
+      return null
+    }
+  }
+  
+  /**
+   * Process direct message (extracted from saveIncomingMessage for reuse)
+   */
+  async processDirectMessage(sessionId, msg, tenantId) {
+    try {
       // Get session user_id
       const { data: session, error: sessionError } = await supabase
         .from('whatsapp_sessions')
@@ -1190,14 +1246,43 @@ class BaileysWhatsAppService {
       console.log(`  👤 User ID: ${userId}`)
 
       // Extract phone number from JID (direct messages only)
-      const phoneNumber = msg.key.remoteJid.split('@')[0]
-      const formattedPhone = phoneNumber.startsWith('62') ? `+${phoneNumber}` : `+62${phoneNumber}`
+      const rawJid = msg.key.remoteJid
+      const phoneNumber = rawJid.split('@')[0]
       
-      // Debug logging
-      console.log('  📱 Remote JID:', msg.key.remoteJid)
-      console.log('  📱 Phone Number:', phoneNumber)
+      // Validate phone number length and format
+      if (!phoneNumber || phoneNumber.length < 10 || phoneNumber.length > 15) {
+        console.error('  ❌ Invalid phone number length:', phoneNumber, `(${phoneNumber.length} chars)`)
+        console.error('  ❌ Raw JID:', rawJid)
+        return null
+      }
+      
+      // Check for corrupted phone (too long or has invalid characters)
+      if (!/^\d+$/.test(phoneNumber)) {
+        console.error('  ❌ Phone number contains non-digit characters:', phoneNumber)
+        console.error('  ❌ Raw JID:', rawJid)
+        return null
+      }
+      
+      // Format phone number properly
+      let formattedPhone
+      if (phoneNumber.startsWith('62')) {
+        // Already has country code
+        formattedPhone = `+${phoneNumber}`
+      } else if (phoneNumber.startsWith('0')) {
+        // Local format (08xxx) - convert to international
+        formattedPhone = `+62${phoneNumber.substring(1)}`
+      } else {
+        // Assume it's missing country code
+        formattedPhone = `+62${phoneNumber}`
+      }
+      
+      // Final validation - must be valid Indonesian mobile number
+      if (!/^\+628\d{8,11}$/.test(formattedPhone)) {
+        console.error('  ❌ Invalid Indonesian phone format:', formattedPhone)
+        return null
+      }
+      
       console.log('  📱 Formatted Phone:', formattedPhone)
-      console.log('  📱 Push Name:', msg.pushName)
 
       // Get pushname (contact name from WhatsApp)
       const pushname = msg.pushName || null

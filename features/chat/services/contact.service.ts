@@ -192,8 +192,25 @@ export class ContactService extends BaseService {
     try {
       this.log('ContactService', 'Creating contact', { phoneNumber, name })
 
+      // Validate and sanitize phone number
+      const { sanitizePhoneForStorage } = await import('@/lib/utils/phone')
+      const cleanPhone = sanitizePhoneForStorage(phoneNumber)
+      
+      if (!cleanPhone) {
+        console.error('[ContactService] Invalid phone number:', phoneNumber)
+        throw new Error(`Invalid phone number format: ${phoneNumber}`)
+      }
+      
+      // Log if phone was modified
+      if (cleanPhone !== phoneNumber) {
+        console.warn('[ContactService] Phone number sanitized:', {
+          original: phoneNumber,
+          sanitized: cleanPhone
+        })
+      }
+
       const contactData: any = {
-        phone_number: phoneNumber,
+        phone_number: cleanPhone, // Use sanitized phone
         name: name || null,
         metadata: metadata || {},
         created_at: new Date().toISOString(),
@@ -223,11 +240,43 @@ export class ContactService extends BaseService {
     try {
       this.log('ContactService', 'Getting or creating contact', { phoneNumber, name })
 
-      // Try to find existing contact
+      // CRITICAL: Validate and sanitize phone number
+      const { sanitizePhoneForStorage, isCorruptedPhone } = await import('@/lib/utils/phone')
+      
+      // Check if phone is corrupted
+      if (isCorruptedPhone(phoneNumber)) {
+        console.error('[ContactService] CORRUPTED PHONE DETECTED:', {
+          phone: phoneNumber,
+          length: phoneNumber.length,
+          stack: new Error().stack
+        })
+        throw new Error(`Corrupted phone number detected: ${phoneNumber}`)
+      }
+      
+      // Sanitize phone number
+      const cleanPhone = sanitizePhoneForStorage(phoneNumber)
+      
+      if (!cleanPhone) {
+        console.error('[ContactService] Invalid phone number:', {
+          original: phoneNumber,
+          sanitized: cleanPhone
+        })
+        throw new Error(`Invalid phone number format: ${phoneNumber}`)
+      }
+      
+      // Log if phone was modified
+      if (cleanPhone !== phoneNumber) {
+        console.warn('[ContactService] Phone number sanitized:', {
+          original: phoneNumber,
+          sanitized: cleanPhone
+        })
+      }
+
+      // Try to find existing contact with CLEAN phone
       const { data: existing, error: findError } = await this.supabase
         .from('contacts')
         .select('*')
-        .eq('phone_number', phoneNumber)
+        .eq('phone_number', cleanPhone)
         .single()
 
       if (existing) {
@@ -239,9 +288,9 @@ export class ContactService extends BaseService {
         return existing
       }
 
-      // Create new contact if not found
+      // Create new contact if not found with CLEAN phone
       if (findError?.code === 'PGRST116') {
-        return await this.createContact(phoneNumber, name)
+        return await this.createContact(cleanPhone, name)
       }
 
       if (findError) {
