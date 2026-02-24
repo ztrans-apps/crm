@@ -4,13 +4,11 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { 
-  Plus, FileText, Loader2, Edit, Trash2, Search, Eye 
+  Plus, FileText, Loader2, Edit, Trash2, Search
 } from 'lucide-react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { Label } from '@/components/ui/label';
+import { CreateTemplateWizard } from './CreateTemplateWizard';
 
 interface Template {
   id: string;
@@ -27,14 +25,8 @@ export function TemplateManagement() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
-  const [showForm, setShowForm] = useState(false);
+  const [showWizard, setShowWizard] = useState(false);
   const [editingTemplate, setEditingTemplate] = useState<Template | null>(null);
-  const [formData, setFormData] = useState({
-    name: '',
-    category: '',
-    content: '',
-  });
-  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     fetchTemplates();
@@ -54,45 +46,9 @@ export function TemplateManagement() {
     }
   };
 
-  const handleSubmit = async () => {
-    if (!formData.name || !formData.content || !formData.category) {
-      alert('Nama, kategori, dan isi pesan harus diisi');
-      return;
-    }
-
-    try {
-      setSaving(true);
-      const url = editingTemplate 
-        ? `/api/broadcast/templates/${editingTemplate.id}`
-        : '/api/broadcast/templates';
-      
-      const response = await fetch(url, {
-        method: editingTemplate ? 'PUT' : 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData),
-      });
-
-      if (response.ok) {
-        await fetchTemplates();
-        setShowForm(false);
-        setEditingTemplate(null);
-        setFormData({ name: '', category: '', content: '' });
-      }
-    } catch (error) {
-      console.error('Failed to save template:', error);
-    } finally {
-      setSaving(false);
-    }
-  };
-
   const handleEdit = (template: Template) => {
     setEditingTemplate(template);
-    setFormData({
-      name: template.name,
-      category: template.category || '',
-      content: template.content,
-    });
-    setShowForm(true);
+    setShowWizard(true);
   };
 
   const handleDelete = async (id: string) => {
@@ -146,7 +102,7 @@ export function TemplateManagement() {
       {/* Header */}
       <Card>
         <CardContent className="p-4">
-          <div className="flex gap-4">
+          <div className="flex gap-4 items-center">
             <div className="flex-1 relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
               <Input
@@ -166,11 +122,14 @@ export function TemplateManagement() {
               <option value="UTILITY">Utility</option>
               <option value="AUTHENTICATION">Authentication</option>
             </select>
-            <Button onClick={() => setShowForm(true)} className="bg-purple-600 hover:bg-purple-700">
+            <Button onClick={() => setShowWizard(true)} className="bg-purple-600 hover:bg-purple-700">
               <Plus className="h-4 w-4 mr-2" />
               Buat Template
             </Button>
           </div>
+          <p className="text-xs text-gray-500 mt-2">
+            ℹ️ Templates cannot be edited after creation (WhatsApp Business API guideline)
+          </p>
         </CardContent>
       </Card>
 
@@ -181,7 +140,7 @@ export function TemplateManagement() {
             <FileText className="h-16 w-16 text-gray-400 mb-4" />
             <h3 className="text-xl font-semibold text-gray-900 mb-2">Belum Ada Template</h3>
             <p className="text-gray-600 mb-6">Buat template pesan untuk mempercepat broadcast</p>
-            <Button onClick={() => setShowForm(true)} className="bg-purple-600 hover:bg-purple-700">
+            <Button onClick={() => setShowWizard(true)} className="bg-purple-600 hover:bg-purple-700">
               <Plus className="h-4 w-4 mr-2" />
               Buat Template Pertama
             </Button>
@@ -202,6 +161,7 @@ export function TemplateManagement() {
                       variant="ghost"
                       size="sm"
                       onClick={() => handleEdit(template)}
+                      title="View template details"
                     >
                       <Edit className="h-4 w-4" />
                     </Button>
@@ -228,81 +188,19 @@ export function TemplateManagement() {
         </div>
       )}
 
-      {/* Form Dialog */}
-      <Dialog open={showForm} onOpenChange={setShowForm}>
-        <DialogContent className="sm:max-w-[600px]">
-          <DialogHeader>
-            <DialogTitle>
-              {editingTemplate ? 'Edit Template' : 'Buat Template Baru'}
-            </DialogTitle>
-          </DialogHeader>
-          
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="name">Nama Template *</Label>
-              <Input
-                id="name"
-                placeholder="Promo Akhir Tahun"
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              />
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="category">Kategori Template *</Label>
-              <select
-                id="category"
-                value={formData.category}
-                onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                className="w-full px-3 py-2 border rounded-lg"
-                required
-              >
-                <option value="">Pilih Kategori</option>
-                <option value="MARKETING">Marketing - Promosi, diskon, atau info produk</option>
-                <option value="UTILITY">Utility - Notifikasi akun, status pesanan, info layanan</option>
-                <option value="AUTHENTICATION">Authentication - Kode OTP atau login verifikasi</option>
-              </select>
-              <p className="text-xs text-gray-500">
-                Kategori sesuai standar WhatsApp Business API
-              </p>
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="content">Isi Pesan *</Label>
-              <Textarea
-                id="content"
-                placeholder="Halo! Kami punya promo spesial untuk Anda..."
-                value={formData.content}
-                onChange={(e) => setFormData({ ...formData, content: e.target.value })}
-                rows={6}
-              />
-              <p className="text-sm text-gray-500">
-                {formData.content.length} karakter
-              </p>
-            </div>
-          </div>
-          
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowForm(false)}>
-              Batal
-            </Button>
-            <Button 
-              onClick={handleSubmit} 
-              disabled={saving || !formData.name || !formData.content || !formData.category}
-              className="bg-purple-600 hover:bg-purple-700"
-            >
-              {saving ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Menyimpan...
-                </>
-              ) : (
-                'Simpan'
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* New Template Wizard */}
+      <CreateTemplateWizard
+        open={showWizard}
+        onClose={() => {
+          setShowWizard(false);
+          setEditingTemplate(null);
+        }}
+        onSuccess={() => {
+          fetchTemplates();
+          setEditingTemplate(null);
+        }}
+        editTemplate={editingTemplate}
+      />
     </div>
   );
 }

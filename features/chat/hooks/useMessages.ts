@@ -101,11 +101,6 @@ export function useMessages({
     // Get session ID from conversation, not from global sessionId
     const conversationSessionId = conversation.whatsapp_session_id || sessionId
     
-    console.log('📤 Sending message:')
-    console.log('  Conversation ID:', conversation.id)
-    console.log('  Contact:', conversation.contact.name, conversation.contact.phone_number)
-    console.log('  Conversation Session ID:', conversation.whatsapp_session_id)
-    console.log('  Using Session ID:', conversationSessionId)
     
     if (!userId || !conversationSessionId) {
       alert('Session tidak ditemukan. Pastikan WhatsApp sudah terhubung.')
@@ -345,13 +340,6 @@ export function useMessages({
           // Fetch the complete message with relations
           const newMessage = await messageService.getMessage(payload.new.id)
           
-          console.log('📨 New message received:', {
-            id: newMessage?.id,
-            content: newMessage?.content,
-            sender_id: newMessage?.sender_id,
-            sent_by_user: newMessage?.sent_by_user,
-            is_from_me: newMessage?.is_from_me
-          })
           
           if (newMessage) {
             setMessages(prev => {

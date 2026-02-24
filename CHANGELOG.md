@@ -1,142 +1,104 @@
 # Changelog
 
-All notable changes to this project will be documented in this file.
-
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
-
-## [Unreleased]
+## 2026-02-21 - Meta-Standard Template Creation Wizard
 
 ### Added
-- Modular monolith architecture structure
-- Multi-tenant system (core/tenant)
-- Audit logging system (core/audit)
-- Database migrations for tenant and audit systems
-- Comprehensive documentation (ARCHITECTURE.md, MIGRATION-GUIDE.md, etc.)
-- Path aliases in tsconfig.json
-- Module templates (whatsapp, crm, chatbot, broadcast)
-- Package templates (ui, shared, sdk)
-- Apps structure (dashboard, admin, agent)
+- **6-Step Template Creation Wizard**: Implemented Meta's standard WhatsApp Business template creation flow
+  - **Step 1: Basic Information**: Template name, language, and category selection
+  - **Step 2: Header Configuration**: Support for TEXT, IMAGE, VIDEO, and DOCUMENT headers
+  - **Step 3: Message Body**: Body text with variable support ({{1}}, {{2}}, etc.) and optional footer
+  - **Step 4: Buttons & Actions**: Call-to-Action (max 2) and Quick Reply (max 3) buttons
+  - **Step 5: Variables & Examples**: Auto-detection and example values for template variables
+  - **Step 6: Review & Submit**: Complete preview with WhatsApp-style message rendering
+
+### Features
+- **Real-time WhatsApp Preview**: Live preview showing exactly how message will appear on mobile
+- **Variable Auto-Detection**: Automatically extracts variables from message body
+- **File Upload Support**: Upload images, videos, or documents for header media
+- **Validation**: Step-by-step validation ensuring all required fields are filled
+- **Progress Indicator**: Visual progress bar showing current step and completion status
+- **Guidelines & Help**: Contextual help text and Meta's official guidelines in each step
+
+### Database Changes
+- Added new columns to `broadcast_templates` table:
+  - `language`: Template language code (id, en, en_US, etc.)
+  - `header_format`: Header type (NONE, TEXT, IMAGE, VIDEO, DOCUMENT)
+  - `header_text`: Text header content (max 60 chars)
+  - `header_media_url`: URL to uploaded header media
+  - `body_text`: Main message body (max 1024 chars)
+  - `footer_text`: Optional footer text (max 60 chars)
+  - `button_type`: Button type (NONE, CALL_TO_ACTION, QUICK_REPLY)
+  - `buttons`: JSONB array of button objects
+  - `variables`: JSONB array of variable objects
+  - `status`: Template approval status (DRAFT, PENDING, APPROVED, REJECTED)
+  - `rejection_reason`: Reason if template was rejected
+  - `metadata`: Additional template metadata
+
+### API Changes
+- Updated `/api/broadcast/templates` POST endpoint to support:
+  - Multipart form data for file uploads
+  - New template structure with all wizard fields
+  - Backward compatibility with old JSON format
+
+### UI/UX Improvements
+- Modern step-by-step wizard interface
+- Color-coded progress indicators (teal theme matching WhatsApp)
+- Responsive design for all screen sizes
+- Smooth transitions between steps
+- Clear validation messages and character counters
+
+### Files Added
+- `modules/broadcast/components/CreateTemplateWizard.tsx`: Main wizard component with all 6 steps
+
+### Files Modified
+- `modules/broadcast/components/TemplateManagement.tsx`: Integrated wizard with existing template management
+- `modules/broadcast/components/index.ts`: Added wizard export
+- `app/api/broadcast/templates/route.ts`: Enhanced to support new template format
+- `README.md`: Added comprehensive documentation for template creation flow
+
+### Migration Required
+- Run migration: `supabase/migrations/20260221000000_add_template_wizard_fields.sql`
+- Existing templates will be automatically migrated (content → body_text)
+
+### Notes
+- Templates created with wizard are marked as DRAFT status
+- File upload currently uses placeholder (implement Supabase Storage in production)
+- Old template creation form still available for backward compatibility
+- Wizard follows Meta's official WhatsApp Business API guidelines
+
+---
+
+## 2026-02-21 - Phone Number & Channel Message Fixes
+
+### Fixed
+- **Phone Number Validation**: Added comprehensive validation to prevent corrupt phone numbers from being saved
+  - Length validation (10-15 digits)
+  - Digit-only validation
+  - Indonesian format validation (+628xxxxxxxxxx)
+  
+- **Channel Message Handling**: Properly handle WhatsApp Channel messages
+  - Skip pure channel broadcasts (no sender info)
+  - Process channel messages with sender info (participant or senderPn field)
+  - Extract actual phone number from senderPn field
+  
+- **Message Type Filtering**: Added filters for non-direct messages
+  - Skip group messages (@g.us)
+  - Skip broadcast messages (@broadcast)
+  - Skip channel messages without sender (@lid)
+  - Process direct messages (@s.whatsapp.net)
 
 ### Changed
-- Project structure from monolithic to modular
-- Updated tsconfig.json with path aliases
+- Refactored `saveIncomingMessage()` into two functions for better code organization
+  - `saveIncomingMessage()`: Filter and route messages
+  - `processDirectMessage()`: Process valid direct messages
 
-### Documentation
-- Added ARCHITECTURE.md - Architecture overview
-- Added IMPLEMENTATION-PLAN.md - Detailed implementation plan
-- Added MIGRATION-GUIDE.md - Step-by-step migration guide
-- Added REFACTOR-SUMMARY.md - Refactor status summary
-- Added QUICK-START.md - Quick start guide
-- Added README.md - Project overview
-- Added TODO.md - Task tracking
-- Added CHANGELOG.md - This file
-- Added module-specific README files
+### Files Modified
+- `whatsapp-service/src/services/whatsapp.js`: Added validation and filtering logic
 
-## [0.1.0] - 2025-02-13
+### Known Issues
+- Real-time update requires manual refresh (low priority)
+- Supabase Realtime or Socket.IO needs configuration for auto-update
 
-### Foundation Release
-
-#### Added
-- Initial modular architecture setup
-- Core tenant module with:
-  - Type definitions
-  - Service layer
-  - Middleware for tenant isolation
-  - React context and hooks
-- Core audit module with:
-  - Type definitions
-  - Service layer
-  - Middleware for auto-capture
-  - React hooks
-  - Database triggers
-- Database migrations:
-  - Tenant system (tenants, organizations, workspaces)
-  - Audit logging system
-  - Automatic audit triggers
-- Documentation suite:
-  - Architecture documentation
-  - Implementation plan
-  - Migration guide
-  - Quick start guide
-  - Module documentation
-
-#### Infrastructure
-- Path aliases configuration
-- Folder structure for modular architecture
-- Module templates
-- Package templates
-- Apps structure
-
-#### Developer Experience
-- Pull request template
-- TODO tracking
-- Changelog
-- Comprehensive README
-
----
-
-## Version History
-
-### [0.1.0] - 2025-02-13
-- Foundation release with modular architecture
-
-### [0.0.1] - [Previous Date]
-- Initial monolithic version
-
----
-
-## Migration Notes
-
-### From 0.0.1 to 0.1.0
-This is a major architectural change. Please follow the MIGRATION-GUIDE.md for detailed steps.
-
-Key changes:
-1. Database schema changes (tenant_id added to all tables)
-2. New folder structure (core, modules, packages, apps)
-3. Path aliases updated
-4. Middleware changes for tenant isolation
-5. Audit logging added
-
-**Breaking Changes:**
-- API routes now require tenant context
-- Database queries must include tenant_id filter
-- Import paths changed to use aliases
-
-**Migration Steps:**
-1. Backup database
-2. Apply migrations
-3. Update environment variables
-4. Update middleware
-5. Update API routes
-6. Update components
-7. Test thoroughly
-
-See MIGRATION-GUIDE.md for complete instructions.
-
----
-
-## Upcoming
-
-### [0.2.0] - Planned
-- WhatsApp module implementation
-- CRM module implementation
-- Queue system setup
-- Multi-session support
-
-### [0.3.0] - Planned
-- Chatbot module implementation
-- Broadcast module implementation
-- Shared packages extraction
-
-### [1.0.0] - Planned
-- Production-ready release
-- Complete module migration
-- SDK package
-- Docker support
-- CI/CD pipeline
-
----
-
-**Maintained by:** [Your Team]
-**Last Updated:** 2025-02-13
+### Migration Notes
+- No database migration required
+- Restart WhatsApp service to apply changes: `./scripts/whatsapp-service.sh restart`

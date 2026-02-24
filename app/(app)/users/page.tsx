@@ -13,9 +13,11 @@ import {
   Trash2,
   Mail,
   Shield,
-  Filter
+  Filter,
+  Smartphone
 } from 'lucide-react';
 import UserFormModal from './components/UserFormModal';
+import UserSessionsModal from './components/UserSessionsModal';
 
 interface User {
   id: string;
@@ -37,6 +39,8 @@ export default function AgentsPage() {
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [isSessionsModalOpen, setIsSessionsModalOpen] = useState(false);
+  const [selectedUserForSessions, setSelectedUserForSessions] = useState<{ id: string; name: string } | null>(null);
   const [stats, setStats] = useState({
     total: 0,
     online: 0,
@@ -132,6 +136,16 @@ export default function AgentsPage() {
 
   const handleModalSuccess = () => {
     loadUsers();
+  };
+
+  const handleAssignSessions = (user: User) => {
+    setSelectedUserForSessions({ id: user.id, name: user.full_name });
+    setIsSessionsModalOpen(true);
+  };
+
+  const handleSessionsModalClose = () => {
+    setIsSessionsModalOpen(false);
+    setSelectedUserForSessions(null);
   };
 
   const getInitial = (name: string) => {
@@ -348,6 +362,13 @@ export default function AgentsPage() {
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       <div className="flex items-center justify-end gap-2">
                         <button
+                          onClick={() => handleAssignSessions(user)}
+                          className="p-2 text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
+                          title="Assign WhatsApp Sessions"
+                        >
+                          <Smartphone className="h-4 w-4" />
+                        </button>
+                        <button
                           onClick={() => handleEditUser(user)}
                           className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                           title="Edit"
@@ -378,6 +399,16 @@ export default function AgentsPage() {
         onClose={handleModalClose}
         onSuccess={handleModalSuccess}
       />
+
+      {/* User Sessions Modal */}
+      {selectedUserForSessions && (
+        <UserSessionsModal
+          isOpen={isSessionsModalOpen}
+          onClose={handleSessionsModalClose}
+          userId={selectedUserForSessions.id}
+          userName={selectedUserForSessions.name}
+        />
+      )}
     </div>
   );
 }

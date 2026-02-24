@@ -103,7 +103,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { name, message_template, scheduled_at, send_now, target_filter, recipient_list_id, whatsapp_account, sender_id } = body;
+    const { name, message_template, scheduled_at, send_now, target_filter, recipient_list_id, whatsapp_account, sender_id, template_id } = body;
 
     // Validate required fields
     if (!name || !message_template) {
@@ -111,6 +111,18 @@ export async function POST(req: NextRequest) {
         { error: 'Campaign name and message are required' },
         { status: 400 }
       );
+    }
+
+    // Get template data if template_id provided
+    let templateData = null;
+    if (template_id) {
+      const { data: template } = await supabase
+        .from('broadcast_templates')
+        .select('*')
+        .eq('id', template_id)
+        .single();
+      
+      templateData = template;
     }
 
     // Get target contacts
@@ -192,6 +204,8 @@ export async function POST(req: NextRequest) {
         metadata: {
           whatsapp_account: whatsapp_account,
           sender_id: sender_id,
+          template_id: template_id,
+          template_data: templateData, // Store full template data
         },
       })
       .select()
