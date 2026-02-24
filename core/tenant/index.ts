@@ -5,6 +5,12 @@
 import { createClient } from '@/lib/supabase/server';
 import { cookies } from 'next/headers';
 
+// Export all helpers
+export * from './helpers';
+export * from './middleware';
+export * from './types';
+export { TenantService } from './service';
+
 export async function getCurrentTenant() {
   try {
     const supabase = await createClient();
