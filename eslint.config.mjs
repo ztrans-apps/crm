@@ -12,6 +12,11 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Ignore whatsapp-service (has its own ESLint config)
+    "whatsapp-service/**",
+    // Ignore other non-TypeScript directories
+    "scripts/**",
+    "tests/**/*.js",
   ]),
 ]);
 
