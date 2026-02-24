@@ -2,7 +2,9 @@ name: PR to Stable - Quality Checks
 
 on:
   pull_request:
-    branches: [stable]
+    branches: [stable, main, develop]
+  push:
+    branches: [stable, main, develop]
 
 jobs:
   tests:
