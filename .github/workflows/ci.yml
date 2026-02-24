@@ -21,7 +21,7 @@ jobs:
           cache: 'npm'
       
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --legacy-peer-deps
       
       - name: Run ESLint
         run: npm run lint
@@ -45,10 +45,10 @@ jobs:
           cache: 'npm'
       
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --legacy-peer-deps
       
       - name: Run tests
-        run: npm test
+        run: npm test -- --run
         continue-on-error: true
 
   build:
@@ -66,7 +66,7 @@ jobs:
           cache: 'npm'
       
       - name: Install dependencies
-        run: npm ci
+        run: npm ci --legacy-peer-deps
       
       - name: Build Next.js
         run: npm run build
@@ -110,4 +110,5 @@ jobs:
           tags: whatsapp-crm-service:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
 
