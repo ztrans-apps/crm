@@ -1,14 +1,11 @@
 // Main chat logic hook
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { io, Socket } from 'socket.io-client'
 import { UserRole, canViewConversation, getUserRole } from '@/lib/rbac/chat-permissions'
 import { chatService } from '../services'
 import { createClient } from '@/lib/supabase/client'
 
 export function useChat() {
   const supabase = createClient()
-  const socketRef = useRef<Socket | null>(null)
-  const serviceUrl = process.env.NEXT_PUBLIC_WHATSAPP_SERVICE_URL || 'http://localhost:3001'
   
   const [conversations, setConversations] = useState<any[]>([])
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null)
@@ -88,44 +85,11 @@ export function useChat() {
     }
   }, [userId, userRole])
 
-  // Setup socket connection and Supabase Realtime
+  // Setup Supabase Realtime for live updates
   useEffect(() => {
     let debounceTimer: NodeJS.Timeout
-    
-    // Socket.IO for WhatsApp messages
-    const checkServiceAndConnect = async () => {
-      try {
-        const response = await fetch(`${serviceUrl}/health`, { 
-          method: 'GET',
-          signal: AbortSignal.timeout(2000)
-        })
-        
-        if (response.ok) {
-          socketRef.current = io(serviceUrl, {
-            reconnection: true,
-            reconnectionDelay: 1000,
-            reconnectionAttempts: 3,
-            timeout: 5000,
-          })
 
-          socketRef.current.on('message', () => {
-            clearTimeout(debounceTimer)
-            debounceTimer = setTimeout(() => loadConversations(), 500)
-          })
-
-          socketRef.current.on('message_status', () => {
-            clearTimeout(debounceTimer)
-            debounceTimer = setTimeout(() => loadConversations(), 500)
-          })
-        }
-      } catch (error) {
-        // Silent fail
-      }
-    }
-
-    checkServiceAndConnect()
-
-    // Supabase Realtime for database changes
+    // Listen for conversation changes
     const conversationsChannel = supabase
       .channel('conversations-changes')
       .on(
@@ -152,14 +116,26 @@ export function useChat() {
           debounceTimer = setTimeout(() => loadConversations(), 300)
         }
       )
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'messages'
+        },
+        () => {
+          // Refresh conversations when new messages arrive (from webhook)
+          clearTimeout(debounceTimer)
+          debounceTimer = setTimeout(() => loadConversations(), 500)
+        }
+      )
       .subscribe()
 
     return () => {
       clearTimeout(debounceTimer)
-      socketRef.current?.disconnect()
       conversationsChannel.unsubscribe()
     }
-  }, [serviceUrl, loadConversations, supabase])
+  }, [loadConversations, supabase])
 
   // Initialize on mount
   useEffect(() => {

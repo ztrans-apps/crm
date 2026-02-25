@@ -1,5 +1,12 @@
+/**
+ * useMessageTracking - Supabase Realtime based (Vercel-compatible)
+ * 
+ * Listens for message status updates via Supabase Realtime
+ * instead of Socket.IO (no persistent WebSocket server needed).
+ */
+
 import { useEffect, useRef, useCallback } from 'react';
-import { io, Socket } from 'socket.io-client';
+import { createClient } from '@/lib/supabase/client';
 
 interface MessageStatusUpdate {
   sessionId: string;
@@ -15,85 +22,54 @@ interface UseMessageTrackingOptions {
 
 export function useMessageTracking(options: UseMessageTrackingOptions) {
   const { enabled = true, onStatusUpdate } = options;
-  const socketRef = useRef<Socket | null>(null);
-  const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const supabase = createClient();
+  const isSubscribed = useRef(false);
 
   const handleStatusUpdate = useCallback((data: MessageStatusUpdate) => {
     onStatusUpdate(data);
   }, [onStatusUpdate]);
 
   useEffect(() => {
-    if (!enabled) {
+    if (!enabled || isSubscribed.current) {
       return;
     }
 
-    const whatsappServiceUrl = process.env.NEXT_PUBLIC_WHATSAPP_SERVICE_URL || 'http://localhost:3001';
-    
-    // Create socket connection
-    const socket = io(whatsappServiceUrl, {
-      transports: ['websocket', 'polling'],
-      reconnection: true,
-      reconnectionDelay: 1000,
-      reconnectionDelayMax: 5000,
-      reconnectionAttempts: Infinity,
-      timeout: 20000,
-    });
+    isSubscribed.current = true;
 
-    socketRef.current = socket;
+    // Listen for message status changes via Supabase Realtime
+    const channel = supabase
+      .channel('message-status-tracking')
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'messages',
+        },
+        (payload) => {
+          const newRecord = payload.new as any;
+          const oldRecord = payload.old as any;
 
-    socket.on('connect', () => {
-      // Clear any pending reconnect timeout
-      if (reconnectTimeoutRef.current) {
-        clearTimeout(reconnectTimeoutRef.current);
-        reconnectTimeoutRef.current = null;
-      }
-    });
+          // Only fire when delivery_status actually changed
+          if (newRecord.delivery_status !== oldRecord.delivery_status) {
+            handleStatusUpdate({
+              sessionId: '',
+              messageId: newRecord.id || newRecord.whatsapp_message_id || '',
+              status: newRecord.delivery_status,
+              timestamp: newRecord.updated_at || new Date().toISOString(),
+            });
+          }
+        }
+      )
+      .subscribe();
 
-    socket.on('disconnect', (reason) => {
-      // Auto-reconnect after 2 seconds if not intentional disconnect
-      if (reason === 'io server disconnect') {
-        // Server disconnected, manually reconnect
-        reconnectTimeoutRef.current = setTimeout(() => {
-          socket.connect();
-        }, 2000);
-      }
-    });
-
-    socket.on('message_status_update', handleStatusUpdate);
-
-    socket.on('connect_error', (error) => {
-      console.error('❌ [useMessageTracking] Connection error:', error.message);
-    });
-
-    socket.on('reconnect', (attemptNumber) => {
-      // Reconnected successfully
-    });
-
-    socket.on('reconnect_attempt', (attemptNumber) => {
-      // Attempting to reconnect
-    });
-
-    socket.on('reconnect_error', (error) => {
-      console.error('❌ [useMessageTracking] Reconnect error:', error.message);
-    });
-
-    socket.on('reconnect_failed', () => {
-      console.error('❌ [useMessageTracking] Reconnect failed after all attempts');
-    });
-
-    // Cleanup on unmount
     return () => {
-      if (reconnectTimeoutRef.current) {
-        clearTimeout(reconnectTimeoutRef.current);
-      }
-      
-      socket.off('message_status_update', handleStatusUpdate);
-      socket.disconnect();
-      socketRef.current = null;
+      isSubscribed.current = false;
+      channel.unsubscribe();
     };
-  }, [enabled, handleStatusUpdate]);
+  }, [enabled, handleStatusUpdate, supabase]);
 
   return {
-    isConnected: socketRef.current?.connected || false,
+    isConnected: true, // Supabase Realtime is always available
   };
 }

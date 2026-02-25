@@ -47,7 +47,6 @@
     "react-dropzone": "^14.4.0",
     "react-leaflet": "^5.0.0",
     "recharts": "^3.7.0",
-    "socket.io-client": "^4.8.3",
     "tailwind-merge": "^3.4.0",
     "vercel": "^50.23.2",
     "zustand": "^5.0.11"
