@@ -11,10 +11,9 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { getMetaCloudAPIForPhoneNumberId, getMetaCloudAPI } from '@/lib/whatsapp/meta-api';
 
 const BATCH_SIZE = 30; // Recipients per cron invocation (stay within Vercel timeout)
-const META_API_VERSION = process.env.WHATSAPP_API_VERSION || 'v21.0';
-const META_PHONE_NUMBER_ID = process.env.WHATSAPP_PHONE_NUMBER_ID || '';
 const META_API_TOKEN = process.env.WHATSAPP_API_TOKEN || '';
 
 function getSupabase() {
@@ -25,10 +24,19 @@ function getSupabase() {
 }
 
 /**
- * Send a message via Meta Cloud API
+ * Send a message via Meta Cloud API for a specific phone number ID.
+ * If no phoneNumberId is provided, falls back to default env.
  */
-async function metaSend(body: any): Promise<any> {
-  const url = `https://graph.facebook.com/${META_API_VERSION}/${META_PHONE_NUMBER_ID}/messages`;
+async function metaSend(body: any, phoneNumberId?: string): Promise<any> {
+  const api = phoneNumberId
+    ? getMetaCloudAPIForPhoneNumberId(phoneNumberId)
+    : getMetaCloudAPI();
+
+  // Use the internal sendRaw method (send pre-built body)
+  const apiVersion = process.env.WHATSAPP_API_VERSION || 'v21.0';
+  const pnid = phoneNumberId || process.env.WHATSAPP_PHONE_NUMBER_ID || '';
+  const url = `https://graph.facebook.com/${apiVersion}/${pnid}/messages`;
+  
   const response = await fetch(url, {
     method: 'POST',
     headers: {
@@ -47,7 +55,7 @@ async function metaSend(body: any): Promise<any> {
 /**
  * Send text message with template formatting
  */
-async function sendFormattedText(phone: string, message: string, templateData: any): Promise<string | null> {
+async function sendFormattedText(phone: string, message: string, templateData: any, phoneNumberId?: string): Promise<string | null> {
   let fullMessage = '';
 
   if (templateData?.header_format === 'TEXT' && templateData?.header_text) {
@@ -75,7 +83,7 @@ async function sendFormattedText(phone: string, message: string, templateData: a
     to: phone,
     type: 'text',
     text: { preview_url: true, body: fullMessage },
-  });
+  }, phoneNumberId);
 
   return data.messages?.[0]?.id || null;
 }
@@ -83,7 +91,7 @@ async function sendFormattedText(phone: string, message: string, templateData: a
 /**
  * Send media message
  */
-async function sendMediaMessage(phone: string, message: string, templateData: any): Promise<string | null> {
+async function sendMediaMessage(phone: string, message: string, templateData: any, phoneNumberId?: string): Promise<string | null> {
   const mediaUrl = templateData.header_media_url;
   const contentType = templateData.header_format === 'IMAGE' ? 'image' :
                      templateData.header_format === 'VIDEO' ? 'video' : 'document';
@@ -102,7 +110,7 @@ async function sendMediaMessage(phone: string, message: string, templateData: an
   };
   body[contentType] = mediaPayload;
 
-  const data = await metaSend(body);
+  const data = await metaSend(body, phoneNumberId);
   return data.messages?.[0]?.id || null;
 }
 
@@ -114,7 +122,8 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    if (!META_PHONE_NUMBER_ID || !META_API_TOKEN) {
+    const defaultPhoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID || '';
+    if (!defaultPhoneNumberId || !META_API_TOKEN) {
       return NextResponse.json({ error: 'WhatsApp API not configured' }, { status: 500 });
     }
 
@@ -144,7 +153,7 @@ export async function GET(request: NextRequest) {
     // ─── Step 2: Get campaigns that are actively sending ───
     const { data: activeCampaigns } = await supabase
       .from('broadcast_campaigns')
-      .select('id, message_template, metadata')
+      .select('id, message_template, metadata, session_id')
       .eq('status', 'sending');
 
     if (!activeCampaigns?.length) {
@@ -160,6 +169,19 @@ export async function GET(request: NextRequest) {
     for (const campaign of activeCampaigns) {
       const templateData = campaign.metadata?.template_data || null;
       const messageTemplate = campaign.message_template || '';
+
+      // Resolve which phone number ID to use for this campaign
+      let campaignPhoneNumberId = defaultPhoneNumberId;
+      if (campaign.session_id) {
+        const { data: session } = await supabase
+          .from('whatsapp_sessions')
+          .select('meta_phone_number_id')
+          .eq('id', campaign.session_id)
+          .single();
+        if (session?.meta_phone_number_id) {
+          campaignPhoneNumberId = session.meta_phone_number_id;
+        }
+      }
 
       // Fetch a batch of pending recipients
       const { data: recipients } = await supabase
@@ -190,13 +212,13 @@ export async function GET(request: NextRequest) {
 
           if (hasMedia) {
             try {
-              waMessageId = await sendMediaMessage(phone, messageTemplate, templateData);
+              waMessageId = await sendMediaMessage(phone, messageTemplate, templateData, campaignPhoneNumberId);
             } catch {
               // Fallback to text
-              waMessageId = await sendFormattedText(phone, messageTemplate, templateData);
+              waMessageId = await sendFormattedText(phone, messageTemplate, templateData, campaignPhoneNumberId);
             }
           } else {
-            waMessageId = await sendFormattedText(phone, messageTemplate, templateData);
+            waMessageId = await sendFormattedText(phone, messageTemplate, templateData, campaignPhoneNumberId);
           }
 
           // Mark as sent

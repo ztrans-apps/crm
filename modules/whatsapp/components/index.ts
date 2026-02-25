@@ -1,5 +1,8 @@
 export { SessionList } from './SessionList';
-export { QRCode } from './QRCode';
-export { AddSessionModal } from './AddSessionModal';
-export { EditSessionModal } from './EditSessionModal';
+export { AddNumberModal } from './AddSessionModal';
+export { EditNumberModal } from './EditSessionModal';
 export { SessionMonitor } from './SessionMonitor';
+
+// Legacy exports (kept for compatibility)
+export { AddNumberModal as AddSessionModal } from './AddSessionModal';
+export { EditNumberModal as EditSessionModal } from './EditSessionModal';

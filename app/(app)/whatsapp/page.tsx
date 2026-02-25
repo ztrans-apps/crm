@@ -1,168 +1,86 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
-import { Plus, AlertCircle } from 'lucide-react';
-import { SessionList, QRCode, AddSessionModal, EditSessionModal } from '@/modules/whatsapp/components';
+import { Plus, AlertCircle, Signal, CheckCircle2, MessageSquare, Shield } from 'lucide-react';
+import { SessionList, AddNumberModal, EditNumberModal } from '@/modules/whatsapp/components';
 import { usePermissions } from '@/lib/rbac';
 
+interface MetaApiStatus {
+  configured: boolean;
+  phoneNumber?: string;
+  verifiedName?: string;
+  qualityRating?: string;
+  messagingLimit?: string;
+  error?: string;
+}
+
 export default function WhatsAppPage() {
-  const [showQR, setShowQR] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
-  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
-  const [sessionMonitor, setSessionMonitor] = useState({
-    total: 0,
-    connected: 0,
-    connecting: 0,
-    disconnected: 0,
-    loggedOut: 0,
-    error: 0,
-  });
-  
+  const [apiStatus, setApiStatus] = useState<MetaApiStatus>({ configured: false });
+  const [loadingStatus, setLoadingStatus] = useState(true);
+
   const { hasPermission } = usePermissions();
-  
-  // Check permissions for different actions
+
   const canAddSession = hasPermission('whatsapp.session.create');
   const canEditSession = hasPermission('whatsapp.session.edit');
   const canDeleteSession = hasPermission('whatsapp.session.delete');
-  const canConnectSession = hasPermission('whatsapp.session.connect');
-  const canDisconnectSession = hasPermission('whatsapp.session.disconnect');
 
-  // Fetch session stats
-  useEffect(() => {
-    const fetchStats = async () => {
-      try {
-        const response = await fetch('/api/whatsapp/session-states');
-        if (response.ok) {
-          const data = await response.json();
-          const states = data.states || [];
-          
-          setSessionMonitor({
-            total: states.length,
-            connected: states.filter((s: any) => s.state === 'CONNECTED').length,
-            connecting: states.filter((s: any) => s.state === 'CONNECTING').length,
-            disconnected: states.filter((s: any) => s.state === 'DISCONNECTED').length,
-            loggedOut: states.filter((s: any) => s.state === 'LOGGED_OUT').length,
-            error: states.filter((s: any) => s.state === 'ERROR').length,
-          });
-        }
-      } catch (error) {
-        console.error('Failed to fetch session stats:', error);
+  // Fetch Meta Cloud API status
+  const fetchApiStatus = useCallback(async () => {
+    try {
+      setLoadingStatus(true);
+      const response = await fetch('/api/whatsapp/meta-status');
+      if (response.ok) {
+        const data = await response.json();
+        setApiStatus(data);
+      } else {
+        setApiStatus({ configured: false, error: 'Failed to check API status' });
       }
-    };
+    } catch {
+      setApiStatus({ configured: false, error: 'Could not connect to API' });
+    } finally {
+      setLoadingStatus(false);
+    }
+  }, []);
 
-    fetchStats();
-    const interval = setInterval(fetchStats, 5000);
-    return () => clearInterval(interval);
-  }, [refreshKey]);
+  useEffect(() => {
+    fetchApiStatus();
+  }, [fetchApiStatus, refreshKey]);
 
-  const handleAddSession = () => {
+  const handleAddNumber = () => {
     if (!canAddSession) {
-      setError('You do not have permission to add WhatsApp sessions');
+      setError('You do not have permission to add WhatsApp numbers');
       return;
     }
     setShowAddModal(true);
   };
 
-  const handleSessionCreated = async (sessionId: string) => {
-    setCurrentSessionId(sessionId);
-    
-    // Wait for DB to update
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    // Trigger reconnect to show QR (force new for new sessions)
-    await handleReconnect(sessionId, true);
-    
-    // Refresh session list
-    setRefreshKey(prev => prev + 1);
-  };
-
-  const handleReconnect = async (sessionId: string, forceNew: boolean = false) => {
-    if (!canConnectSession) {
-      setError('You do not have permission to connect WhatsApp sessions');
+  const handleEdit = (sessionId: string) => {
+    if (!canEditSession) {
+      setError('You do not have permission to edit WhatsApp numbers');
       return;
     }
-    
-    try {
-      setError(null);
-      
-      // Only use forceNew for new sessions, otherwise let backend decide
-      const url = forceNew 
-        ? `/api/whatsapp/reconnect/${sessionId}?forceNew=true`
-        : `/api/whatsapp/reconnect/${sessionId}`;
-      
-      const response = await fetch(url, {
-        method: 'POST',
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        
-        // Only show QR if not auto-reconnecting
-        if (!data.autoReconnect || forceNew) {
-          // Wait for status to update
-          await new Promise(resolve => setTimeout(resolve, 1500));
-          
-          setCurrentSessionId(sessionId);
-          setShowQR(true);
-        }
-        
-        // Refresh session list
-        setRefreshKey(prev => prev + 1);
-      } else {
-        const data = await response.json();
-        throw new Error(data.error || 'Failed to reconnect');
-      }
-    } catch (error: any) {
-      setError(error.message);
-    }
-  };
-
-  const handleDisconnect = async (sessionId: string) => {
-    if (!canDisconnectSession) {
-      setError('You do not have permission to disconnect WhatsApp sessions');
-      return;
-    }
-    
-    if (!confirm('This will disconnect WhatsApp but keep the phone number saved. You can reconnect later.')) {
-      return;
-    }
-
-    try {
-      setError(null);
-      
-      const response = await fetch(`/api/whatsapp/disconnect/${sessionId}`, {
-        method: 'POST',
-      });
-
-      if (response.ok) {
-        setRefreshKey(prev => prev + 1);
-      } else {
-        const data = await response.json();
-        throw new Error(data.error || 'Failed to disconnect');
-      }
-    } catch (error: any) {
-      setError(error.message);
-    }
+    setEditingSessionId(sessionId);
+    setShowEditModal(true);
   };
 
   const handleDelete = async (sessionId: string) => {
     if (!canDeleteSession) {
-      setError('You do not have permission to delete WhatsApp sessions');
+      setError('You do not have permission to delete WhatsApp numbers');
       return;
     }
-    
-    if (!confirm('This will permanently delete this WhatsApp number and all authentication data. Are you sure?')) {
+
+    if (!confirm('This will remove this WhatsApp number from the CRM. Are you sure?')) {
       return;
     }
 
     try {
       setError(null);
-      
       const response = await fetch(`/api/whatsapp/delete/${sessionId}`, {
         method: 'DELETE',
       });
@@ -171,26 +89,20 @@ export default function WhatsAppPage() {
         setRefreshKey(prev => prev + 1);
       } else {
         const data = await response.json();
-        throw new Error(data.error || 'Failed to delete session');
+        throw new Error(data.error || 'Failed to delete number');
       }
     } catch (error: any) {
       setError(error.message);
     }
   };
 
-  const handleEdit = (sessionId: string) => {
-    if (!canEditSession) {
-      setError('You do not have permission to edit WhatsApp sessions');
-      return;
+  const getQualityColor = (rating?: string) => {
+    switch (rating?.toUpperCase()) {
+      case 'GREEN': return 'text-green-600 bg-green-100';
+      case 'YELLOW': return 'text-yellow-600 bg-yellow-100';
+      case 'RED': return 'text-red-600 bg-red-100';
+      default: return 'text-gray-600 bg-gray-100';
     }
-    setEditingSessionId(sessionId);
-    setShowEditModal(true);
-  };
-
-  const handleQRConnected = () => {
-    setShowQR(false);
-    setCurrentSessionId(null);
-    setRefreshKey(prev => prev + 1);
   };
 
   return (
@@ -199,11 +111,11 @@ export default function WhatsAppPage() {
       <div className="mb-8 flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">WhatsApp Connections</h1>
-          <p className="text-gray-600 mt-1">Manage your WhatsApp business numbers</p>
+          <p className="text-gray-600 mt-1">Manage your WhatsApp Business numbers via Meta Cloud API</p>
         </div>
         {canAddSession && (
           <Button
-            onClick={handleAddSession}
+            onClick={handleAddNumber}
             size="lg"
             className="bg-green-600 hover:bg-green-700 font-medium flex items-center gap-2"
           >
@@ -221,30 +133,38 @@ export default function WhatsAppPage() {
             <h3 className="font-medium text-red-900">Error</h3>
             <p className="text-sm text-red-700 mt-1">{error}</p>
           </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setError(null)}
-          >
+          <Button variant="outline" size="sm" onClick={() => setError(null)}>
             Dismiss
           </Button>
         </div>
       )}
 
-      {/* Stats Cards */}
+      {/* Meta Cloud API Status Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
         <div className="bg-white rounded-lg border p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600 mb-1">Total Sessions</p>
-              <p className="text-3xl font-bold text-gray-900">
-                {sessionMonitor.total}
+              <p className="text-sm text-gray-600 mb-1">API Status</p>
+              <p className={`text-lg font-bold ${apiStatus.configured ? 'text-green-600' : 'text-red-600'}`}>
+                {loadingStatus ? '...' : apiStatus.configured ? 'Connected' : 'Not Configured'}
+              </p>
+            </div>
+            <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${apiStatus.configured ? 'bg-green-100' : 'bg-red-100'}`}>
+              <Signal className={`w-6 h-6 ${apiStatus.configured ? 'text-green-600' : 'text-red-600'}`} />
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-lg border p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm text-gray-600 mb-1">Verified Name</p>
+              <p className="text-lg font-bold text-gray-900 truncate">
+                {loadingStatus ? '...' : apiStatus.verifiedName || '-'}
               </p>
             </div>
             <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-              <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
-              </svg>
+              <CheckCircle2 className="w-6 h-6 text-blue-600" />
             </div>
           </div>
         </div>
@@ -252,15 +172,13 @@ export default function WhatsAppPage() {
         <div className="bg-white rounded-lg border p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600 mb-1">Connected</p>
-              <p className="text-3xl font-bold text-green-600">
-                {sessionMonitor.connected}
+              <p className="text-sm text-gray-600 mb-1">Quality Rating</p>
+              <p className={`text-lg font-bold ${apiStatus.qualityRating === 'GREEN' ? 'text-green-600' : apiStatus.qualityRating === 'YELLOW' ? 'text-yellow-600' : apiStatus.qualityRating === 'RED' ? 'text-red-600' : 'text-gray-600'}`}>
+                {loadingStatus ? '...' : apiStatus.qualityRating || '-'}
               </p>
             </div>
-            <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-              <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
+            <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${getQualityColor(apiStatus.qualityRating)}`}>
+              <Shield className="w-6 h-6" />
             </div>
           </div>
         </div>
@@ -268,71 +186,75 @@ export default function WhatsAppPage() {
         <div className="bg-white rounded-lg border p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600 mb-1">Disconnected</p>
-              <p className="text-3xl font-bold text-yellow-600">
-                {sessionMonitor.disconnected}
+              <p className="text-sm text-gray-600 mb-1">Messaging Limit</p>
+              <p className="text-lg font-bold text-gray-900">
+                {loadingStatus ? '...' : apiStatus.messagingLimit || '-'}
               </p>
             </div>
-            <div className="w-12 h-12 bg-yellow-100 rounded-lg flex items-center justify-center">
-              <svg className="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-              </svg>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg border p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-600 mb-1">Errors</p>
-              <p className="text-3xl font-bold text-red-600">
-                {sessionMonitor.error}
-              </p>
-            </div>
-            <div className="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center">
-              <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
+            <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
+              <MessageSquare className="w-6 h-6 text-purple-600" />
             </div>
           </div>
         </div>
       </div>
 
-      {/* QR Code */}
-      {showQR && currentSessionId && (
-        <QRCode
-          sessionId={currentSessionId}
-          onClose={() => {
-            setShowQR(false);
-            setCurrentSessionId(null);
-          }}
-          onConnected={handleQRConnected}
-        />
+      {/* API Not Configured Warning */}
+      {!loadingStatus && !apiStatus.configured && (
+        <div className="bg-amber-50 border border-amber-200 rounded-lg p-6 mb-6">
+          <div className="flex items-start gap-3">
+            <AlertCircle className="h-6 w-6 text-amber-600 mt-0.5 shrink-0" />
+            <div>
+              <h3 className="font-semibold text-amber-900">Meta Cloud API Not Configured</h3>
+              <p className="text-sm text-amber-700 mt-1">
+                Set these environment variables in your Vercel Dashboard to connect:
+              </p>
+              <ul className="text-sm text-amber-700 mt-2 space-y-1 list-disc list-inside">
+                <li><code className="bg-amber-100 px-1 rounded">META_WHATSAPP_TOKEN</code> — Access token from Meta Developer Console</li>
+                <li><code className="bg-amber-100 px-1 rounded">META_PHONE_NUMBER_ID</code> — Phone Number ID from WhatsApp → API Setup</li>
+                <li><code className="bg-amber-100 px-1 rounded">META_BUSINESS_ACCOUNT_ID</code> — WhatsApp Business Account ID</li>
+              </ul>
+              <p className="text-sm text-amber-700 mt-2">
+                Find these in the{' '}
+                <a href="https://developers.facebook.com/apps/" target="_blank" rel="noopener noreferrer" className="text-amber-800 underline font-medium">
+                  Meta Developer Console
+                </a>
+              </p>
+            </div>
+          </div>
+        </div>
       )}
 
-      {/* Sessions Table */}
+      {/* Numbers Table */}
       <SessionList
         key={refreshKey}
-        onAddSession={canAddSession ? handleAddSession : undefined}
-        onReconnect={canConnectSession ? handleReconnect : undefined}
-        onDisconnect={canDisconnectSession ? handleDisconnect : undefined}
-        onDelete={canDeleteSession ? handleDelete : undefined}
+        onAddNumber={canAddSession ? handleAddNumber : undefined}
         onEdit={canEditSession ? handleEdit : undefined}
+        onDelete={canDeleteSession ? handleDelete : undefined}
+        onRefresh={() => {
+          setRefreshKey(prev => prev + 1);
+          fetchApiStatus();
+        }}
       />
 
-      {/* Add Session Modal */}
-      <AddSessionModal
+      {/* Add Number Modal */}
+      <AddNumberModal
         open={showAddModal}
         onOpenChange={setShowAddModal}
-        onSuccess={handleSessionCreated}
+        onSuccess={() => {
+          setRefreshKey(prev => prev + 1);
+          fetchApiStatus();
+        }}
       />
 
-      {/* Edit Session Modal */}
-      <EditSessionModal
+      {/* Edit Number Modal */}
+      <EditNumberModal
         open={showEditModal}
         onOpenChange={setShowEditModal}
         sessionId={editingSessionId}
-        onSuccess={() => setRefreshKey(prev => prev + 1)}
+        onSuccess={() => {
+          setRefreshKey(prev => prev + 1);
+          fetchApiStatus();
+        }}
       />
     </div>
   );

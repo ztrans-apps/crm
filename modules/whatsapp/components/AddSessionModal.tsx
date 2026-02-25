@@ -5,28 +5,29 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Loader2 } from 'lucide-react';
+import { Loader2, ExternalLink } from 'lucide-react';
 
-interface AddSessionModalProps {
+interface AddNumberModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSuccess?: (sessionId: string) => void;
+  onSuccess?: () => void;
 }
 
-export function AddSessionModal({ open, onOpenChange, onSuccess }: AddSessionModalProps) {
+export function AddNumberModal({ open, onOpenChange, onSuccess }: AddNumberModalProps) {
   const [phoneNumber, setPhoneNumber] = useState('');
-  const [name, setName] = useState('');
+  const [label, setLabel] = useState('');
+  const [metaPhoneNumberId, setMetaPhoneNumberId] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = async () => {
     if (!phoneNumber.trim()) {
-      setError('Please enter a phone number');
+      setError('Please enter the phone number');
       return;
     }
 
-    if (!name.trim()) {
-      setError('Please enter a name for this device');
+    if (!label.trim()) {
+      setError('Please enter a label for this number');
       return;
     }
 
@@ -37,18 +38,22 @@ export function AddSessionModal({ open, onOpenChange, onSuccess }: AddSessionMod
       const response = await fetch('/api/whatsapp/init', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phoneNumber, name }),
+        body: JSON.stringify({
+          phoneNumber: phoneNumber.trim(),
+          name: label.trim(),
+          metaPhoneNumberId: metaPhoneNumberId.trim() || undefined,
+        }),
       });
 
       if (response.ok) {
-        const data = await response.json();
         setPhoneNumber('');
-        setName('');
+        setLabel('');
+        setMetaPhoneNumberId('');
         onOpenChange(false);
-        onSuccess?.(data.sessionId);
+        onSuccess?.();
       } else {
         const data = await response.json();
-        throw new Error(data.error || 'Failed to initialize session');
+        throw new Error(data.error || 'Failed to register number');
       }
     } catch (error: any) {
       setError(error.message);
@@ -59,45 +64,74 @@ export function AddSessionModal({ open, onOpenChange, onSuccess }: AddSessionMod
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Add WhatsApp Number</DialogTitle>
+          <DialogTitle>Register WhatsApp Number</DialogTitle>
           <DialogDescription>
-            Enter the phone number you want to connect (with country code)
+            Add a WhatsApp Business number connected via Meta Cloud API
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4 py-4">
-          <div className="space-y-2">
-            <Label htmlFor="name">Device Name</Label>
-            <Input
-              id="name"
-              placeholder="e.g., Customer Service, Sales Team"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              disabled={loading}
-            />
-            <p className="text-sm text-gray-500">
-              A friendly name to identify this WhatsApp device
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+            <p className="text-sm text-blue-800">
+              With Meta Cloud API, numbers are managed through the{' '}
+              <a
+                href="https://business.facebook.com/wa/manage/phone-numbers/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="underline font-medium inline-flex items-center gap-1"
+              >
+                Meta Business Manager <ExternalLink className="h-3 w-3" />
+              </a>
+              . No QR code scanning needed.
             </p>
           </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="label">Label</Label>
+            <Input
+              id="label"
+              placeholder="e.g., Customer Service, Sales Team"
+              value={label}
+              onChange={(e) => setLabel(e.target.value)}
+              disabled={loading}
+            />
+            <p className="text-xs text-gray-500">
+              A friendly name to identify this number in the CRM
+            </p>
+          </div>
+
           <div className="space-y-2">
             <Label htmlFor="phone">Phone Number</Label>
             <Input
               id="phone"
-              placeholder="+62812345678"
+              placeholder="+6285777078921"
               value={phoneNumber}
               onChange={(e) => setPhoneNumber(e.target.value)}
+              disabled={loading}
+            />
+            <p className="text-xs text-gray-500">
+              The WhatsApp Business number with country code
+            </p>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="metaId">Meta Phone Number ID <span className="text-gray-400">(optional)</span></Label>
+            <Input
+              id="metaId"
+              placeholder="e.g., 123456789012345"
+              value={metaPhoneNumberId}
+              onChange={(e) => setMetaPhoneNumberId(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  handleSubmit();
-                }
+                if (e.key === 'Enter') handleSubmit();
               }}
               disabled={loading}
             />
-            <p className="text-sm text-gray-500">
-              Include country code (e.g., +62 for Indonesia)
+            <p className="text-xs text-gray-500">
+              Found in Meta Developer Console → WhatsApp → API Setup
             </p>
           </div>
+
           {error && (
             <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
               <p className="text-sm text-red-700">{error}</p>
@@ -110,16 +144,16 @@ export function AddSessionModal({ open, onOpenChange, onSuccess }: AddSessionMod
           </Button>
           <Button
             onClick={handleSubmit}
-            disabled={!phoneNumber.trim() || !name.trim() || loading}
+            disabled={!phoneNumber.trim() || !label.trim() || loading}
             className="bg-green-600 hover:bg-green-700"
           >
             {loading ? (
               <>
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Creating...
+                Registering...
               </>
             ) : (
-              'Continue'
+              'Register Number'
             )}
           </Button>
         </DialogFooter>

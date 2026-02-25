@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { getMetaCloudAPI } from '@/lib/whatsapp/meta-api'
+import { getMetaCloudAPIForSession } from '@/lib/whatsapp/meta-api'
 
 export async function POST(request: NextRequest) {
   try {
@@ -74,8 +74,8 @@ export async function POST(request: NextRequest) {
     }
 
     try {
-      // Send media via Meta Cloud API (Official WhatsApp Business API)
-      const metaApi = getMetaCloudAPI()
+      // Send media via Meta Cloud API (supports multi-number)
+      const metaApi = await getMetaCloudAPIForSession(sessionId, supabase)
 
       if (!metaApi.isConfigured()) {
         throw new Error('WhatsApp Cloud API not configured. Set WHATSAPP_API_TOKEN and WHATSAPP_PHONE_NUMBER_ID environment variables.')

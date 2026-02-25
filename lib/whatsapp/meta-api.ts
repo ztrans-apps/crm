@@ -539,13 +539,67 @@ export class MetaApiError extends Error {
 
 // ─── Singleton Instance ────────────────────────────────────────────────────
 
-let _instance: MetaCloudAPI | null = null
+let _defaultInstance: MetaCloudAPI | null = null
+const _instanceCache = new Map<string, MetaCloudAPI>()
 
+/**
+ * Get MetaCloudAPI instance using default env vars (backward compatible).
+ * Use this when you don't need multi-number support.
+ */
 export function getMetaCloudAPI(config?: Partial<MetaApiConfig>): MetaCloudAPI {
-  if (!_instance || config) {
-    _instance = new MetaCloudAPI(config)
+  if (!_defaultInstance || config) {
+    _defaultInstance = new MetaCloudAPI(config)
   }
-  return _instance
+  return _defaultInstance
+}
+
+/**
+ * Get MetaCloudAPI instance for a specific phone number ID.
+ * Used for multi-number support — each number gets its own instance.
+ * Falls back to default env if phoneNumberId not provided.
+ */
+export function getMetaCloudAPIForPhoneNumberId(phoneNumberId: string): MetaCloudAPI {
+  if (!phoneNumberId) {
+    return getMetaCloudAPI()
+  }
+
+  if (_instanceCache.has(phoneNumberId)) {
+    return _instanceCache.get(phoneNumberId)!
+  }
+
+  const instance = new MetaCloudAPI({ phoneNumberId })
+  _instanceCache.set(phoneNumberId, instance)
+  return instance
+}
+
+/**
+ * Look up the Meta Phone Number ID for a session from the database,
+ * and return the correct MetaCloudAPI instance.
+ * Falls back to default env if session has no meta_phone_number_id.
+ */
+export async function getMetaCloudAPIForSession(
+  sessionId: string | undefined,
+  supabase: any
+): Promise<MetaCloudAPI> {
+  if (!sessionId) {
+    return getMetaCloudAPI()
+  }
+
+  try {
+    const { data: session } = await supabase
+      .from('whatsapp_sessions')
+      .select('meta_phone_number_id')
+      .eq('id', sessionId)
+      .single()
+
+    if (session?.meta_phone_number_id) {
+      return getMetaCloudAPIForPhoneNumberId(session.meta_phone_number_id)
+    }
+  } catch (e) {
+    console.warn('[Meta Cloud API] Could not look up session, using default:', e)
+  }
+
+  return getMetaCloudAPI()
 }
 
 export default MetaCloudAPI

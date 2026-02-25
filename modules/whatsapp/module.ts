@@ -85,16 +85,15 @@ export class WhatsAppModule extends BaseModule {
     return {
       // These will be lazy-loaded
       WhatsAppSessionList: () => import('./components/SessionList').then(m => m.SessionList),
-      WhatsAppQRCode: () => import('./components/QRCode').then(m => m.QRCode),
       WhatsAppChat: () => import('./components/Chat').then(m => m.Chat),
     };
   }
 
   getConfig(): Record<string, any> {
     return {
-      serviceUrl: process.env.WHATSAPP_SERVICE_URL || 'http://localhost:3001',
-      maxSessions: 10,
-      autoReconnect: true,
+      // Meta Cloud API configuration
+      apiVersion: process.env.WHATSAPP_API_VERSION || 'v21.0',
+      maxNumbers: 10,
     };
   }
 }

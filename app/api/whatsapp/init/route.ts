@@ -1,6 +1,7 @@
 /**
  * WhatsApp Init API
- * Initialize new WhatsApp session
+ * Register a WhatsApp Business number (Meta Cloud API)
+ * No QR code or Baileys service needed.
  */
 
 import { createClient } from '@/lib/supabase/server';
@@ -11,7 +12,7 @@ export async function POST(request: Request) {
   try {
     const supabase = await createClient();
     const body = await request.json();
-    const { phoneNumber, name } = body;
+    const { phoneNumber, name, metaPhoneNumberId } = body;
 
     // Get current user
     const { data: { user } } = await supabase.auth.getUser();
@@ -19,28 +20,34 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Generate proper UUID for session ID
-    const sessionId = randomUUID();
+    // Get user's tenant_id
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('tenant_id')
+      .eq('id', user.id)
+      .single();
 
-    // Generate unique session name from phone number with timestamp
-    const timestamp = Date.now();
-    const sessionName = phoneNumber 
-      ? `${phoneNumber}-${timestamp}` 
-      : `session-${timestamp}`;
+    // Generate UUID for session ID
+    const sessionId = randomUUID();
 
     // Prepare session data
     const sessionData: any = {
       id: sessionId,
       user_id: user.id,
-      phone_number: phoneNumber || 'Connecting...',
-      session_name: name || sessionName, // Use name if provided, otherwise use auto-generated
-      status: 'connecting',
+      phone_number: phoneNumber || '',
+      session_name: name || phoneNumber || 'WhatsApp Business',
+      status: 'connected', // Meta Cloud API numbers are always connected
+      meta_phone_number_id: metaPhoneNumberId || process.env.META_PHONE_NUMBER_ID || null,
     };
 
-    // Add tenant_id if available (for multi-tenant support)
-    const defaultTenantId = process.env.DEFAULT_TENANT_ID;
-    if (defaultTenantId) {
-      sessionData.tenant_id = defaultTenantId;
+    // Add tenant_id
+    if (profile?.tenant_id) {
+      sessionData.tenant_id = profile.tenant_id;
+    } else {
+      const defaultTenantId = process.env.DEFAULT_TENANT_ID;
+      if (defaultTenantId) {
+        sessionData.tenant_id = defaultTenantId;
+      }
     }
 
     // Create session in database
@@ -52,36 +59,15 @@ export async function POST(request: Request) {
 
     if (error) throw error;
 
-    // Initialize session in WhatsApp service
-    try {
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_WHATSAPP_SERVICE_URL}/api/whatsapp/init`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 
-            sessionId,
-            forceNew: true // Always force new session to generate QR
-          }),
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error('Failed to initialize WhatsApp service');
-      }
-    } catch (serviceError) {
-      console.error('[WhatsApp Init] Service error:', serviceError);
-      // Continue anyway - user can retry
-    }
-
     return NextResponse.json({ 
       success: true, 
-      sessionId: session.id 
+      sessionId: session.id,
+      message: 'WhatsApp number registered successfully via Meta Cloud API',
     });
   } catch (error: any) {
     console.error('[WhatsApp Init] Error:', error);
     return NextResponse.json(
-      { error: error.message || 'Failed to initialize session' },
+      { error: error.message || 'Failed to register number' },
       { status: 500 }
     );
   }
