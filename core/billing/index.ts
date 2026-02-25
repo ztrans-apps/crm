@@ -1,3 +1,4 @@
 export * from './types';
-export * from './service';
+// Service is server-side only - use API routes from client components
+// export * from './service';
 export * from './hooks';

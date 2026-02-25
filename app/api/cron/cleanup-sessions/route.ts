@@ -1,13 +1,13 @@
 /**
  * Cron Job: Cleanup Stuck Sessions
  * 
- * This endpoint should be called periodically by a cron service (e.g., Vercel Cron, GitHub Actions, or external cron)
+ * This endpoint should be called periodically by a cron service
  * 
  * For Vercel: Add to vercel.json:
  * {
  *   "crons": [{
  *     "path": "/api/cron/cleanup-sessions",
- *     "schedule": "*/5 * * * *"
+ *     "schedule": "every 5 minutes"
  *   }]
  * }
  * 
