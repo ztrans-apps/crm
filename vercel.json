@@ -1,16 +1,8 @@
 {
   "crons": [
     {
-      "path": "/api/cron/aggregate-metrics?type=hourly",
-      "schedule": "0 * * * *"
-    },
-    {
       "path": "/api/cron/aggregate-metrics?type=daily",
       "schedule": "0 0 * * *"
-    },
-    {
-      "path": "/api/cron/aggregate-metrics?type=weekly",
-      "schedule": "0 0 * * 0"
     }
   ]
 }
