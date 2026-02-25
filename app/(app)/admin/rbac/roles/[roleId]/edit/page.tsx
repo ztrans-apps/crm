@@ -70,7 +70,7 @@ export default function EditRolePage() {
         .eq('id', roleId)
         .single()
 
-      if (roleError) throw roleError
+      if (roleError || !roleData) throw roleError || new Error('Role not found')
 
       const roleWithPerms = {
         ...roleData,
