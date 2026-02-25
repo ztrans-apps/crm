@@ -1,6 +1,6 @@
 // Example API route using middleware pattern
 import { withAuth, withRole } from '@/core/auth/middleware'
-import { requirePermission } from '@/core/permissions/middleware'
+import { requireMessagePermission } from '@/core/permissions/middleware'
 import { requireTenantIdFromHeaders } from '@core/tenant'
 import { chatService } from '@/features/chat/services'
 

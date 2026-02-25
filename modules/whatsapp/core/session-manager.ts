@@ -1,9 +1,13 @@
 /**
  * WhatsApp Session Manager
  * Multi-tenant session isolation and management
+ * 
+ * NOTE: This file is deprecated. We now use WhatsApp Business Cloud API.
+ * See: lib/whatsapp/providers/meta-cloud-api.ts
  */
 
-import { Client, LocalAuth } from 'whatsapp-web.js';
+// Deprecated - using WhatsApp Business Cloud API instead
+// import { Client, LocalAuth } from 'whatsapp-web.js';
 import { createClient } from '@/lib/supabase/server';
 
 interface SessionConfig {
