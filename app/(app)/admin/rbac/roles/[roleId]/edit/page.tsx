@@ -73,8 +73,8 @@ export default function EditRolePage() {
       if (roleError || !roleData) throw roleError || new Error('Role not found')
 
       const roleWithPerms = {
-        ...roleData,
-        permissions: roleData.role_permissions?.map((rp: any) => rp.permission) || []
+        ...(roleData as any),
+        permissions: (roleData as any).role_permissions?.map((rp: any) => rp.permission) || []
       }
 
       setRole(roleWithPerms)
