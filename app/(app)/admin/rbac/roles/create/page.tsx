@@ -154,7 +154,7 @@ export default function CreateRolePage() {
 
   async function loadPermissions() {
     try {
-      const { data, error } = await supabase
+      const { data, error } = await (supabase as any)
         .from('permissions')
         .select('*')
         .order('module, permission_name')
@@ -226,7 +226,7 @@ export default function CreateRolePage() {
 
     try {
       // Create role
-      const { data: role, error: roleError } = await supabase
+      const { data: role, error: roleError } = await (supabase as any)
         .from('roles')
         .insert({
           role_key: roleKey,
@@ -251,7 +251,7 @@ export default function CreateRolePage() {
         permission_id: permId
       }))
 
-      const { error: permError } = await supabase
+      const { error: permError } = await (supabase as any)
         .from('role_permissions')
         .insert(rolePermissions)
 

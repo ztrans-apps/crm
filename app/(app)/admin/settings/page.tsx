@@ -61,7 +61,7 @@ export default function AdminSettingsPage() {
     try {
       setSaving(true)
 
-      const { data: { user } } = await supabase.auth.getUser()
+      const { data: { user } } = await (supabase as any).auth.getUser()
       if (!user) throw new Error('Not authenticated')
 
       // @ts-ignore - Supabase type inference issue with JSONB columns
