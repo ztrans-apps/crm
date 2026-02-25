@@ -73,3 +73,4 @@ scripts/check-database-schema.js
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+.env*.local
