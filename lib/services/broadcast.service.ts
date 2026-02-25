@@ -1,10 +1,10 @@
 /**
  * Broadcast Service
  * Manage broadcast campaigns and message delivery
+ * Uses Vercel Cron for processing (no BullMQ)
  */
 
 import { createClient } from '@/lib/supabase/server'
-import { queueManager } from '@/lib/queue/queue-manager'
 
 export interface BroadcastCampaign {
   id: string
@@ -245,7 +245,7 @@ class BroadcastService {
   }
 
   /**
-   * Queue messages for sending
+   * Queue messages for sending (marks as 'queued' for Vercel Cron to process)
    */
   private async queueMessages(campaignId: string, sendRate: number): Promise<void> {
     try {
@@ -254,7 +254,7 @@ class BroadcastService {
       // Get pending messages
       const { data: messages } = await supabase
         .from('broadcast_messages')
-        .select('*')
+        .select('id')
         .eq('campaign_id', campaignId)
         .eq('status', 'pending')
         .order('created_at', { ascending: true })
@@ -263,45 +263,19 @@ class BroadcastService {
         return
       }
 
-      const queue = queueManager.getQueue('broadcast-send')
-
-      // Calculate delay between messages based on send rate
-      const delayMs = (60 * 1000) / sendRate // Convert rate per minute to delay in ms
-
-      // Queue messages with staggered delays
-      for (let i = 0; i < messages.length; i++) {
-        const message = messages[i]
-        const delay = i * delayMs
-
-        await queue.add(
-          'send',
-          {
-            messageId: message.id,
-            campaignId: message.campaign_id,
-            tenantId: message.tenant_id,
-            contactId: message.contact_id,
-            phoneNumber: message.phone_number,
-            content: message.message_content,
-            mediaUrl: message.media_url,
-          },
-          {
-            delay,
-            attempts: 3,
-            backoff: {
-              type: 'exponential',
-              delay: 2000,
-            },
-          }
-        )
-
-        // Update status to queued
+      // Mark all messages as queued — Vercel Cron /api/cron/process-broadcasts will process them
+      const batchSize = 100
+      for (let i = 0; i < messages.length; i += batchSize) {
+        const batch = messages.slice(i, i + batchSize)
+        const ids = batch.map(m => m.id)
+        
         await supabase
           .from('broadcast_messages')
           .update({ status: 'queued' })
-          .eq('id', message.id)
+          .in('id', ids)
       }
 
-      console.log(`[BroadcastService] Queued ${messages.length} messages for campaign ${campaignId}`)
+      console.log(`[BroadcastService] Queued ${messages.length} messages for campaign ${campaignId} (Vercel Cron will process)`)
     } catch (error) {
       console.error('[BroadcastService] Error queuing messages:', error)
     }

@@ -1,22 +1,16 @@
 /**
  * WhatsApp Service
- * Communicates with the separate WhatsApp service (port 3001)
+ * Uses Meta WhatsApp Business Cloud API via internal API routes
+ * Migrated from Baileys (localhost:3001) to Meta Cloud API
  */
 export class WhatsAppService {
-  private serviceUrl: string;
-
-  constructor() {
-    this.serviceUrl = process.env.WHATSAPP_SERVICE_URL || 'http://localhost:3001';
-  }
-
   /**
-   * Get all sessions for a tenant
+   * Get all sessions for a tenant via internal API
    */
   async getSessions(tenantId: string): Promise<any[]> {
     try {
-      const response = await fetch(`${this.serviceUrl}/api/sessions?tenantId=${tenantId}`);
+      const response = await fetch('/api/whatsapp/sessions');
       if (!response.ok) throw new Error('Failed to fetch sessions');
-      
       const data = await response.json();
       return data.sessions || [];
     } catch (error) {
@@ -26,27 +20,25 @@ export class WhatsAppService {
   }
 
   /**
-   * Create a new WhatsApp session
+   * Register a new WhatsApp number (Meta Cloud API)
    */
-  async createSession(tenantId: string, config: any): Promise<any> {
+  async createSession(tenantId: string, config: { phone_number: string; session_name: string; meta_phone_number_id?: string }): Promise<any> {
     try {
-      const response = await fetch(`${this.serviceUrl}/api/sessions`, {
+      const response = await fetch('/api/whatsapp/init', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tenantId, ...config }),
+        body: JSON.stringify(config),
       });
-      
-      if (!response.ok) throw new Error('Failed to create session');
-      
+      if (!response.ok) throw new Error('Failed to register number');
       return await response.json();
     } catch (error) {
-      console.error('Error creating session:', error);
+      console.error('Error registering number:', error);
       throw error;
     }
   }
 
   /**
-   * Send a message
+   * Send a message via internal API (uses Meta Cloud API)
    */
   async sendMessage(
     tenantId: string,
@@ -55,14 +47,12 @@ export class WhatsAppService {
     message: string
   ): Promise<any> {
     try {
-      const response = await fetch(`${this.serviceUrl}/api/send`, {
+      const response = await fetch('/api/send-message', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tenantId, sessionId, to, message }),
+        body: JSON.stringify({ sessionId, to, message }),
       });
-      
       if (!response.ok) throw new Error('Failed to send message');
-      
       return await response.json();
     } catch (error) {
       console.error('Error sending message:', error);
@@ -74,7 +64,6 @@ export class WhatsAppService {
    * Cleanup resources
    */
   async cleanup(): Promise<void> {
-    // Cleanup logic if needed
-    console.log('WhatsApp service cleanup');
+    // No persistent connection to clean up with Meta Cloud API
   }
 }

@@ -66,18 +66,13 @@ export function SessionMonitor({ refreshInterval = 5000 }: SessionMonitorProps) 
   const getStateMessage = (state: string, errorCount: number) => {
     switch (state) {
       case 'CONNECTED':
-        return 'Session is active and ready to send/receive messages';
+        return 'Meta Cloud API connection active — ready to send/receive messages';
       case 'CONNECTING':
-        return 'Establishing connection to WhatsApp servers...';
+        return 'Establishing connection to Meta Cloud API...';
       case 'DISCONNECTED':
-        return 'Connection lost. Auto-reconnect in progress with exponential backoff';
-      case 'LOGGED_OUT':
-        return 'Session logged out. Please scan QR code to reconnect';
+        return 'Session marked as disconnected. Verify Meta Business Manager settings.';
       case 'ERROR':
-        if (errorCount > 5) {
-          return 'Multiple errors detected. Check logs or restart session';
-        }
-        return 'Connection error. Attempting to recover...';
+        return 'Connection error. Check Meta API credentials and phone number configuration.';
       default:
         return 'Unknown state';
     }
@@ -156,8 +151,8 @@ export function SessionMonitor({ refreshInterval = 5000 }: SessionMonitorProps) 
 
   const summary = getSummary();
 
-  // Check if we have real-time data from WhatsApp service
-  const hasRealtimeData = states.some(s => s.metadata?.fromService !== false);
+  // Check data availability
+  const hasData = states.length > 0;
 
   return (
     <Card>
@@ -167,22 +162,10 @@ export function SessionMonitor({ refreshInterval = 5000 }: SessionMonitorProps) 
           Session Monitor
         </CardTitle>
         <CardDescription>
-          Real-time connection status • Updates every {refreshInterval / 1000}s
+          Meta Cloud API connection status • Updates every {refreshInterval / 1000}s
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        {/* Warning if WhatsApp service not available */}
-        {!hasRealtimeData && states.length > 0 && (
-          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 flex items-start gap-2">
-            <AlertCircle className="h-4 w-4 text-yellow-600 mt-0.5" />
-            <div className="text-sm">
-              <p className="font-medium text-yellow-900">Limited Monitoring</p>
-              <p className="text-yellow-700 text-xs mt-0.5">
-                WhatsApp service not available. Showing database status only. Start service for real-time monitoring.
-              </p>
-            </div>
-          </div>
-        )}
 
         {/* Summary Stats */}
         <div className="grid grid-cols-2 md:grid-cols-6 gap-3">

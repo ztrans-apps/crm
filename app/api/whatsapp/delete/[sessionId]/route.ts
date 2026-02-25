@@ -32,23 +32,7 @@ export async function DELETE(
       return NextResponse.json({ error: 'Session not found' }, { status: 404 });
     }
 
-    // Force delete session in WhatsApp service (including auth files)
-    try {
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_WHATSAPP_SERVICE_URL}/api/whatsapp/sessions/${sessionId}/force`,
-        {
-          method: 'DELETE',
-        }
-      );
-
-      if (!response.ok) {
-        console.error('[WhatsApp Delete] Service error');
-      }
-    } catch (serviceError) {
-      console.error('[WhatsApp Delete] Service error:', serviceError);
-    }
-
-    // Delete from database
+    // Delete from database (Meta Cloud API numbers are managed via Meta Business Manager)
     await supabase
       .from('whatsapp_sessions')
       .delete()

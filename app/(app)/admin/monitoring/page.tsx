@@ -4,47 +4,56 @@ import { useEffect, useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { Activity, AlertCircle, CheckCircle, Clock, MessageSquare, TrendingUp, Zap } from 'lucide-react'
+import { Activity, AlertCircle, CheckCircle, Clock, MessageSquare, Phone, TrendingUp, Zap } from 'lucide-react'
 
-interface HealthMetrics {
-  status: 'healthy' | 'degraded' | 'unhealthy'
-  uptime: number
-  operations: {
-    total: number
-    successful: number
-    failed: number
-    successRate: number
-  }
-  sessions: Record<string, string>
-  circuitBreakers: Record<string, {
-    state: 'CLOSED' | 'OPEN' | 'HALF_OPEN'
-    failures: number
-    lastFailure: number | null
+interface MonitoringData {
+  apiStatus: 'connected' | 'error' | 'unknown'
+  sessions: Array<{
+    id: string
+    phone_number: string
+    session_name: string
+    status: string
+    meta_phone_number_id: string | null
+    updated_at: string
   }>
-  deliveryStats: {
+  messageStats: {
     sent: number
     delivered: number
     read: number
     failed: number
   }
-  recentOperations: Array<{
-    name: string
-    success: boolean
-    timestamp: number
-  }>
 }
 
 export default function MonitoringPage() {
-  const [metrics, setMetrics] = useState<HealthMetrics | null>(null)
+  const [data, setData] = useState<MonitoringData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   const fetchMetrics = async () => {
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_WHATSAPP_SERVICE_URL || 'http://localhost:3001'}/api/health/metrics`)
-      if (!response.ok) throw new Error('Failed to fetch metrics')
-      const data = await response.json()
-      setMetrics(data)
+      // Fetch sessions and Meta API status in parallel
+      const [sessionsRes, metaStatusRes] = await Promise.all([
+        fetch('/api/whatsapp/sessions'),
+        fetch('/api/whatsapp/meta-status'),
+      ])
+
+      const sessionsData = sessionsRes.ok ? await sessionsRes.json() : { sessions: [] }
+      const metaData = metaStatusRes.ok ? await metaStatusRes.json() : null
+
+      // Fetch message stats from Supabase via stats API
+      const statsRes = await fetch('/api/whatsapp/sessions/stats')
+      const statsData = statsRes.ok ? await statsRes.json() : { stats: {} }
+
+      setData({
+        apiStatus: metaData?.phone_number ? 'connected' : 'error',
+        sessions: sessionsData.sessions || [],
+        messageStats: {
+          sent: statsData.stats?.active || 0,
+          delivered: 0,
+          read: 0,
+          failed: statsData.stats?.inactive || 0,
+        },
+      })
       setError(null)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unknown error')
@@ -55,7 +64,7 @@ export default function MonitoringPage() {
 
   useEffect(() => {
     fetchMetrics()
-    const interval = setInterval(fetchMetrics, 5000) // Refresh every 5 seconds
+    const interval = setInterval(fetchMetrics, 30000) // Refresh every 30 seconds
     return () => clearInterval(interval)
   }, [])
 
@@ -81,205 +90,151 @@ export default function MonitoringPage() {
     )
   }
 
-  if (!metrics) return null
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'healthy': return 'bg-green-500'
-      case 'degraded': return 'bg-yellow-500'
-      case 'unhealthy': return 'bg-red-500'
-      default: return 'bg-gray-500'
-    }
-  }
-
-  const getCircuitBreakerColor = (state: string) => {
-    switch (state) {
-      case 'CLOSED': return 'success'
-      case 'HALF_OPEN': return 'warning'
-      case 'OPEN': return 'destructive'
-      default: return 'secondary'
-    }
-  }
+  if (!data) return null
 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold">WhatsApp Service Monitoring</h1>
-        <p className="text-muted-foreground">Real-time health and performance metrics</p>
+        <h1 className="text-3xl font-bold">System Monitoring</h1>
+        <p className="text-muted-foreground">Meta WhatsApp Cloud API & Service Health</p>
       </div>
 
-      {/* Overall Status */}
+      {/* API Status */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Activity className="h-5 w-5" />
-            Service Status
+            Meta Cloud API Status
           </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="flex items-center gap-4">
-            <div className={`h-4 w-4 rounded-full ${getStatusColor(metrics.status)}`} />
-            <span className="text-2xl font-bold capitalize">{metrics.status}</span>
+            <div className={`h-4 w-4 rounded-full ${data.apiStatus === 'connected' ? 'bg-green-500' : 'bg-red-500'}`} />
+            <span className="text-2xl font-bold capitalize">{data.apiStatus}</span>
             <Badge variant="outline" className="ml-auto">
               <Clock className="h-3 w-3 mr-1" />
-              Uptime: {Math.floor(metrics.uptime / 1000 / 60)} minutes
+              API v21.0
             </Badge>
           </div>
         </CardContent>
       </Card>
 
-      {/* Operations Stats */}
+      {/* Stats Cards */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Operations</CardTitle>
-            <Zap className="h-4 w-4 text-muted-foreground" />
+            <CardTitle className="text-sm font-medium">Total Numbers</CardTitle>
+            <Phone className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{metrics.operations.total}</div>
+            <div className="text-2xl font-bold">{data.sessions.length}</div>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Successful</CardTitle>
+            <CardTitle className="text-sm font-medium">Active</CardTitle>
             <CheckCircle className="h-4 w-4 text-green-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600">{metrics.operations.successful}</div>
+            <div className="text-2xl font-bold text-green-600">
+              {data.sessions.filter(s => s.status === 'connected').length}
+            </div>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Failed</CardTitle>
+            <CardTitle className="text-sm font-medium">With Meta ID</CardTitle>
+            <Zap className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">
+              {data.sessions.filter(s => s.meta_phone_number_id).length}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Disconnected</CardTitle>
             <AlertCircle className="h-4 w-4 text-red-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-red-600">{metrics.operations.failed}</div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Success Rate</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{metrics.operations.successRate.toFixed(1)}%</div>
+            <div className="text-2xl font-bold text-red-600">
+              {data.sessions.filter(s => s.status === 'disconnected').length}
+            </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Delivery Stats */}
+      {/* Registered Numbers */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <MessageSquare className="h-5 w-5" />
-            Message Delivery Stats
+            <Phone className="h-5 w-5" />
+            Registered WhatsApp Numbers
           </CardTitle>
-          <CardDescription>Last 24 hours</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-4 md:grid-cols-4">
-            <div>
-              <p className="text-sm text-muted-foreground">Sent</p>
-              <p className="text-2xl font-bold">{metrics.deliveryStats.sent}</p>
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Delivered</p>
-              <p className="text-2xl font-bold text-blue-600">{metrics.deliveryStats.delivered}</p>
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Read</p>
-              <p className="text-2xl font-bold text-green-600">{metrics.deliveryStats.read}</p>
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Failed</p>
-              <p className="text-2xl font-bold text-red-600">{metrics.deliveryStats.failed}</p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Circuit Breakers */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Circuit Breakers</CardTitle>
-          <CardDescription>Protection status for critical operations</CardDescription>
+          <CardDescription>Numbers connected via Meta Business Cloud API</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="space-y-2">
-            {Object.entries(metrics.circuitBreakers).map(([name, breaker]) => (
-              <div key={name} className="flex items-center justify-between p-3 border rounded-lg">
+            {data.sessions.map((session) => (
+              <div key={session.id} className="flex items-center justify-between p-3 border rounded-lg">
                 <div>
-                  <p className="font-medium">{name}</p>
+                  <p className="font-medium">{session.session_name || session.phone_number}</p>
                   <p className="text-sm text-muted-foreground">
-                    Failures: {breaker.failures}
-                    {breaker.lastFailure && ` • Last: ${new Date(breaker.lastFailure).toLocaleTimeString()}`}
+                    {session.phone_number}
+                    {session.meta_phone_number_id && ` | Meta ID: ${session.meta_phone_number_id}`}
                   </p>
                 </div>
-                <Badge variant={getCircuitBreakerColor(breaker.state) as any}>
-                  {breaker.state}
+                <Badge variant={session.status === 'connected' ? 'default' : 'secondary'}>
+                  {session.status}
                 </Badge>
               </div>
             ))}
-            {Object.keys(metrics.circuitBreakers).length === 0 && (
-              <p className="text-sm text-muted-foreground text-center py-4">No circuit breakers active</p>
+            {data.sessions.length === 0 && (
+              <p className="text-sm text-muted-foreground text-center py-4">No registered numbers</p>
             )}
           </div>
         </CardContent>
       </Card>
 
-      {/* Active Sessions */}
+      {/* Architecture Info */}
       <Card>
         <CardHeader>
-          <CardTitle>Active Sessions</CardTitle>
-          <CardDescription>WhatsApp session status</CardDescription>
+          <CardTitle className="flex items-center gap-2">
+            <TrendingUp className="h-5 w-5" />
+            Architecture
+          </CardTitle>
+          <CardDescription>Current system configuration</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="space-y-2">
-            {Object.entries(metrics.sessions).map(([sessionId, status]) => (
-              <div key={sessionId} className="flex items-center justify-between p-3 border rounded-lg">
-                <p className="font-medium">{sessionId}</p>
-                <Badge variant={status === 'connected' ? 'success' : 'secondary'}>
-                  {status}
-                </Badge>
-              </div>
-            ))}
-            {Object.keys(metrics.sessions).length === 0 && (
-              <p className="text-sm text-muted-foreground text-center py-4">No active sessions</p>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Recent Operations */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Recent Operations</CardTitle>
-          <CardDescription>Last 10 operations</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-2">
-            {metrics.recentOperations.slice(0, 10).map((op, idx) => (
-              <div key={idx} className="flex items-center justify-between p-2 border-b last:border-0">
-                <div className="flex items-center gap-2">
-                  {op.success ? (
-                    <CheckCircle className="h-4 w-4 text-green-500" />
-                  ) : (
-                    <AlertCircle className="h-4 w-4 text-red-500" />
-                  )}
-                  <span className="text-sm">{op.name}</span>
-                </div>
-                <span className="text-xs text-muted-foreground">
-                  {new Date(op.timestamp).toLocaleTimeString()}
-                </span>
-              </div>
-            ))}
-            {metrics.recentOperations.length === 0 && (
-              <p className="text-sm text-muted-foreground text-center py-4">No recent operations</p>
-            )}
+          <div className="grid gap-3 md:grid-cols-2">
+            <div className="p-3 border rounded-lg">
+              <p className="text-sm font-medium">WhatsApp API</p>
+              <p className="text-sm text-muted-foreground">Meta Business Cloud API v21.0</p>
+            </div>
+            <div className="p-3 border rounded-lg">
+              <p className="text-sm font-medium">Hosting</p>
+              <p className="text-sm text-muted-foreground">Vercel Serverless</p>
+            </div>
+            <div className="p-3 border rounded-lg">
+              <p className="text-sm font-medium">Database</p>
+              <p className="text-sm text-muted-foreground">Supabase PostgreSQL</p>
+            </div>
+            <div className="p-3 border rounded-lg">
+              <p className="text-sm font-medium">Real-time</p>
+              <p className="text-sm text-muted-foreground">Supabase Realtime</p>
+            </div>
+            <div className="p-3 border rounded-lg">
+              <p className="text-sm font-medium">Cache</p>
+              <p className="text-sm text-muted-foreground">Upstash Redis (Serverless)</p>
+            </div>
+            <div className="p-3 border rounded-lg">
+              <p className="text-sm font-medium">Background Jobs</p>
+              <p className="text-sm text-muted-foreground">Vercel Cron</p>
+            </div>
           </div>
         </CardContent>
       </Card>

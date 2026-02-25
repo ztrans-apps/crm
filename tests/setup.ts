@@ -7,9 +7,10 @@ import { beforeAll, afterAll, vi } from 'vitest'
 
 // Mock environment variables
 process.env.NODE_ENV = 'test'
-process.env.REDIS_HOST = 'localhost'
-process.env.REDIS_PORT = '6379'
-process.env.WHATSAPP_SERVICE_URL = 'http://localhost:3001'
+process.env.META_WHATSAPP_TOKEN = 'test-token'
+process.env.META_WHATSAPP_PHONE_NUMBER_ID = '123456789'
+process.env.META_WHATSAPP_BUSINESS_ACCOUNT_ID = '987654321'
+process.env.META_WEBHOOK_VERIFY_TOKEN = 'test-verify-token'
 process.env.DEFAULT_TENANT_ID = '00000000-0000-0000-0000-000000000001'
 
 // Mock Supabase

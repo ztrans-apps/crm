@@ -33,7 +33,7 @@ export async function fetchMessages(
 }
 
 /**
- * Send message via WhatsApp service
+ * Send message via internal API route (Meta Cloud API)
  */
 export async function sendMessage(
   sessionId: string,
@@ -44,9 +44,7 @@ export async function sendMessage(
   media?: MediaAttachment
 ): Promise<SendMessageResponse> {
   try {
-    const serviceUrl = process.env.NEXT_PUBLIC_WHATSAPP_SERVICE_URL || 'http://localhost:3001'
-    
-    // Prepare request body
+    // Prepare request body for internal API
     const body: any = {
       sessionId,
       to,
@@ -71,8 +69,9 @@ export async function sendMessage(
       }
     }
 
-    // Send message via WhatsApp service
-    const response = await fetch(`${serviceUrl}/api/whatsapp/send`, {
+    // Send message via internal API route (routes to Meta Cloud API)
+    const endpoint = media ? '/api/send-media' : '/api/send-message'
+    const response = await fetch(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),

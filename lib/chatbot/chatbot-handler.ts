@@ -175,7 +175,7 @@ export class ChatbotHandler {
   }
 
   /**
-   * Send chatbot response via WhatsApp
+   * Send chatbot response via WhatsApp (Meta Cloud API)
    */
   private static async sendChatbotResponse(conversation: Conversation, flow: ChatbotFlow) {
     try {
@@ -197,21 +197,11 @@ export class ChatbotHandler {
 
       if (!contact) return;
 
-      // Send message via WhatsApp service
-      const response = await fetch('http://localhost:3001/api/messages/send', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          sessionId: conv.whatsapp_session_id,
-          to: contact.phone_number,
-          message: flow.content,
-          type: 'text'
-        })
-      });
-
-      if (!response.ok) {
-        console.error('Failed to send WhatsApp message');
-      }
+      // Send message via Meta Cloud API
+      const { getMetaCloudAPIForSession } = await import('@/lib/whatsapp/meta-api');
+      const api = await getMetaCloudAPIForSession(conv.whatsapp_session_id, supabase);
+      
+      await api.sendTextMessage(contact.phone_number, flow.content);
 
     } catch (error) {
       console.error('Error sending chatbot response:', error);

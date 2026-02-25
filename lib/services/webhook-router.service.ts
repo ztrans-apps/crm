@@ -1,11 +1,11 @@
 /**
  * Webhook Router Service
  * Routes WhatsApp events to registered webhooks
+ * Delivers directly (no BullMQ queue)
  */
 
 import { createClient } from '@/lib/supabase/server'
 import crypto from 'crypto'
-import { queueManager } from '@/lib/queue/queue-manager'
 
 export interface WebhookEvent {
   type: string
@@ -76,32 +76,20 @@ class WebhookRouterService {
   }
 
   /**
-   * Queue webhook delivery
+   * Queue webhook delivery (delivers directly, no BullMQ)
    */
   private async queueWebhookDelivery(webhook: Webhook, event: WebhookEvent): Promise<void> {
     try {
-      const queue = queueManager.getQueue('webhook-delivery')
-
-      await queue.add(
-        'deliver',
-        {
-          webhookId: webhook.id,
-          webhook,
-          event,
-        },
-        {
-          attempts: webhook.retry_count,
-          backoff: {
-            type: 'exponential',
-            delay: 2000, // 2 seconds
-          },
-          timeout: webhook.timeout_ms,
-        }
-      )
-
-      console.log(`[WebhookRouter] Queued delivery for webhook: ${webhook.name}`)
+      // Deliver directly instead of queuing via BullMQ
+      const result = await this.deliverWebhook(webhook.id, webhook, event, 1)
+      
+      if (!result.success) {
+        console.error(`[WebhookRouter] Failed to deliver webhook: ${webhook.name}`, result.error)
+      } else {
+        console.log(`[WebhookRouter] Delivered webhook: ${webhook.name} (${result.duration}ms)`)
+      }
     } catch (error) {
-      console.error('[WebhookRouter] Error queueing webhook delivery:', error)
+      console.error('[WebhookRouter] Error delivering webhook:', error)
     }
   }
 

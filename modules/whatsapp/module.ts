@@ -83,9 +83,8 @@ export class WhatsAppModule extends BaseModule {
 
   getComponents(): ComponentRegistry {
     return {
-      // These will be lazy-loaded
       WhatsAppSessionList: () => import('./components/SessionList').then(m => m.SessionList),
-      WhatsAppChat: () => import('./components/Chat').then(m => m.Chat),
+      WhatsAppSessionMonitor: () => import('./components/SessionMonitor').then(m => m.SessionMonitor),
     };
   }
 

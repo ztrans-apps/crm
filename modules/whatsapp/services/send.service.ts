@@ -1,18 +1,30 @@
 /**
  * WhatsApp Send Service
- * Handle outgoing messages with queue and rate limiting
+ * Handle outgoing messages via Meta Cloud API with rate limiting
  */
 
-import { sessionManager } from '../core/session-manager';
 import { rateLimiter } from '../core/rate-limiter';
-import { queueManager, QUEUE_NAMES } from '@/lib/queue/queue-manager';
-import type { SendMessageInput } from '../types';
+import { getMetaCloudAPIForSession } from '@/lib/whatsapp/meta-api';
+import { createClient } from '@supabase/supabase-js';
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
+
+interface SendInput {
+  tenantId: string;
+  sessionId: string;
+  to: string;
+  message: string;
+  metadata?: Record<string, any>;
+}
 
 export class WhatsAppSendService {
   /**
-   * Send text message
+   * Send text message via Meta Cloud API
    */
-  async sendMessage(input: SendMessageInput): Promise<{ jobId: string }> {
+  async sendMessage(input: SendInput): Promise<{ messageId: string }> {
     const { tenantId, sessionId, to, message } = input;
 
     // Check rate limit
@@ -23,28 +35,18 @@ export class WhatsAppSendService {
       );
     }
 
-    // Add to queue
-    const job = await queueManager.addJob(
-      QUEUE_NAMES.WHATSAPP_SEND,
-      'send-text',
-      {
-        tenantId,
-        sessionId,
-        to,
-        message,
-        type: 'text',
-        metadata: input.metadata,
-      }
-    );
+    // Send via Meta Cloud API
+    const api = await getMetaCloudAPIForSession(sessionId, supabase);
+    const result = await api.sendTextMessage(to, message);
 
     // Increment rate limit
     rateLimiter.increment(tenantId, sessionId);
 
-    return { jobId: job.id! };
+    return { messageId: result.messages?.[0]?.id || 'sent' };
   }
 
   /**
-   * Send media message
+   * Send media message via Meta Cloud API
    */
   async sendMedia(
     tenantId: string,
@@ -52,9 +54,7 @@ export class WhatsAppSendService {
     to: string,
     mediaUrl: string,
     caption?: string,
-    metadata?: Record<string, any>
-  ): Promise<{ jobId: string }> {
-    // Check rate limit
+  ): Promise<{ messageId: string }> {
     if (rateLimiter.isRateLimited(tenantId, sessionId)) {
       const resetTime = rateLimiter.getResetTime(tenantId, sessionId);
       throw new Error(
@@ -62,29 +62,16 @@ export class WhatsAppSendService {
       );
     }
 
-    // Add to queue
-    const job = await queueManager.addJob(
-      QUEUE_NAMES.WHATSAPP_SEND,
-      'send-media',
-      {
-        tenantId,
-        sessionId,
-        to,
-        message: caption || '',
-        type: 'media',
-        mediaUrl,
-        metadata,
-      }
-    );
+    const api = await getMetaCloudAPIForSession(sessionId, supabase);
+    const result = await api.sendImageMessage(to, mediaUrl, caption);
 
-    // Increment rate limit
     rateLimiter.increment(tenantId, sessionId);
 
-    return { jobId: job.id! };
+    return { messageId: result.messages?.[0]?.id || 'sent' };
   }
 
   /**
-   * Send location
+   * Send location via Meta Cloud API
    */
   async sendLocation(
     tenantId: string,
@@ -93,9 +80,7 @@ export class WhatsAppSendService {
     latitude: number,
     longitude: number,
     description?: string,
-    metadata?: Record<string, any>
-  ): Promise<{ jobId: string }> {
-    // Check rate limit
+  ): Promise<{ messageId: string }> {
     if (rateLimiter.isRateLimited(tenantId, sessionId)) {
       const resetTime = rateLimiter.getResetTime(tenantId, sessionId);
       throw new Error(
@@ -103,26 +88,12 @@ export class WhatsAppSendService {
       );
     }
 
-    // Add to queue
-    const job = await queueManager.addJob(
-      QUEUE_NAMES.WHATSAPP_SEND,
-      'send-location',
-      {
-        tenantId,
-        sessionId,
-        to,
-        message: description || '',
-        type: 'location',
-        latitude,
-        longitude,
-        metadata,
-      }
-    );
+    const api = await getMetaCloudAPIForSession(sessionId, supabase);
+    const result = await api.sendLocationMessage(to, latitude, longitude, description || '', '');
 
-    // Increment rate limit
     rateLimiter.increment(tenantId, sessionId);
 
-    return { jobId: job.id! };
+    return { messageId: result.messages?.[0]?.id || 'sent' };
   }
 
   /**
@@ -134,32 +105,5 @@ export class WhatsAppSendService {
       resetIn: rateLimiter.getResetTime(tenantId, sessionId),
       isLimited: rateLimiter.isRateLimited(tenantId, sessionId),
     };
-  }
-
-  /**
-   * Send direct (bypass queue) - Use with caution!
-   */
-  async sendDirect(input: SendMessageInput): Promise<{ messageId: string }> {
-    const { tenantId, sessionId, to, message } = input;
-
-    // Get session
-    const client = sessionManager.getSession(tenantId, sessionId);
-    if (!client) {
-      throw new Error('WhatsApp session not ready');
-    }
-
-    // Check rate limit
-    if (rateLimiter.isRateLimited(tenantId, sessionId)) {
-      throw new Error('Rate limit exceeded');
-    }
-
-    // Send message
-    const chatId = to.includes('@') ? to : `${to}@c.us`;
-    const result = await client.sendMessage(chatId, message);
-
-    // Increment rate limit
-    rateLimiter.increment(tenantId, sessionId);
-
-    return { messageId: result.id.id };
   }
 }

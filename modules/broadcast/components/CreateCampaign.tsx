@@ -81,26 +81,20 @@ export function CreateCampaign({ onSuccess }: CreateCampaignProps) {
       const account = whatsappAccounts.find(a => a.id === accountId);
       if (!account) return;
 
-      // Fetch health data from WhatsApp service
-      const serviceUrl = process.env.NEXT_PUBLIC_WHATSAPP_SERVICE_URL || 'http://localhost:3001';
-      const response = await fetch(`${serviceUrl}/api/health/detailed`);
+      // Fetch status from Meta Cloud API
+      const response = await fetch('/api/whatsapp/meta-status');
       
       if (response.ok) {
-        const healthData = await response.json();
+        const data = await response.json();
         
-        // Find session metrics for this account
-        const sessionMetrics = healthData.metrics?.sessions?.metrics?.find(
-          (s: any) => s.sessionId === accountId
-        );
-        
-        // Update account with health data
+        // Update account with health data from Meta API
         setWhatsappAccounts(prev => prev.map(acc => {
           if (acc.id === accountId) {
             return {
               ...acc,
               health: {
-                status: sessionMetrics?.status || healthData.status || 'unknown',
-                quality: healthData.status || 'unknown',
+                status: data.phone_number ? 'connected' : 'unknown',
+                quality: data.quality_rating || 'unknown',
               }
             };
           }

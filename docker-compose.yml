@@ -1,45 +1,7 @@
 version: '3.8'
 
 services:
-  # Redis for queue system
-  redis:
-    image: redis:7-alpine
-    container_name: whatsapp-crm-redis
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis-data:/data
-    command: redis-server --appendonly yes
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 3s
-      retries: 3
-    restart: unless-stopped
-
-  # WhatsApp Service (Baileys)
-  whatsapp-service:
-    build:
-      context: ./whatsapp-service
-      dockerfile: Dockerfile
-    container_name: whatsapp-crm-wa-service
-    ports:
-      - "3001:3001"
-    environment:
-      - PORT=3001
-      - FRONTEND_URL=http://localhost:3000
-      - SUPABASE_URL=${SUPABASE_URL}
-      - SUPABASE_SERVICE_KEY=${SUPABASE_SERVICE_KEY}
-      - DEFAULT_TENANT_ID=${DEFAULT_TENANT_ID}
-      - STATUS_SYNC_INTERVAL=15000
-    volumes:
-      - whatsapp-auth:/app/.baileys_auth
-    depends_on:
-      redis:
-        condition: service_healthy
-    restart: unless-stopped
-
-  # Next.js App
+  # Next.js App (Meta WhatsApp Cloud API)
   app:
     build:
       context: .
@@ -52,42 +14,15 @@ services:
       - NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
       - NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY}
       - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
-      - NEXT_PUBLIC_WHATSAPP_SERVICE_URL=http://whatsapp-service:3001
       - NEXT_PUBLIC_APP_URL=http://localhost:3000
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
-      - QUEUE_CONCURRENCY=5
-      - QUEUE_MAX_RETRIES=3
-      - QUEUE_RETRY_DELAY=2000
       - DEFAULT_TENANT_ID=${DEFAULT_TENANT_ID}
       - NEXT_PUBLIC_DEFAULT_TENANT_ID=${NEXT_PUBLIC_DEFAULT_TENANT_ID}
-      - WHATSAPP_SERVICE_URL=http://whatsapp-service:3001
-    depends_on:
-      - redis
-      - whatsapp-service
+      # Meta WhatsApp Business Cloud API
+      - META_WHATSAPP_TOKEN=${META_WHATSAPP_TOKEN}
+      - META_WHATSAPP_PHONE_NUMBER_ID=${META_WHATSAPP_PHONE_NUMBER_ID}
+      - META_WHATSAPP_BUSINESS_ACCOUNT_ID=${META_WHATSAPP_BUSINESS_ACCOUNT_ID}
+      - META_WEBHOOK_VERIFY_TOKEN=${META_WEBHOOK_VERIFY_TOKEN}
+      # Upstash Redis (serverless cache)
+      - UPSTASH_REDIS_REST_URL=${UPSTASH_REDIS_REST_URL}
+      - UPSTASH_REDIS_REST_TOKEN=${UPSTASH_REDIS_REST_TOKEN}
     restart: unless-stopped
-
-  # Queue Workers
-  workers:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: whatsapp-crm-workers
-    command: ["node", "scripts/start-workers.js"]
-    environment:
-      - NODE_ENV=production
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
-      - QUEUE_CONCURRENCY=5
-      - WHATSAPP_SERVICE_URL=http://whatsapp-service:3001
-      - DEFAULT_TENANT_ID=${DEFAULT_TENANT_ID}
-    depends_on:
-      - redis
-      - whatsapp-service
-    restart: unless-stopped
-
-volumes:
-  redis-data:
-    driver: local
-  whatsapp-auth:
-    driver: local

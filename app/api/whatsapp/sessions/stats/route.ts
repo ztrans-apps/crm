@@ -1,37 +1,59 @@
-import { NextRequest, NextResponse } from 'next/server'
-
-const WHATSAPP_SERVICE_URL = process.env.WHATSAPP_SERVICE_URL || 'http://localhost:3001'
-
 /**
- * Get session statistics
- * GET /api/whatsapp/sessions/stats
+ * WhatsApp Sessions Stats API
+ * Get session statistics from Supabase (Meta Cloud API)
  */
-export async function GET(request: NextRequest) {
+
+import { createClient } from '@/lib/supabase/server'
+import { NextResponse } from 'next/server'
+
+export async function GET() {
   try {
-    const response = await fetch(
-      `${WHATSAPP_SERVICE_URL}/api/sessions/stats/all`,
-      {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      }
-    )
+    const supabase = await createClient()
 
-    const data = await response.json()
-
-    if (!response.ok) {
-      return NextResponse.json(
-        { error: data.error || 'Failed to get statistics' },
-        { status: response.status }
-      )
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    return NextResponse.json(data)
-  } catch (error) {
-    console.error('[API] Error getting statistics:', error)
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('tenant_id')
+      .eq('id', user.id)
+      .single()
+
+    if (!profile?.tenant_id) {
+      return NextResponse.json({ stats: { total: 0, active: 0, inactive: 0 } })
+    }
+
+    const { data: sessions, error } = await supabase
+      .from('whatsapp_sessions')
+      .select('id, status, phone_number, created_at, updated_at')
+      .eq('tenant_id', profile.tenant_id)
+
+    if (error) throw error
+
+    const allSessions = sessions || []
+    const active = allSessions.filter(s => s.status === 'connected').length
+    const inactive = allSessions.filter(s => s.status !== 'connected').length
+
+    return NextResponse.json({
+      stats: {
+        total: allSessions.length,
+        active,
+        inactive,
+        sessions: allSessions.map(s => ({
+          id: s.id,
+          phone_number: s.phone_number,
+          status: s.status,
+          created_at: s.created_at,
+          updated_at: s.updated_at,
+        })),
+      },
+    })
+  } catch (error: any) {
+    console.error('[Sessions Stats API] Error:', error)
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: error.message || 'Internal server error' },
       { status: 500 }
     )
   }

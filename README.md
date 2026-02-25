@@ -1,6 +1,6 @@
 # WhatsApp CRM System
 
-> Multi-tenant WhatsApp Business CRM with advanced features including RBAC, broadcasting, queue management, and real-time messaging.
+> Multi-tenant WhatsApp Business CRM powered by Meta WhatsApp Business Cloud API, deployed on Vercel with Supabase.
 
 ## 📋 Table of Contents
 
@@ -8,46 +8,200 @@
 - [Architecture](#architecture)
 - [Features](#features)
 - [Tech Stack](#tech-stack)
-- [Project Structure](#project-structure)
 - [Getting Started](#getting-started)
 - [Configuration](#configuration)
 - [Running the Application](#running-the-application)
-- [WhatsApp Service](#whatsapp-service)
-- [Queue System](#queue-system)
 - [RBAC System](#rbac-system)
 - [Broadcast System](#broadcast-system)
-- [Development](#development)
 - [Deployment](#deployment)
-- [Troubleshooting](#troubleshooting)
 
 ## 🎯 Overview
 
-WhatsApp CRM adalah sistem Customer Relationship Management berbasis WhatsApp Business API yang dirancang untuk:
-- Mengelola multiple WhatsApp business numbers
+WhatsApp CRM adalah sistem Customer Relationship Management berbasis **Meta WhatsApp Business Cloud API** yang dirancang untuk:
+- Mengelola multiple WhatsApp business numbers via Meta Cloud API
 - Multi-tenant architecture untuk isolasi data
 - Role-based access control (RBAC) untuk keamanan
 - Broadcasting messages ke multiple contacts
-- Queue system untuk message processing
-- Real-time messaging dengan Socket.IO
+- Vercel Cron untuk background job processing
+- Real-time messaging dengan Supabase Realtime
 - Chatbot integration
 - Analytics dan reporting
 
 ## 🏗️ Architecture
 
-### System Architecture
+### System Architecture (Meta Cloud API)
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                     Client Layer                             │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐      │
-│  │   Web App    │  │  Mobile App  │  │   WhatsApp   │      │
-│  │  (Next.js)   │  │   (Future)   │  │   Business   │      │
-│  └──────────────┘  └──────────────┘  └──────────────┘      │
+│  ┌──────────────────────────────────────────────────────┐   │
+│  │              Web App (Next.js 16 on Vercel)          │   │
+│  │         Supabase Realtime for live updates           │   │
+│  └──────────────────────────────────────────────────────┘   │
 └─────────────────────────────────────────────────────────────┘
                             │
                             ▼
 ┌─────────────────────────────────────────────────────────────┐
 │                   Application Layer                          │
+│  ┌──────────────────────────────────────────────────────┐   │
+│  │              Vercel Serverless Functions              │   │
+│  │         API Routes + Vercel Cron (broadcasts)        │   │
+│  └──────────────────────────────────────────────────────┘   │
+│  ┌──────────────────────────────────────────────────────┐   │
+│  │           Meta WhatsApp Business Cloud API           │   │
+│  │            graph.facebook.com/v21.0                  │   │
+│  │    Send messages, receive webhooks, manage numbers   │   │
+│  └──────────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────────┘
+                            │
+                            ▼
+┌─────────────────────────────────────────────────────────────┐
+│                     Data Layer                               │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐      │
+│  │   Supabase   │  │   Supabase   │  │   Upstash    │      │
+│  │  PostgreSQL  │  │   Realtime   │  │    Redis     │      │
+│  │  (Database)  │  │ (WebSockets) │  │   (Cache)    │      │
+│  └──────────────┘  └──────────────┘  └──────────────┘      │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Key Architecture Decisions
+
+| Component | Old (Baileys) | Current (Meta Cloud API) |
+|-----------|--------------|--------------------------|
+| WhatsApp API | Baileys (unofficial) | Meta Business Cloud API (official) |
+| Real-time | Socket.IO | Supabase Realtime |
+| Queue | BullMQ + Redis | Vercel Cron + Supabase |
+| Hosting | VPS + Docker | Vercel Serverless |
+| Cache | Redis | Upstash Redis (serverless) |
+| Auth/DB | Supabase | Supabase (unchanged) |
+
+## ✨ Features
+
+- **WhatsApp Business Cloud API** - Official Meta API, no bans, webhook-based
+- **Multi-Number Support** - Register multiple phone numbers per tenant
+- **Broadcasting** - Send campaigns to contacts with templates, processed by Vercel Cron
+- **Real-time Chat** - Powered by Supabase Realtime (PostgreSQL LISTEN/NOTIFY)
+- **RBAC** - Role-based access control (Admin, Manager, Agent)
+- **Chatbots** - Keyword/greeting triggered auto-responders
+- **Contact Management** - Labels, segments, import/export
+- **Analytics** - Message stats, delivery rates, agent performance
+- **Multi-tenant** - Data isolation per organization
+
+## 🛠️ Tech Stack
+
+| Technology | Purpose |
+|-----------|---------|
+| **Next.js 16** | Full-stack React framework |
+| **React 19** | UI library |
+| **TypeScript** | Type safety |
+| **Tailwind CSS 4** | Styling |
+| **Supabase** | Database (PostgreSQL) + Auth + Realtime + Storage |
+| **Meta Cloud API** | WhatsApp Business messaging (graph.facebook.com/v21.0) |
+| **Vercel** | Hosting + Serverless Functions + Cron |
+| **Upstash Redis** | Serverless cache for dashboard KPIs |
+
+## 🚀 Getting Started
+
+### Prerequisites
+
+- Node.js v24+
+- Meta Business Account with WhatsApp Business API access
+- Supabase project
+- Vercel account (for deployment)
+- Upstash Redis account (for caching)
+
+### Environment Variables
+
+```env
+# Supabase
+NEXT_PUBLIC_SUPABASE_URL=https://xxx.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJ...
+SUPABASE_SERVICE_ROLE_KEY=eyJ...
+
+# Meta WhatsApp Business Cloud API
+META_WHATSAPP_TOKEN=EAAxxxxxxx
+META_WHATSAPP_PHONE_NUMBER_ID=123456789012
+META_WHATSAPP_BUSINESS_ACCOUNT_ID=987654321098
+META_WEBHOOK_VERIFY_TOKEN=your-verify-token
+
+# Upstash Redis (serverless cache)
+UPSTASH_REDIS_REST_URL=https://xxx.upstash.io
+UPSTASH_REDIS_REST_TOKEN=AXxxx
+
+# App
+NEXT_PUBLIC_APP_URL=https://your-domain.vercel.app
+DEFAULT_TENANT_ID=your-tenant-uuid
+NEXT_PUBLIC_DEFAULT_TENANT_ID=your-tenant-uuid
+CRON_SECRET=your-cron-secret
+```
+
+### Installation
+
+```bash
+npm install
+npm run dev
+```
+
+No external services needed — Meta Cloud API is accessed via HTTP, Supabase is cloud-hosted.
+
+## 📡 WhatsApp Integration
+
+### Meta Cloud API Setup
+
+1. Create a Meta Business Account at [business.facebook.com](https://business.facebook.com)
+2. Create a WhatsApp Business App in [Meta Developer Console](https://developers.facebook.com)
+3. Get your **Phone Number ID** and **Access Token** from the WhatsApp section
+4. Configure the webhook URL: `https://your-domain.vercel.app/api/whatsapp/webhook`
+5. Set your verify token to match `META_WEBHOOK_VERIFY_TOKEN`
+6. Subscribe to webhook fields: `messages`, `message_deliveries`, `message_reads`
+
+### Webhook Flow
+
+```
+Meta sends webhook → /api/whatsapp/webhook → Process message → Save to Supabase → Supabase Realtime → Client updates
+```
+
+### Multi-Number Support
+
+Each `whatsapp_sessions` row can have a different `meta_phone_number_id`. The system looks up the correct phone number ID when sending messages per session.
+
+## 📢 Broadcast System
+
+Broadcasts are processed by **Vercel Cron** (no BullMQ/Redis needed):
+
+1. Campaign created → messages inserted as `status: 'queued'`
+2. Vercel Cron runs `/api/cron/process-broadcasts` every minute
+3. Cron picks up queued messages, sends via Meta Cloud API
+4. Message status updated in Supabase
+5. Campaign stats auto-calculated
+
+## 🔒 RBAC System
+
+Roles: **Admin**, **Manager**, **Agent**
+
+| Action | Admin | Manager | Agent |
+|--------|-------|---------|-------|
+| Manage users | ✅ | ❌ | ❌ |
+| Manage WhatsApp numbers | ✅ | ✅ | ❌ |
+| Create broadcasts | ✅ | ✅ | ❌ |
+| View all chats | ✅ | ✅ | ❌ |
+| Reply to assigned chats | ✅ | ✅ | ✅ |
+| View analytics | ✅ | ✅ | ❌ |
+
+## 🚢 Deployment (Vercel)
+
+1. Push code to GitHub
+2. Connect repo to Vercel
+3. Set environment variables in Vercel dashboard
+4. Configure Vercel Cron in `vercel.json`
+5. Deploy
+
+See [DEPLOYMENT.md](DEPLOYMENT.md) for detailed instructions.
+
+---
+
+> **Migration Note**: This project was migrated from a Baileys + Socket.IO + BullMQ/Redis architecture to Meta WhatsApp Business Cloud API + Supabase Realtime + Vercel Cron. The `whatsapp-service/` directory contains the legacy Baileys service code (no longer used in production).
 │  ┌──────────────────────────────────────────────────────┐   │
 │  │              Next.js Application                      │   │
 │  │  ┌────────────┐  ┌────────────┐  ┌────────────┐    │   │

@@ -201,35 +201,35 @@ export interface TranslateMessageResponse {
   error?: string
 }
 
-// Socket.IO event types
-export interface SocketMessageEvent {
+// Supabase Realtime event types (migrated from Socket.IO)
+export interface RealtimeMessageEvent {
   conversationId: string
   message: Message
 }
 
-export interface SocketConversationUpdatedEvent {
+export interface RealtimeConversationUpdatedEvent {
   conversationId: string
   updates: Partial<Conversation>
 }
 
-export interface SocketLabelEvent {
+export interface RealtimeLabelEvent {
   conversationId: string
   label: Label
   labelId?: string
 }
 
-export interface SocketNoteEvent {
+export interface RealtimeNoteEvent {
   conversationId: string
   note: ConversationNote
 }
 
-export interface SocketChatbotEvent {
+export interface RealtimeChatbotEvent {
   conversationId: string
   chatbotId: string
   isActive: boolean
 }
 
-export interface SocketResponseWindowEvent {
+export interface RealtimeResponseWindowEvent {
   conversationId: string
   expiresAt?: string
 }

@@ -1,14 +1,15 @@
 /**
  * WhatsApp Module Types
- * Platform-level type definitions
+ * Meta WhatsApp Business Cloud API type definitions
  */
 
 export interface WhatsAppSession {
   id: string;
   tenant_id: string;
   phone_number: string;
-  status: 'connected' | 'disconnected' | 'connecting' | 'qr';
-  qr_code: string | null;
+  status: 'connected' | 'disconnected' | 'connecting';
+  meta_phone_number_id: string | null;
+  session_name: string | null;
   last_seen: string;
   metadata: Record<string, any>;
   created_at: string;

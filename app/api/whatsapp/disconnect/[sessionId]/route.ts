@@ -32,26 +32,11 @@ export async function POST(
       return NextResponse.json({ error: 'Session not found' }, { status: 404 });
     }
 
-    // Disconnect session in WhatsApp service
-    try {
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_WHATSAPP_SERVICE_URL}/api/whatsapp/sessions/${sessionId}`,
-        {
-          method: 'DELETE',
-        }
-      );
-
-      if (!response.ok) {
-        console.error('[WhatsApp Disconnect] Service error');
-      }
-    } catch (serviceError) {
-      console.error('[WhatsApp Disconnect] Service error:', serviceError);
-    }
-
-    // Update status in database
+    // Update status in database (Meta Cloud API sessions are managed via Meta Business Manager)
     await supabase
       .from('whatsapp_sessions')
-      .update({ status: 'disconnected' })
+      // @ts-ignore
+      .update({ status: 'disconnected', updated_at: new Date().toISOString() })
       .eq('id', sessionId);
 
     return NextResponse.json({ success: true });
