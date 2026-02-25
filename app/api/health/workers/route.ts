@@ -1,65 +1,48 @@
-import { NextResponse } from 'next/server';
-import { broadcastQueue } from '@/lib/queue/workers/broadcast-send.worker';
-
 /**
- * GET /api/health/workers
- * Check worker and queue health
+ * Worker Health Check - Vercel compatible
+ * Checks if broadcast processing is working by verifying recent cron activity
  */
+
+import { NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
+
 export async function GET() {
   try {
-    const [waiting, active, completed, failed, delayed] = await Promise.all([
-      broadcastQueue.getWaitingCount(),
-      broadcastQueue.getActiveCount(),
-      broadcastQueue.getCompletedCount(),
-      broadcastQueue.getFailedCount(),
-      broadcastQueue.getDelayedCount(),
-    ]);
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
 
-    const total = waiting + active + completed + failed + delayed;
-    const failureRate = total > 0 ? (failed / total) * 100 : 0;
+    // Check if any campaigns are stuck (sending for more than 1 hour with no progress)
+    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+    
+    const { data: stuckCampaigns } = await supabase
+      .from('broadcast_campaigns')
+      .select('id, name, started_at')
+      .eq('status', 'sending')
+      .lt('started_at', oneHourAgo);
 
-    // Determine health status
-    let status = 'healthy';
-    const issues = [];
+    // Check recent sends (last 10 minutes)
+    const tenMinAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+    const { count: recentSends } = await supabase
+      .from('broadcast_recipients')
+      .select('*', { count: 'exact', head: true })
+      .gte('sent_at', tenMinAgo);
 
-    if (active === 0 && waiting > 0) {
-      status = 'warning';
-      issues.push('No active workers processing jobs');
-    }
-
-    if (failureRate > 10) {
-      status = 'unhealthy';
-      issues.push(`High failure rate: ${failureRate.toFixed(2)}%`);
-    }
-
-    if (failed > 100) {
-      status = 'warning';
-      issues.push(`High number of failed jobs: ${failed}`);
-    }
+    const healthy = (stuckCampaigns?.length || 0) === 0;
 
     return NextResponse.json({
-      status,
-      issues,
-      queue: {
-        name: 'broadcast-send',
-        waiting,
-        active,
-        completed,
-        failed,
-        delayed,
-        total,
-        failureRate: `${failureRate.toFixed(2)}%`
-      },
-      timestamp: new Date().toISOString()
+      status: healthy ? 'healthy' : 'degraded',
+      mode: 'serverless',
+      processor: 'Vercel Cron',
+      recentSendsLast10Min: recentSends || 0,
+      stuckCampaigns: stuckCampaigns?.length || 0,
+      whatsappApiConfigured: !!(process.env.WHATSAPP_API_TOKEN && process.env.WHATSAPP_PHONE_NUMBER_ID),
     });
-  } catch (error) {
-    return NextResponse.json(
-      { 
-        status: 'error',
-        error: 'Failed to check worker health',
-        details: error instanceof Error ? error.message : 'Unknown error'
-      },
-      { status: 500 }
-    );
+  } catch (error: any) {
+    return NextResponse.json({
+      status: 'error',
+      error: error.message,
+    }, { status: 500 });
   }
 }

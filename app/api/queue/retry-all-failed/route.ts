@@ -1,36 +1,48 @@
 /**
- * Retry All Failed Jobs API
- * POST /api/queue/retry-all-failed
+ * Queue Retry All Failed - Vercel compatible
+ * Retries all failed broadcast recipients across all campaigns
  */
 
-import { NextRequest, NextResponse } from 'next/server';
-import { getRetryManager } from '@/lib/queue/failed-job-retry';
+import { NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
 
-export async function POST(request: NextRequest) {
+export async function POST() {
   try {
-    const body = await request.json();
-    const { queueName } = body;
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
 
-    if (!queueName) {
-      return NextResponse.json(
-        { error: 'queueName is required' },
-        { status: 400 }
-      );
+    // Reset all failed recipients to pending
+    const { data, error } = await supabase
+      .from('broadcast_recipients')
+      .update({
+        status: 'pending',
+        error_message: null,
+        failed_at: null,
+      })
+      .eq('status', 'failed')
+      .select('campaign_id');
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    const retryManager = getRetryManager();
-    const result = await retryManager.retryAllFailed(queueName);
+    // Reset parent campaigns back to sending
+    const campaignIds = [...new Set(data?.map(r => r.campaign_id) || [])];
+    for (const campaignId of campaignIds) {
+      await supabase
+        .from('broadcast_campaigns')
+        .update({ status: 'sending', completed_at: null })
+        .eq('id', campaignId);
+    }
 
     return NextResponse.json({
-      success: true,
-      queueName,
-      ...result,
+      message: `${data?.length || 0} failed recipients reset across ${campaignIds.length} campaigns`,
+      retriedCount: data?.length || 0,
+      campaignsReactivated: campaignIds.length,
     });
   } catch (error: any) {
-    console.error('Error retrying failed jobs:', error);
-    return NextResponse.json(
-      { error: error.message || 'Failed to retry jobs' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

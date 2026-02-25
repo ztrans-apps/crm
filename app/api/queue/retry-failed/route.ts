@@ -1,92 +1,51 @@
 /**
- * Retry Failed Jobs API
- * Endpoint to manually retry failed jobs in queues
+ * Queue Retry Failed - Vercel compatible
+ * Retries failed broadcast recipients by resetting their status to pending
  */
 
-import { NextResponse } from 'next/server';
-import { Queue } from 'bullmq';
-import { redisConnection, QUEUE_NAMES } from '@/lib/queue/config';
+import { NextRequest, NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
-    const { queueName } = await request.json();
+    const { campaignId } = await request.json();
 
-    // Validate queue name
-    const validQueues = Object.values(QUEUE_NAMES);
-    if (queueName && !validQueues.includes(queueName)) {
-      return NextResponse.json(
-        { error: 'Invalid queue name' },
-        { status: 400 }
-      );
+    if (!campaignId) {
+      return NextResponse.json({ error: 'campaignId is required' }, { status: 400 });
     }
 
-    const results: Record<string, any> = {};
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
 
-    // If specific queue provided, retry only that queue
-    // Otherwise retry all queues
-    const queuesToProcess = queueName 
-      ? [queueName] 
-      : [
-          QUEUE_NAMES.WHATSAPP_SEND,
-          QUEUE_NAMES.WHATSAPP_RECEIVE,
-          QUEUE_NAMES.BROADCAST_SEND,
-          QUEUE_NAMES.WEBHOOK_DELIVER,
-        ];
+    // Reset failed recipients to pending so cron picks them up
+    const { data, error } = await supabase
+      .from('broadcast_recipients')
+      .update({
+        status: 'pending',
+        error_message: null,
+        failed_at: null,
+      })
+      .eq('campaign_id', campaignId)
+      .eq('status', 'failed')
+      .select('id');
 
-    for (const name of queuesToProcess) {
-      const queue = new Queue(name, { connection: redisConnection });
-
-      try {
-        // Get all failed jobs
-        const failedJobs = await queue.getFailed();
-
-        if (failedJobs.length === 0) {
-          results[name] = {
-            success: true,
-            retriedCount: 0,
-            message: 'No failed jobs found',
-          };
-          continue;
-        }
-
-        let retriedCount = 0;
-        const errors: string[] = [];
-
-        // Retry each failed job
-        for (const job of failedJobs) {
-          try {
-            await job.retry();
-            retriedCount++;
-          } catch (error: any) {
-            errors.push(`Job ${job.id}: ${error.message}`);
-          }
-        }
-
-        results[name] = {
-          success: true,
-          retriedCount,
-          totalFailed: failedJobs.length,
-          errors: errors.length > 0 ? errors : undefined,
-        };
-      } catch (error: any) {
-        results[name] = {
-          success: false,
-          error: error.message,
-        };
-      } finally {
-        await queue.close();
-      }
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 });
     }
+
+    // Also reset campaign status to sending
+    await supabase
+      .from('broadcast_campaigns')
+      .update({ status: 'sending', completed_at: null })
+      .eq('id', campaignId);
 
     return NextResponse.json({
-      success: true,
-      results,
+      message: `${data?.length || 0} failed recipients reset to pending`,
+      retriedCount: data?.length || 0,
     });
   } catch (error: any) {
-    console.error('[Retry Failed Jobs] Error:', error);
-    return NextResponse.json(
-      { error: error.message || 'Failed to retry jobs' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

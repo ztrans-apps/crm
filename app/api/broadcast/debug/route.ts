@@ -1,84 +1,51 @@
-import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
-import { broadcastQueue } from '@/lib/queue/workers/broadcast-send.worker';
-
 /**
- * GET /api/broadcast/debug
- * Debug broadcast system status
+ * Broadcast Debug - System Status
+ * Vercel-compatible: no Redis/BullMQ dependency
  */
+
+import { NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
+
 export async function GET() {
   try {
-    const supabase = await createClient();
-    
-    // Get current user
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-    if (userError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!
+    );
 
-    // Get user's tenant
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('tenant_id')
-      .eq('id', user.id)
-      .single();
-
-    if (!profile) {
-      return NextResponse.json({ error: 'Profile not found' }, { status: 404 });
-    }
-
-    // Get recent campaigns
-    const { data: campaigns } = await supabase
+    const { count: totalCampaigns } = await supabase
       .from('broadcast_campaigns')
-      .select('*')
-      .eq('tenant_id', profile.tenant_id)
-      .order('created_at', { ascending: false })
-      .limit(5);
+      .select('*', { count: 'exact', head: true });
 
-    // Get queue stats
-    let queueStats = null;
-    try {
-      const waiting = await broadcastQueue.getWaitingCount();
-      const active = await broadcastQueue.getActiveCount();
-      const completed = await broadcastQueue.getCompletedCount();
-      const failed = await broadcastQueue.getFailedCount();
-      
-      queueStats = {
-        waiting,
-        active,
-        completed,
-        failed,
-        total: waiting + active + completed + failed
-      };
-    } catch (error) {
-      console.error('Error getting queue stats:', error);
-      queueStats = { error: 'Failed to get queue stats' };
-    }
+    const { count: sendingCampaigns } = await supabase
+      .from('broadcast_campaigns')
+      .select('*', { count: 'exact', head: true })
+      .eq('status', 'sending');
 
-    // Get recent recipients for latest campaign
-    let recipients = null;
-    if (campaigns && campaigns.length > 0) {
-      const { data: recipientData } = await supabase
-        .from('broadcast_recipients')
-        .select('*')
-        .eq('campaign_id', campaigns[0].id)
-        .limit(10);
-      
-      recipients = recipientData;
-    }
+    const { count: scheduledCampaigns } = await supabase
+      .from('broadcast_campaigns')
+      .select('*', { count: 'exact', head: true })
+      .eq('status', 'scheduled');
 
     return NextResponse.json({
-      campaigns: campaigns || [],
-      queueStats,
-      recipients: recipients || [],
-      timestamp: new Date().toISOString()
+      mode: 'serverless',
+      whatsapp_api: META_API_STATUS(),
+      broadcast: {
+        total_campaigns: totalCampaigns,
+        sending: sendingCampaigns,
+        scheduled: scheduledCampaigns,
+        processor: 'Vercel Cron (every minute)',
+      },
     });
-
-  } catch (error) {
-    console.error('Error in GET /api/broadcast/debug:', error);
-    return NextResponse.json(
-      { error: 'Internal server error', details: error instanceof Error ? error.message : 'Unknown error' },
-      { status: 500 }
-    );
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
   }
+}
+
+function META_API_STATUS() {
+  return {
+    configured: !!(process.env.WHATSAPP_API_TOKEN && process.env.WHATSAPP_PHONE_NUMBER_ID),
+    phone_number_id: process.env.WHATSAPP_PHONE_NUMBER_ID ? '***configured***' : 'missing',
+    api_version: process.env.WHATSAPP_API_VERSION || 'v21.0',
+  };
 }

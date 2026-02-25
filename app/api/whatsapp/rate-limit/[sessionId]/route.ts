@@ -1,37 +1,25 @@
+/**
+ * WhatsApp Rate Limit Status
+ * Vercel-compatible: Meta Cloud API handles rate limiting automatically
+ */
+
 import { NextRequest, NextResponse } from 'next/server';
-import { baileysAdapter } from '@/lib/queue/adapters/baileys-adapter';
 
 export async function GET(
-  request: NextRequest,
-  { params }: { params: { sessionId: string } }
+  _request: NextRequest,
+  { params }: { params: Promise<{ sessionId: string }> }
 ) {
-  try {
-    const { sessionId } = params;
+  const { sessionId } = await params;
 
-    if (!sessionId) {
-      return NextResponse.json(
-        { error: 'Session ID is required' },
-        { status: 400 }
-      );
-    }
-
-    const defaultTenantId = process.env.DEFAULT_TENANT_ID || '00000000-0000-0000-0000-000000000001';
-    
-    // Get rate limit status from adapter
-    const status = baileysAdapter.getRateLimitStatus(sessionId, defaultTenantId);
-
-    return NextResponse.json({
-      success: true,
-      sessionId,
-      ...status,
-      maxMessages: 20, // From rate limiter config
-      windowMs: 60000, // 1 minute
-    });
-  } catch (error: any) {
-    console.error('Error getting rate limit status:', error);
-    return NextResponse.json(
-      { error: error.message || 'Failed to get rate limit status' },
-      { status: 500 }
-    );
-  }
+  return NextResponse.json({
+    sessionId,
+    note: 'Rate limiting is managed by Meta WhatsApp Cloud API',
+    meta_limits: {
+      business_initiated: '1,000 messages/day (Tier 1) up to unlimited',
+      user_initiated: 'Unlimited within 24-hour window',
+      template_messages: 'Depends on quality rating and tier',
+      api_rate: '80 messages/second',
+    },
+    docs: 'https://developers.facebook.com/docs/whatsapp/messaging-limits',
+  });
 }

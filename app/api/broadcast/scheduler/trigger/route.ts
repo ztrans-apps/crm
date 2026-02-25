@@ -1,35 +1,29 @@
-import { NextResponse } from 'next/server';
-import { processScheduledCampaigns } from '@/lib/queue/jobs/broadcast-scheduler';
-
 /**
- * POST /api/broadcast/scheduler/trigger
- * Manually trigger scheduler to check for scheduled campaigns
+ * Broadcast Scheduler - Manual Trigger
+ * Triggers the broadcast processing immediately (same as cron but on-demand)
  */
-export async function POST() {
+
+import { NextRequest, NextResponse } from 'next/server';
+
+export async function POST(request: NextRequest) {
   try {
-    console.log('🔄 Manual scheduler trigger requested');
-    await processScheduledCampaigns();
+    // Call the cron endpoint directly
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || request.nextUrl.origin;
     
-    return NextResponse.json({ 
-      message: 'Scheduler triggered successfully',
-      timestamp: new Date().toISOString()
+    const response = await fetch(`${baseUrl}/api/cron/process-broadcasts`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${process.env.CRON_SECRET || ''}`,
+      },
     });
-  } catch (error) {
-    console.error('Error triggering scheduler:', error);
-    return NextResponse.json(
-      { error: 'Failed to trigger scheduler' },
-      { status: 500 }
-    );
-  }
-}
 
-/**
- * GET /api/broadcast/scheduler/trigger
- * Get info about manual trigger
- */
-export async function GET() {
-  return NextResponse.json({
-    message: 'Use POST to manually trigger the scheduler',
-    info: 'This will immediately check for scheduled campaigns that are ready to send'
-  });
+    const result = await response.json();
+
+    return NextResponse.json({
+      message: 'Broadcast processing triggered manually',
+      result,
+    });
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
 }

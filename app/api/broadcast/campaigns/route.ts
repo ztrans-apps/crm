@@ -245,16 +245,15 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // If send_now, trigger immediate sending
+    // If send_now, mark as 'sending' so the cron processor picks it up immediately
     if (send_now) {
-      try {
-        // Import and queue broadcast campaign
-        const { queueBroadcastCampaign } = await import('@/lib/queue/workers/broadcast-send.worker');
-        await queueBroadcastCampaign(campaign.id);
-      } catch (error) {
-        console.error('Failed to queue broadcast:', error);
-        // Don't fail the request, campaign is created
-      }
+      await supabase
+        .from('broadcast_campaigns')
+        .update({ 
+          status: 'sending',
+          started_at: new Date().toISOString(),
+        })
+        .eq('id', campaign.id);
     }
 
     return NextResponse.json({ 

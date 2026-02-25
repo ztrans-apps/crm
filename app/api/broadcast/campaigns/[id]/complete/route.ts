@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import { checkCampaignCompletion } from '@/lib/queue/workers/broadcast-send.worker';
 
 /**
  * POST /api/broadcast/campaigns/[id]/complete
@@ -43,8 +42,27 @@ export async function POST(
       return NextResponse.json({ error: 'Campaign not found' }, { status: 404 });
     }
 
-    // Trigger completion check
-    await checkCampaignCompletion(id);
+    // Check completion directly via Supabase
+    const { data: recipients } = await supabase
+      .from('broadcast_recipients')
+      .select('status')
+      .eq('campaign_id', id);
+
+    if (recipients?.length) {
+      const pending = recipients.filter(r => r.status === 'pending').length;
+      const failed = recipients.filter(r => r.status === 'failed').length;
+
+      if (pending === 0) {
+        const finalStatus = failed === recipients.length ? 'failed' : 'completed';
+        await supabase
+          .from('broadcast_campaigns')
+          .update({
+            status: finalStatus,
+            completed_at: new Date().toISOString(),
+          })
+          .eq('id', id);
+      }
+    }
 
     // Get updated campaign
     const { data: updatedCampaign } = await supabase

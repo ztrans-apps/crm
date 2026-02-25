@@ -1,6 +1,10 @@
 {
   "crons": [
     {
+      "path": "/api/cron/process-broadcasts",
+      "schedule": "*/1 * * * *"
+    },
+    {
       "path": "/api/cron/aggregate-metrics?type=daily",
       "schedule": "0 0 * * *"
     }
