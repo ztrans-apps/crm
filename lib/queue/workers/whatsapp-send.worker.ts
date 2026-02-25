@@ -1,6 +1,6 @@
 /**
  * WhatsApp Send Worker
- * Processes outgoing WhatsApp messages using Baileys
+ * Processes outgoing WhatsApp messages using Meta Cloud API (Official)
  */
 
 import 'dotenv/config'; // Load environment variables
@@ -16,6 +16,7 @@ interface SendMessageJob {
   message: string;
   type: 'text' | 'media' | 'location';
   mediaBuffer?: Buffer;
+  mediaUrl?: string;
   mimetype?: string;
   caption?: string;
   filename?: string;
@@ -27,6 +28,32 @@ interface SendMessageJob {
   messageDbId?: string; // Database message ID to update after sending
 }
 
+/**
+ * Call Meta Cloud API to send WhatsApp messages
+ */
+async function callMetaApi(phoneNumberId: string, apiToken: string, body: any): Promise<any> {
+  const apiVersion = process.env.WHATSAPP_API_VERSION || 'v21.0';
+  const url = `https://graph.facebook.com/${apiVersion}/${phoneNumberId}/messages`;
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  });
+
+  const data = await response.json();
+
+  if (!response.ok) {
+    const errorMsg = data?.error?.message || `HTTP ${response.status}`;
+    throw new Error(`Meta Cloud API error: ${errorMsg}`);
+  }
+
+  return data;
+}
+
 async function processSendMessage(job: Job<SendMessageJob>) {
   const { 
     tenantId, 
@@ -35,6 +62,7 @@ async function processSendMessage(job: Job<SendMessageJob>) {
     message, 
     type, 
     mediaBuffer,
+    mediaUrl,
     mimetype,
     caption,
     filename,
@@ -47,70 +75,82 @@ async function processSendMessage(job: Job<SendMessageJob>) {
   } = job.data;
 
   try {
-    const whatsappServiceUrl = process.env.WHATSAPP_SERVICE_URL || 'http://localhost:3001';
+    const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID || '';
+    const apiToken = process.env.WHATSAPP_API_TOKEN || '';
+
+    if (!phoneNumberId || !apiToken) {
+      throw new Error('WHATSAPP_PHONE_NUMBER_ID and WHATSAPP_API_TOKEN environment variables are required');
+    }
+
+    const formattedTo = to.replace(/\D/g, '');
     
     await job.updateProgress(25);
 
-    let result;
+    let result: any;
 
     switch (type) {
       case 'text': {
-        // Call WhatsApp service API
-        const response = await fetch(`${whatsappServiceUrl}/api/whatsapp/send`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            sessionId,
-            to,
-            message,
-            quotedMessageId,
-            tenantId
-          })
+        const data = await callMetaApi(phoneNumberId, apiToken, {
+          messaging_product: 'whatsapp',
+          recipient_type: 'individual',
+          to: formattedTo,
+          type: 'text',
+          text: {
+            preview_url: true,
+            body: message,
+          },
         });
 
-        if (!response.ok) {
-          const errorText = await response.text();
-          let errorData;
-          try {
-            errorData = JSON.parse(errorText);
-          } catch {
-            errorData = { error: errorText };
-          }
-          throw new Error(errorData.error || `HTTP ${response.status}: Failed to send message`);
-        }
-
-        result = await response.json();
+        result = { messageId: data.messages?.[0]?.id };
         break;
       }
 
       case 'media': {
-        if (!mediaBuffer || !mimetype) {
-          throw new Error('Media buffer and mimetype required for media messages');
+        // Determine media type from mimetype
+        let mediaType = 'document';
+        if (mimetype?.startsWith('image/')) mediaType = 'image';
+        else if (mimetype?.startsWith('video/')) mediaType = 'video';
+        else if (mimetype?.startsWith('audio/')) mediaType = 'audio';
+
+        const mediaPayload: any = {};
+        
+        if (mediaUrl) {
+          mediaPayload.link = mediaUrl;
+        } else if (mediaBuffer) {
+          // Upload media first
+          const uploadUrl = `https://graph.facebook.com/${process.env.WHATSAPP_API_VERSION || 'v21.0'}/${phoneNumberId}/media`;
+          const formData = new FormData();
+          formData.append('messaging_product', 'whatsapp');
+          formData.append('file', new Blob([mediaBuffer], { type: mimetype }), filename || `upload_${Date.now()}`);
+
+          const uploadResponse = await fetch(uploadUrl, {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${apiToken}` },
+            body: formData,
+          });
+
+          const uploadData = await uploadResponse.json() as any;
+          if (!uploadResponse.ok) {
+            throw new Error(`Media upload failed: ${uploadData?.error?.message || 'Unknown error'}`);
+          }
+          mediaPayload.id = uploadData.id;
+        } else {
+          throw new Error('Media buffer or URL required for media messages');
         }
 
-        // Convert buffer to base64 for JSON transport
-        const mediaBase64 = mediaBuffer.toString('base64');
+        if (caption) mediaPayload.caption = caption;
+        if (mediaType === 'document' && filename) mediaPayload.filename = filename;
 
-        const response = await fetch(`${whatsappServiceUrl}/api/whatsapp/send-media`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            sessionId,
-            to,
-            mediaBase64,
-            mimetype,
-            caption,
-            filename,
-            tenantId
-          })
-        });
+        const body: any = {
+          messaging_product: 'whatsapp',
+          recipient_type: 'individual',
+          to: formattedTo,
+          type: mediaType,
+        };
+        body[mediaType] = mediaPayload;
 
-        if (!response.ok) {
-          const error = await response.json();
-          throw new Error(error.error || 'Failed to send media');
-        }
-
-        result = await response.json();
+        const data = await callMetaApi(phoneNumberId, apiToken, body);
+        result = { messageId: data.messages?.[0]?.id };
         break;
       }
 
@@ -119,25 +159,20 @@ async function processSendMessage(job: Job<SendMessageJob>) {
           throw new Error('Latitude and longitude required for location messages');
         }
 
-        const response = await fetch(`${whatsappServiceUrl}/api/whatsapp/send-location`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            sessionId,
-            to,
+        const data = await callMetaApi(phoneNumberId, apiToken, {
+          messaging_product: 'whatsapp',
+          recipient_type: 'individual',
+          to: formattedTo,
+          type: 'location',
+          location: {
             latitude,
             longitude,
-            metadata,
-            tenantId
-          })
+            name: metadata?.name || '',
+            address: metadata?.address || '',
+          },
         });
 
-        if (!response.ok) {
-          const error = await response.json();
-          throw new Error(error.error || 'Failed to send location');
-        }
-
-        result = await response.json();
+        result = { messageId: data.messages?.[0]?.id };
         break;
       }
 
@@ -156,31 +191,17 @@ async function processSendMessage(job: Job<SendMessageJob>) {
     if (isValidMessageDbId && result.messageId) {
       try {
         const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
-        
-        const rawMessage: any = {
-          key: result.key || {
-            id: result.messageId,
-            fromMe: true,
-            remoteJid: to
-          },
-          messageTimestamp: Math.floor(Date.now() / 1000)
-        };
-
-        if (type === 'text') {
-          rawMessage.message = { conversation: message };
-        } else if (type === 'media' && caption) {
-          rawMessage.message = { 
-            imageMessage: { caption },
-            videoMessage: { caption }
-          };
-        }
 
         const updateResponse = await fetch(`${appUrl}/api/messages/${messageDbId}/update-metadata`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             whatsapp_message_id: result.messageId,
-            raw_message: rawMessage
+            raw_message: {
+              key: { id: result.messageId, fromMe: true, remoteJid: to },
+              messageTimestamp: Math.floor(Date.now() / 1000),
+              message: type === 'text' ? { conversation: message } : undefined,
+            },
           })
         });
 

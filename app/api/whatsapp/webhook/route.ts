@@ -9,6 +9,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import type { WebhookMessage, WebhookStatus } from '@/lib/whatsapp/providers/base-provider'
 
+// Ensure Meta always receives 200 OK to prevent webhook retries
+const OK_RESPONSE = NextResponse.json({ success: true }, { status: 200 })
+
 const WEBHOOK_VERIFY_TOKEN = process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN || 'your_verify_token'
 
 /**
@@ -69,7 +72,7 @@ export async function POST(request: NextRequest) {
  * Handle messages change event
  */
 async function handleMessagesChange(value: any) {
-  const supabase = createClient()
+  const supabase = await createClient()
 
   // Handle incoming messages
   if (value.messages && value.messages.length > 0) {

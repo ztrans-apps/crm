@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { getMetaCloudAPI } from '@/lib/whatsapp/meta-api'
 
 export async function POST(request: NextRequest) {
   try {
@@ -17,9 +18,9 @@ export async function POST(request: NextRequest) {
     const mediaFilename = formData.get('mediaFilename') as string
     const mediaSize = formData.get('mediaSize') as string
 
-    if (!sessionId || !to || !media || !conversationId || !userId) {
+    if (!to || !conversationId || !userId) {
       return NextResponse.json(
-        { error: 'Missing required fields' },
+        { error: 'Missing required fields: to, conversationId, userId' },
         { status: 400 }
       )
     }
@@ -46,7 +47,7 @@ export async function POST(request: NextRequest) {
       sender_id: userId,
       content: caption || null,
       is_from_me: true,
-      status: 'sent' as const, // Changed from 'sending' to 'sent'
+      status: 'sent' as const,
       message_type: mediaType as 'text' | 'image' | 'video' | 'audio' | 'document' | 'location',
       media_url: mediaUrl,
       media_type: mediaType as 'image' | 'video' | 'audio' | 'document' | 'location' | 'vcard' | null,
@@ -72,84 +73,99 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Convert blob to buffer
-    const buffer = Buffer.from(await media.arrayBuffer())
+    try {
+      // Send media via Meta Cloud API (Official WhatsApp Business API)
+      const metaApi = getMetaCloudAPI()
 
-    // Call WhatsApp service
-    const whatsappServiceUrl = process.env.WHATSAPP_SERVICE_URL || 'http://localhost:3001'
-    
-    // Create form data for WhatsApp service
-    const serviceFormData = new FormData()
-    serviceFormData.append('sessionId', sessionId)
-    serviceFormData.append('to', to)
-    serviceFormData.append('caption', caption || '')
-    serviceFormData.append('media', new Blob([buffer], { type: mimetype }))
-    serviceFormData.append('mimetype', mimetype)
-    
-    const response = await fetch(`${whatsappServiceUrl}/api/whatsapp/send-media`, {
-      method: 'POST',
-      body: serviceFormData,
-    })
+      if (!metaApi.isConfigured()) {
+        throw new Error('WhatsApp Cloud API not configured. Set WHATSAPP_API_TOKEN and WHATSAPP_PHONE_NUMBER_ID environment variables.')
+      }
 
-    if (!response.ok) {
-      const errorText = await response.text()
-      console.error('WhatsApp service error:', errorText)
-      
-      // Update message status to failed
+      let result
+
+      // Determine media type for Meta API
+      const waMediaType = (mediaType || 'image') as 'image' | 'video' | 'audio' | 'document'
+
+      if (media) {
+        // Upload media to Meta first, then send by media ID
+        const buffer = Buffer.from(await media.arrayBuffer())
+        const uploadedMediaId = await metaApi.uploadMedia(buffer, mimetype, mediaFilename)
+        
+        result = await metaApi.sendMedia(to, {
+          type: waMediaType,
+          id: uploadedMediaId,
+          caption: caption || undefined,
+          filename: mediaFilename || undefined,
+        })
+      } else if (mediaUrl) {
+        // Send by URL directly
+        result = await metaApi.sendMedia(to, {
+          type: waMediaType,
+          url: mediaUrl,
+          caption: caption || undefined,
+          filename: mediaFilename || undefined,
+        })
+      } else {
+        throw new Error('Either media file or mediaUrl is required')
+      }
+
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to send media via WhatsApp Cloud API')
+      }
+
+      // Update message status to sent
       await supabase
         .from('messages')
-        .update({ status: 'failed' })
+        .update({
+          status: 'sent',
+          whatsapp_message_id: result.messageId,
+          sent_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', savedMessage.id)
+
+      // Update conversation last_message and first_response_at
+      const updateData: any = {
+        last_message: caption || '[Media]',
+        last_message_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      }
+      
+      const { data: conv } = await supabase
+        .from('conversations')
+        .select('first_response_at, workflow_status')
+        .eq('id', conversationId)
+        .single()
+      
+      if (conv && !conv.first_response_at) {
+        updateData.first_response_at = new Date().toISOString()
+        
+        if (conv.workflow_status === 'waiting' || conv.workflow_status === 'incoming') {
+          updateData.workflow_status = 'in_progress'
+          updateData.workflow_started_at = new Date().toISOString()
+        }
+      }
+      
+      await supabase
+        .from('conversations')
+        .update(updateData)
+        .eq('id', conversationId)
+
+      return NextResponse.json({
+        success: true,
+        messageId: result.messageId,
+        message: 'Media sent via WhatsApp Cloud API'
+      })
+    } catch (sendError: any) {
+      console.error('WhatsApp Cloud API error:', sendError)
+      
+      await supabase
+        .from('messages')
+        .update({ status: 'failed', metadata: { error: sendError.message } })
         .eq('id', savedMessage.id)
       
-      throw new Error(`WhatsApp service error: ${response.status} ${errorText}`)
+      throw sendError
     }
-
-    const result = await response.json()
-
-    // Update message status to sent
-    await supabase
-      .from('messages')
-      .update({
-        status: 'sent',
-        whatsapp_message_id: result.messageId,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', savedMessage.id)
-
-    // Update conversation last_message and first_response_at
-    const updateData: any = {
-      last_message: caption || '[Media]',
-      last_message_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    }
-    
-    // Check if this is the first agent response
-    const { data: conv } = await supabase
-      .from('conversations')
-      .select('first_response_at, workflow_status')
-      .eq('id', conversationId)
-      .single()
-    
-    if (conv && !conv.first_response_at) {
-      // This is the first agent response - set first_response_at
-      updateData.first_response_at = new Date().toISOString()
-      
-      // Auto-change workflow status from 'waiting' to 'in_progress'
-      if (conv.workflow_status === 'waiting' || conv.workflow_status === 'incoming') {
-        updateData.workflow_status = 'in_progress'
-        updateData.workflow_started_at = new Date().toISOString()
-      }
-    }
-    
-    await supabase
-      .from('conversations')
-      .update(updateData)
-      .eq('id', conversationId)
-
-    return NextResponse.json({
-      success: true,
-      messageId: result.messageId
-    })
   } catch (error: any) {
     console.error('Error sending media:', error)
     return NextResponse.json(

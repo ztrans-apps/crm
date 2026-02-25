@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { baileysAdapter } from '@/lib/queue/adapters/baileys-adapter'
+import { getMetaCloudAPI } from '@/lib/whatsapp/meta-api'
 
 export async function POST(request: NextRequest) {
   try {
@@ -27,9 +27,9 @@ export async function POST(request: NextRequest) {
 
     const { sessionId, to, message, conversationId, userId, quotedMessageId } = body
 
-    if (!sessionId || !to || !message) {
+    if (!to || !message) {
       return NextResponse.json(
-        { error: 'Missing required fields: sessionId, to, message' },
+        { error: 'Missing required fields: to, message' },
         { status: 400 }
       )
     }
@@ -150,23 +150,27 @@ export async function POST(request: NextRequest) {
     }
 
     try {
-      // Send message via queue
-      const { jobId } = await baileysAdapter.sendMessage(
-        sessionId,
-        to,
-        messageForWhatsApp, // Use converted message with actual newlines
-        quotedMessageId,
-        defaultTenantId,
-        savedMessage?.id || undefined // Only pass if valid, otherwise undefined
-      )
+      // Send message via Meta Cloud API (Official WhatsApp Business API)
+      const metaApi = getMetaCloudAPI()
 
-      // Update message status to queued
+      if (!metaApi.isConfigured()) {
+        throw new Error('WhatsApp Cloud API not configured. Set WHATSAPP_API_TOKEN and WHATSAPP_PHONE_NUMBER_ID environment variables.')
+      }
+
+      const result = await metaApi.sendText(to, messageForWhatsApp)
+
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to send message via WhatsApp Cloud API')
+      }
+
+      // Update message with WhatsApp message ID
       if (savedMessage) {
         await supabase
           .from('messages')
           .update({
-            status: 'sent', // Will be updated by worker when actually sent
-            metadata: { queueJobId: jobId },
+            status: 'sent',
+            whatsapp_message_id: result.messageId,
+            sent_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
           })
           .eq('id', savedMessage.id)
@@ -186,10 +190,8 @@ export async function POST(request: NextRequest) {
           .single()
         
         if (conv && !conv.first_response_at) {
-          // This is the first agent response - set first_response_at
           updateData.first_response_at = new Date().toISOString()
           
-          // Auto-change workflow status from 'waiting' to 'in_progress'
           if (conv.workflow_status === 'waiting' || conv.workflow_status === 'incoming') {
             updateData.workflow_status = 'in_progress'
             updateData.workflow_started_at = new Date().toISOString()
@@ -204,22 +206,22 @@ export async function POST(request: NextRequest) {
 
       return NextResponse.json({
         success: true,
-        jobId,
         messageId: savedMessage?.id,
-        message: 'Message queued for sending'
+        whatsappMessageId: result.messageId,
+        message: 'Message sent via WhatsApp Cloud API'
       })
-    } catch (queueError: any) {
-      console.error('Queue error:', queueError)
+    } catch (sendError: any) {
+      console.error('WhatsApp Cloud API error:', sendError)
       
       // Update message status to failed if we saved it
       if (savedMessage) {
         await supabase
           .from('messages')
-          .update({ status: 'failed', metadata: { error: queueError.message } })
+          .update({ status: 'failed', metadata: { error: sendError.message } })
           .eq('id', savedMessage.id)
       }
       
-      throw queueError
+      throw sendError
     }
   } catch (error: any) {
     console.error('Error sending message:', error)
