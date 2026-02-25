@@ -242,7 +242,7 @@ export default function MonitoringPage() {
             {Object.entries(metrics.sessions).map(([sessionId, status]) => (
               <div key={sessionId} className="flex items-center justify-between p-3 border rounded-lg">
                 <p className="font-medium">{sessionId}</p>
-                <Badge variant={status === 'connected' ? 'default' : 'secondary'}>
+                <Badge variant={status === 'connected' ? 'success' : 'secondary'}>
                   {status}
                 </Badge>
               </div>
