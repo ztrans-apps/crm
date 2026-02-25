@@ -152,7 +152,7 @@ export default function RolesPage() {
               <div>
                 <p className="text-sm text-gray-600 mb-1">System Roles</p>
                 <p className="text-3xl font-bold text-gray-900">
-                  {roles.filter(r => r.is_system_role).length}
+                  {roles.filter(r => (r as any).is_system_role).length}
                 </p>
               </div>
               <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
@@ -224,7 +224,7 @@ export default function RolesPage() {
                         <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
                           Master Template
                         </span>
-                      ) : role.is_system_role ? (
+                      ) : (role as any).is_system_role ? (
                         <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
                           System Role
                         </span>
