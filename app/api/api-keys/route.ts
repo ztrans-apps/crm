@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Get API keys
-    const apiKeys = await apiKeyService.listKeys(profile.tenant_id)
+    const apiKeys = await apiKeyService.listKeys((profile as any).tenant_id)
 
     return NextResponse.json({ apiKeys })
   } catch (error: any) {
@@ -78,7 +78,7 @@ export async function POST(request: NextRequest) {
 
     // Create API key
     const { apiKey, key } = await apiKeyService.createApiKey(
-      profile.tenant_id,
+      (profile as any).tenant_id,
       name,
       scopes,
       expiresInDays,

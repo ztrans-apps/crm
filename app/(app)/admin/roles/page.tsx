@@ -202,7 +202,7 @@ export default function RolesPage() {
                             {role.role_name}
                           </div>
                           <div className="text-xs text-gray-500">
-                            {role.role_key}
+                            {(role as any).role_key}
                           </div>
                         </div>
                       </div>
