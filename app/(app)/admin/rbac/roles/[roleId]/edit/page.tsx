@@ -286,7 +286,6 @@ export default function EditRolePage() {
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="w-full"
-                  icon={<Search className="h-4 w-4" />}
                 />
               </div>
               
