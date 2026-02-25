@@ -1,9 +1,11 @@
 /**
  * Send Message Integration Tests
- * Test complete message sending flow
+ * Test complete message sending flow via Meta WhatsApp Cloud API
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+
+const BASE_URL = 'http://localhost:3000'
 
 describe('Send Message Integration', () => {
   const mockFetch = vi.fn()
@@ -14,13 +16,11 @@ describe('Send Message Integration', () => {
   })
 
   describe('Complete Send Flow', () => {
-    it('should send message through complete pipeline', async () => {
+    it('should send message through Meta Cloud API pipeline', async () => {
       const messageData = {
-        tenantId: '00000000-0000-0000-0000-000000000001',
         sessionId: 'test-session',
         to: '+6281234567890',
         message: 'Hello World',
-        type: 'text',
       }
 
       // Mock API response
@@ -28,12 +28,12 @@ describe('Send Message Integration', () => {
         ok: true,
         json: async () => ({
           success: true,
-          jobId: '123',
-          message: 'Message queued successfully',
+          messageId: 'wamid.abc123',
+          message: 'Message sent successfully',
         }),
       })
 
-      const response = await fetch('http://localhost:3000/api/send-message', {
+      const response = await fetch(`${BASE_URL}/api/send-message`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(messageData),
@@ -43,7 +43,7 @@ describe('Send Message Integration', () => {
 
       expect(response.ok).toBe(true)
       expect(result.success).toBe(true)
-      expect(result.jobId).toBe('123')
+      expect(result.messageId).toBe('wamid.abc123')
     })
 
     it('should handle session not found error', async () => {
@@ -55,7 +55,7 @@ describe('Send Message Integration', () => {
         }),
       })
 
-      const response = await fetch('http://localhost:3001/api/whatsapp/send', {
+      const response = await fetch(`${BASE_URL}/api/send-message`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -97,34 +97,34 @@ describe('Send Message Integration', () => {
     })
   })
 
-  describe('Queue Integration', () => {
-    it('should add job to queue', async () => {
-      const jobData = {
-        tenantId: '00000000-0000-0000-0000-000000000001',
+  describe('Send Media', () => {
+    it('should send media message via Meta Cloud API', async () => {
+      const mediaData = {
         sessionId: 'test-session',
         to: '+6281234567890',
-        message: 'Test',
-        type: 'text' as const,
+        type: 'image',
+        url: 'https://example.com/image.jpg',
+        caption: 'Test image',
       }
 
-      // Mock queue add
-      const mockQueueAdd = vi.fn().mockResolvedValue({ id: '456' })
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          success: true,
+          messageId: 'wamid.media123',
+        }),
+      })
 
-      const result = await mockQueueAdd('whatsapp-send', jobData)
+      const response = await fetch(`${BASE_URL}/api/send-media`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(mediaData),
+      })
 
-      expect(mockQueueAdd).toHaveBeenCalledWith('whatsapp-send', jobData)
-      expect(result.id).toBe('456')
-    })
+      const result = await response.json()
 
-    it('should retry failed jobs', async () => {
-      const mockJob = {
-        id: '789',
-        retry: vi.fn().mockResolvedValue(undefined),
-      }
-
-      await mockJob.retry()
-
-      expect(mockJob.retry).toHaveBeenCalledTimes(1)
+      expect(response.ok).toBe(true)
+      expect(result.success).toBe(true)
     })
   })
 
@@ -133,8 +133,9 @@ describe('Send Message Integration', () => {
       mockFetch.mockRejectedValueOnce(new Error('Network error'))
 
       await expect(
-        fetch('http://localhost:3001/api/whatsapp/send', {
+        fetch(`${BASE_URL}/api/send-message`, {
           method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({}),
         })
       ).rejects.toThrow('Network error')
@@ -144,8 +145,9 @@ describe('Send Message Integration', () => {
       mockFetch.mockRejectedValueOnce(new Error('Request timeout'))
 
       await expect(
-        fetch('http://localhost:3001/api/whatsapp/send', {
+        fetch(`${BASE_URL}/api/send-message`, {
           method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({}),
         })
       ).rejects.toThrow('Request timeout')
@@ -159,8 +161,9 @@ describe('Send Message Integration', () => {
         },
       })
 
-      const response = await fetch('http://localhost:3001/api/whatsapp/send', {
+      const response = await fetch(`${BASE_URL}/api/send-message`, {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({}),
       })
 

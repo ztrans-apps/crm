@@ -64,12 +64,15 @@ WHATSAPP_API_URL=https://graph.facebook.com/v22.0
 #### App Configuration
 ```
 NEXT_PUBLIC_APP_URL=https://your-app.vercel.app
-NEXT_PUBLIC_WHATSAPP_SERVICE_URL=https://your-app.vercel.app
 ```
 
-#### Redis (Optional - untuk BullMQ)
+#### Vercel Cron
 ```
-REDIS_URL=your_redis_url
+CRON_SECRET=your_random_cron_secret
+```
+
+#### Upstash Redis (untuk dashboard cache)
+```
 UPSTASH_REDIS_REST_URL=your_upstash_url
 UPSTASH_REDIS_REST_TOKEN=your_upstash_token
 ```
