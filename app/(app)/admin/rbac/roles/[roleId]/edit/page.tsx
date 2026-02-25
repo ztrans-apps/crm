@@ -59,7 +59,7 @@ export default function EditRolePage() {
       setLoading(true)
 
       // Load role with permissions
-      const { data: roleData, error: roleError } = await supabase
+      const { data: roleData, error: roleError } = await (supabase as any)
         .from('roles')
         .select(`
           *,
@@ -81,7 +81,7 @@ export default function EditRolePage() {
       setSelectedPermissions(new Set(roleWithPerms.permissions.map((p: Permission) => p.id)))
 
       // Load all permissions
-      const { data: perms, error: permsError } = await supabase
+      const { data: perms, error: permsError } = await (supabase as any)
         .from('permissions')
         .select('*')
         .order('module, permission_name')
@@ -106,7 +106,7 @@ export default function EditRolePage() {
       setSaving(true)
       setError(null)
 
-      const { error: updateError } = await supabase
+      const { error: updateError } = await (supabase as any)
         .from('roles')
         .update({
           role_name: role?.role_name,
@@ -117,7 +117,7 @@ export default function EditRolePage() {
       if (updateError) throw updateError
 
       // Update permissions
-      await supabase
+      await (supabase as any)
         .from('role_permissions')
         .delete()
         .eq('role_id', roleId)
@@ -128,7 +128,7 @@ export default function EditRolePage() {
           permission_id: permId,
         }))
 
-        const { error: permError } = await supabase
+        const { error: permError } = await (supabase as any)
           .from('role_permissions')
           .insert(rolePermissions)
 
