@@ -1,5 +1,5 @@
 // Main chat logic hook
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { canViewConversation, getUserRole } from '@/lib/rbac/chat-permissions'
 import { chatService } from '../services'
 import { createClient } from '@/lib/supabase/client'
@@ -95,11 +95,45 @@ export function useChat() {
       .on(
         'postgres_changes',
         {
-          event: '*',
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'conversations'
+        },
+        (payload) => {
+          // Update specific fields only, preserve relations
+          setConversations(prev => {
+            const updated = prev.map(conv => 
+              conv.id === payload.new.id 
+                ? { 
+                    ...conv,
+                    status: payload.new.status,
+                    workflow_status: payload.new.workflow_status,
+                    last_message: payload.new.last_message,
+                    last_message_at: payload.new.last_message_at,
+                    assigned_to: payload.new.assigned_to,
+                    unread_count: payload.new.unread_count,
+                    updated_at: payload.new.updated_at
+                  }
+                : conv
+            )
+            // Re-sort by last_message_at
+            return updated.sort((a, b) => {
+              const aTime = new Date(a.last_message_at || 0).getTime()
+              const bTime = new Date(b.last_message_at || 0).getTime()
+              return bTime - aTime
+            })
+          })
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
           schema: 'public',
           table: 'conversations'
         },
         () => {
+          // New conversation - full refresh needed to get relations
           clearTimeout(debounceTimer)
           debounceTimer = setTimeout(() => loadConversations(), 300)
         }
@@ -123,10 +157,29 @@ export function useChat() {
           schema: 'public',
           table: 'messages'
         },
-        () => {
-          // Refresh conversations when new messages arrive (from webhook)
-          clearTimeout(debounceTimer)
-          debounceTimer = setTimeout(() => loadConversations(), 500)
+        (payload) => {
+          // New message - update conversation immediately
+          const conversationId = payload.new.conversation_id
+          
+          // Update the conversation's last_message_at to trigger re-sort
+          setConversations(prev => {
+            const updated = prev.map(conv => 
+              conv.id === conversationId
+                ? { 
+                    ...conv, 
+                    last_message_at: payload.new.created_at,
+                    last_message: payload.new.content,
+                    unread_count: (conv.unread_count || 0) + 1
+                  }
+                : conv
+            )
+            // Re-sort by last_message_at
+            return updated.sort((a, b) => {
+              const aTime = new Date(a.last_message_at || 0).getTime()
+              const bTime = new Date(b.last_message_at || 0).getTime()
+              return bTime - aTime
+            })
+          })
         }
       )
       .subscribe()

@@ -40,10 +40,26 @@ export class ConversationService extends BaseService {
       const permissions = await getUserPermissions(userId)
       const hasFullAccess = permissions.has('chat.view.all') || permissions.has('chat.view_all')
       
-      if (!hasFullAccess) {
-        query = query.or(`and(assigned_to.eq.${userId}),and(assigned_to.is.null,workflow_status.in.(incoming,waiting))`)
+      // Fallback: Check old role system if no permissions found
+      let hasOwnerRole = false
+      if (permissions.size === 0) {
+        const { data: profile } = await this.supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', userId)
+          .single()
+        
+        hasOwnerRole = profile?.role === 'owner' || profile?.role === 'supervisor'
       }
-      // Users with full access see all (no filter)
+      
+      if (!hasFullAccess && !hasOwnerRole) {
+        // Allow users to see:
+        // 1. Conversations assigned to them
+        // 2. Unassigned conversations with workflow_status in (incoming, waiting, done)
+        // 3. All open conversations (for users without proper permissions setup)
+        query = query.or(`and(assigned_to.eq.${userId}),and(assigned_to.is.null,workflow_status.in.(incoming,waiting,done)),status.eq.open`)
+      }
+      // Users with full access or owner role see all (no filter)
 
       // Apply additional filters
       if (filters?.status) {

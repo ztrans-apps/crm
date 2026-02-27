@@ -340,7 +340,6 @@ export function useMessages({
           // Fetch the complete message with relations
           const newMessage = await messageService.getMessage(payload.new.id)
           
-          
           if (newMessage) {
             setMessages(prev => {
               // Check if message already exists
