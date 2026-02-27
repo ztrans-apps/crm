@@ -46,8 +46,6 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
 
-    console.log('[Webhook] Received webhook:', JSON.stringify(body, null, 2))
-
     // Validate webhook payload
     if (!body.object || body.object !== 'whatsapp_business_account') {
       console.error('[Webhook] Invalid webhook object:', body.object)
@@ -56,20 +54,16 @@ export async function POST(request: NextRequest) {
 
     // Process each entry
     for (const entry of body.entry || []) {
-      console.log('[Webhook] Processing entry:', entry.id)
       for (const change of entry.changes || []) {
-        console.log('[Webhook] Processing change:', change.field)
         if (change.field === 'messages') {
           await handleMessagesChange(change.value)
         }
       }
     }
 
-    // Always return 200 to acknowledge receipt
     return NextResponse.json({ success: true }, { status: 200 })
   } catch (error) {
     console.error('[Webhook] Error processing webhook:', error)
-    // Still return 200 to prevent retries
     return NextResponse.json({ success: true }, { status: 200 })
   }
 }
@@ -102,12 +96,9 @@ async function handleIncomingMessage(
   message: WebhookMessage,
   metadata: any,
   supabase: any,
-  contacts?: any[] // Add contacts parameter
+  contacts?: any[]
 ) {
   try {
-    console.log('[Webhook] Processing incoming message:', message.id)
-
-    const phoneNumberId = metadata.phone_number_id
     const from = message.from
     const messageId = message.id
     const timestamp = message.timestamp
@@ -116,10 +107,9 @@ async function handleIncomingMessage(
     const contactProfile = contacts?.find(c => c.wa_id === from)
     const contactName = contactProfile?.profile?.name || from
 
-    // Default tenant ID - TODO: Get from phone_number_id mapping
     const DEFAULT_TENANT_ID = '00000000-0000-0000-0000-000000000001'
 
-    // Get or create contact first
+    // Get or create contact
     let { data: contact } = await supabase
       .from('contacts')
       .select('id, tenant_id, name')
@@ -127,12 +117,11 @@ async function handleIncomingMessage(
       .single()
 
     if (!contact) {
-      // Create new contact with name from WhatsApp profile
       const { data: newContact, error: contactError } = await supabase
         .from('contacts')
         .insert({
           phone_number: from,
-          name: contactName, // Use WhatsApp profile name
+          name: contactName,
           user_id: null,
           tenant_id: DEFAULT_TENANT_ID,
         })
@@ -145,15 +134,12 @@ async function handleIncomingMessage(
       }
 
       contact = newContact
-      console.log('[Webhook] Created new contact:', contactName, '(', from, ')')
     } else if (contact.name === from || contact.name === contact.id) {
       // Update contact name if it's still using phone number or ID
       await supabase
         .from('contacts')
         .update({ name: contactName })
         .eq('id', contact.id)
-      
-      console.log('[Webhook] Updated contact name:', contactName)
     }
 
     // Get or create conversation
@@ -232,13 +218,13 @@ async function handleIncomingMessage(
       conversation_id: conversationId,
       whatsapp_message_id: messageId,
       sender_type: 'customer',
-      sender_id: null, // NULL for customer messages (not linked to profiles)
+      sender_id: null,
       message_type: message.type,
       content,
-      media_url: mediaId, // Store media ID in media_url for now
-      status: 'sent', // Message status
+      media_url: mediaId,
+      status: 'sent',
       is_from_me: false,
-      delivery_status: 'sent', // Use 'sent' instead of 'received'
+      delivery_status: 'sent',
       delivered_at: new Date(parseInt(timestamp) * 1000).toISOString(),
     })
 
@@ -255,11 +241,6 @@ async function handleIncomingMessage(
         last_message: content,
       })
       .eq('id', conversationId)
-
-    // Trigger chatbot if enabled
-    // TODO: Implement chatbot trigger
-
-    console.log('[Webhook] Message processed successfully:', messageId)
   } catch (error) {
     console.error('[Webhook] Error handling incoming message:', error)
   }
@@ -270,8 +251,6 @@ async function handleIncomingMessage(
  */
 async function handleStatusUpdate(status: WebhookStatus, supabase: any) {
   try {
-    console.log('[Webhook] Processing status update:', status.id, status.status)
-
     // Update message status in database
     await supabase
       .from('messages')
@@ -293,8 +272,6 @@ async function handleStatusUpdate(status: WebhookStatus, supabase: any) {
         })
         .eq('whatsapp_message_id', status.id)
     }
-
-    console.log('[Webhook] Status updated successfully:', status.id)
   } catch (error) {
     console.error('[Webhook] Error handling status update:', error)
   }
