@@ -85,6 +85,18 @@ const API_PERMISSIONS: Record<string, string | string[]> = {
   '/api/debug': 'admin.access',
   '/api/test-queue': 'admin.access',
   '/api/test-redis': 'admin.access',
+
+  // ==================== WEBHOOKS EMIT (admin) ====================
+  '/api/webhooks/emit': 'admin.access',
+
+  // ==================== MESSAGE METADATA (admin) ====================
+  '/api/messages': 'admin.access',
+
+  // ==================== TENANT ====================
+  '/api/tenant': 'settings.manage',
+
+  // ==================== UTILITIES (auth-only, no specific perm) ====================
+  // translate + geocode are auth-only via withAuth, no middleware perm needed
 }
 
 /**
@@ -95,16 +107,11 @@ const SKIP_PERMISSION_ROUTES = [
   '/api/health',
   '/api/cron',
   '/api/whatsapp/webhook',     // Incoming webhook from WhatsApp
-  '/api/webhooks/emit',        // Internal webhook emission
   '/api/v1/messages',          // External API (uses API key auth, not session)
-  '/api/chat/operations',      // Internal chat operations (already has own auth)
-  '/api/chat/conversations',   // Internal chat data
-  '/api/translate',            // Translation utility
-  '/api/geocode',              // Geocoding utility
+  '/api/chat/operations',      // Internal chat operations (has withAuth)
+  '/api/chat/conversations',   // Internal chat data (has withAuth)
   '/api/docs',                 // API documentation
-  '/api/tenant',               // Tenant info
-  '/api/conversations',        // Auto-assign (internal)
-  '/api/messages',             // Message metadata update (internal)
+  '/api/conversations',        // Auto-assign (has withAuth)
 ]
 
 export async function middleware(request: NextRequest) {

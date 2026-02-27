@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
+import { withAuth } from '@/lib/rbac/with-auth'
 
-export async function GET() {
-  try {
+export const GET = withAuth(async (req, ctx) => {
     // Test search with a simple query
     const testQuery = 'bandung'
     
@@ -28,11 +28,4 @@ export async function GET() {
       resultsCount: Array.isArray(data) ? data.length : 0,
       results: data
     })
-  } catch (error: any) {
-    console.error('[Geocode Test] Error:', error)
-    return NextResponse.json({
-      success: false,
-      error: error.message
-    }, { status: 500 })
-  }
-}
+}, { permission: 'admin.access' })

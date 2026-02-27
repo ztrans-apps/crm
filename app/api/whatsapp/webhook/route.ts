@@ -12,7 +12,10 @@ import type { WebhookMessage, WebhookStatus } from '@/lib/whatsapp/providers/bas
 // Ensure Meta always receives 200 OK to prevent webhook retries
 const OK_RESPONSE = NextResponse.json({ success: true }, { status: 200 })
 
-const WEBHOOK_VERIFY_TOKEN = process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN || 'your_verify_token'
+const WEBHOOK_VERIFY_TOKEN = process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN
+if (!WEBHOOK_VERIFY_TOKEN) {
+  console.warn('[Webhook] WHATSAPP_WEBHOOK_VERIFY_TOKEN is not set — webhook verification will reject all requests')
+}
 
 /**
  * GET - Webhook verification
@@ -43,7 +46,9 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
 
-    console.log('[Webhook] Received:', JSON.stringify(body, null, 2))
+    if (process.env.NODE_ENV !== 'production') {
+      console.log('[Webhook] Received:', JSON.stringify(body, null, 2))
+    }
 
     // Validate webhook payload
     if (!body.object || body.object !== 'whatsapp_business_account') {

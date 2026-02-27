@@ -1,31 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { withAuth } from '@/lib/rbac/with-auth'
 import { deliveryStatusService } from '@/lib/services/delivery-status.service'
 
 /**
  * Get message delivery timeline
  * GET /api/delivery/:messageId/timeline
  */
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { messageId: string } }
-) {
-  try {
-    const timeline = await deliveryStatusService.getDeliveryTimeline(params.messageId)
+export const GET = withAuth(async (req, ctx, params) => {
+  const { messageId } = await params
 
-    if (!timeline) {
-      return NextResponse.json(
-        { error: 'Message not found' },
-        { status: 404 }
-      )
-    }
+  const timeline = await deliveryStatusService.getDeliveryTimeline(messageId)
 
-    return NextResponse.json({ timeline })
-  } catch (error: any) {
-    console.error('[API] Error getting delivery timeline:', error)
+  if (!timeline) {
     return NextResponse.json(
-      { error: error.message || 'Failed to get delivery timeline' },
-      { status: 500 }
+      { error: 'Message not found' },
+      { status: 404 }
     )
   }
-}
+
+  return NextResponse.json({ timeline })
+})
 

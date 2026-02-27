@@ -34,15 +34,11 @@ export async function GET() {
     return NextResponse.json({
       status: healthy ? 'healthy' : 'degraded',
       mode: 'serverless',
-      processor: 'Vercel Cron',
-      recentSendsLast10Min: recentSends || 0,
       stuckCampaigns: stuckCampaigns?.length || 0,
-      whatsappApiConfigured: !!(process.env.WHATSAPP_API_TOKEN && process.env.WHATSAPP_PHONE_NUMBER_ID),
     });
   } catch (error: any) {
     return NextResponse.json({
       status: 'error',
-      error: error.message,
     }, { status: 500 });
   }
 }

@@ -3,45 +3,38 @@
  * For testing queue functionality
  */
 
+import { NextRequest, NextResponse } from 'next/server';
+import { withAuth } from '@/lib/rbac/with-auth';
 import { WhatsAppSendService } from '@/modules/whatsapp/services/send.service';
-import { NextResponse } from 'next/server';
 
-export async function POST(request: Request) {
-  try {
-    const { to, message } = await request.json();
+export const POST = withAuth(async (req, ctx) => {
+  const { to, message } = await req.json();
 
-    if (!to || !message) {
-      return NextResponse.json(
-        { error: 'Missing required fields: to, message' },
-        { status: 400 }
-      );
-    }
-
-    const sendService = new WhatsAppSendService();
-
-    // Send message via queue
-    const result = await sendService.sendMessage({
-      tenantId: process.env.DEFAULT_TENANT_ID || '00000000-0000-0000-0000-000000000001',
-      sessionId: 'test-session',
-      to,
-      message,
-    });
-
-    return NextResponse.json({
-      success: true,
-      jobId: result.jobId,
-      message: 'Message queued successfully',
-    });
-  } catch (error: any) {
-    console.error('[Test Queue] Error:', error);
+  if (!to || !message) {
     return NextResponse.json(
-      { error: error.message || 'Failed to queue message' },
-      { status: 500 }
+      { error: 'Missing required fields: to, message' },
+      { status: 400 }
     );
   }
-}
 
-export async function GET() {
+  const sendService = new WhatsAppSendService();
+
+  // Send message via queue
+  const result = await sendService.sendMessage({
+    tenantId: ctx.tenantId,
+    sessionId: 'test-session',
+    to,
+    message,
+  });
+
+  return NextResponse.json({
+    success: true,
+    jobId: result.jobId,
+    message: 'Message queued successfully',
+  });
+}, { permission: 'admin.access' });
+
+export const GET = withAuth(async (req, ctx) => {
   return NextResponse.json({
     message: 'Queue Test API',
     usage: {
@@ -57,4 +50,4 @@ export async function GET() {
         -d '{"to":"6281234567890","message":"Hello from queue!"}'
     `,
   });
-}
+}, { permission: 'admin.access' });

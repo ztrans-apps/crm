@@ -99,10 +99,7 @@ export const POST = withAuth(async (request, ctx) => {
         })
         return NextResponse.json(
           { 
-            error: 'Failed to save message to database',
-            details: dbError.message,
-            hint: dbError.hint,
-            code: dbError.code
+            error: 'Failed to save message to database'
           },
           { status: 500 }
         )

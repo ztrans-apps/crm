@@ -1,45 +1,28 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { withAuth } from '@/lib/rbac/with-auth'
 import { apiKeyService } from '@/lib/services/api-key.service'
 
 /**
  * Revoke API key
  * POST /api/api-keys/:keyId/revoke
  */
-export async function POST(
-  request: NextRequest,
-  { params }: { params: { keyId: string } }
-) {
-  try {
-    await apiKeyService.revokeKey(params.keyId)
+export const POST = withAuth(async (req, ctx, params) => {
+  const { keyId } = await params
 
-    return NextResponse.json({ success: true, message: 'API key revoked' })
-  } catch (error: any) {
-    console.error('[API] Error revoking API key:', error)
-    return NextResponse.json(
-      { error: error.message || 'Failed to revoke API key' },
-      { status: 500 }
-    )
-  }
-}
+  await apiKeyService.revokeKey(keyId)
+
+  return NextResponse.json({ success: true, message: 'API key revoked' })
+}, { permission: 'settings.manage' })
 
 /**
  * Delete API key
  * DELETE /api/api-keys/:keyId
  */
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: { keyId: string } }
-) {
-  try {
-    await apiKeyService.deleteKey(params.keyId)
+export const DELETE = withAuth(async (req, ctx, params) => {
+  const { keyId } = await params
 
-    return NextResponse.json({ success: true, message: 'API key deleted' })
-  } catch (error: any) {
-    console.error('[API] Error deleting API key:', error)
-    return NextResponse.json(
-      { error: error.message || 'Failed to delete API key' },
-      { status: 500 }
-    )
-  }
-}
+  await apiKeyService.deleteKey(keyId)
+
+  return NextResponse.json({ success: true, message: 'API key deleted' })
+}, { permission: 'settings.manage' })
 

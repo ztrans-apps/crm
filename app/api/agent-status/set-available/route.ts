@@ -19,7 +19,7 @@ export const POST = withAuth(async (req, ctx) => {
   if (error) {
     console.error('Error setting available status:', error)
     return NextResponse.json(
-      { error: 'Failed to set status', details: error },
+      { error: 'Failed to set status' },
       { status: 500 }
     )
   }

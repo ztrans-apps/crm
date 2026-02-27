@@ -13,7 +13,7 @@ export const GET = withAuth(async (req, ctx) => {
   if (error) {
     console.error('Error fetching agents:', error)
     return NextResponse.json(
-      { error: 'Failed to fetch agents', details: error },
+      { error: 'Failed to fetch agents' },
       { status: 500 }
     )
   }
@@ -51,7 +51,7 @@ export const POST = withAuth(async (req, ctx) => {
   if (error) {
     console.error('Error updating agent status:', error)
     return NextResponse.json(
-      { error: 'Failed to update agent status', details: error },
+      { error: 'Failed to update agent status' },
       { status: 500 }
     )
   }

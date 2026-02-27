@@ -1,29 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { withAuth } from '@/lib/rbac/with-auth';
 import { BillingService } from '@/core/billing/service';
-import { getCurrentTenant } from '@/core/tenant';
 
 /**
  * GET /api/billing/features/[feature]
  * Check if tenant has access to a feature
  */
-export async function GET(
-  req: NextRequest,
-  { params }: { params: { feature: string } }
-) {
-  try {
-    const tenant = await getCurrentTenant();
-    if (!tenant) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+export const GET = withAuth(async (req, ctx, params) => {
+  const { feature } = await params;
 
-    const hasAccess = await BillingService.hasFeature(tenant.id, params.feature);
+  const hasAccess = await BillingService.hasFeature(ctx.tenantId, feature);
 
-    return NextResponse.json({ hasAccess });
-  } catch (error) {
-    console.error('Error checking feature access:', error);
-    return NextResponse.json(
-      { error: 'Failed to check feature access' },
-      { status: 500 }
-    );
-  }
-}
+  return NextResponse.json({ hasAccess });
+}, { permission: 'settings.manage' });

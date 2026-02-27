@@ -4,42 +4,26 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { withAuth } from '@/lib/rbac/with-auth';
 import { TenantService } from '@core/tenant/service';
 
-export async function GET(request: NextRequest) {
-  try {
-    const tenantId = request.headers.get('X-Tenant-ID');
+export const GET = withAuth(async (req, ctx) => {
+  const tenantService = new TenantService();
+  const tenant = await tenantService.getTenant(ctx.tenantId);
 
-    if (!tenantId) {
-      return NextResponse.json(
-        { error: 'Tenant ID required' },
-        { status: 400 }
-      );
-    }
-
-    const tenantService = new TenantService();
-    const tenant = await tenantService.getTenant(tenantId);
-
-    if (!tenant) {
-      return NextResponse.json(
-        { error: 'Tenant not found' },
-        { status: 404 }
-      );
-    }
-
-    // Get organizations for this tenant
-    const organizations = await tenantService.getOrganizations(tenantId);
-
-    return NextResponse.json({
-      tenant,
-      organization: organizations[0] || null,
-      workspace: null, // TODO: Implement workspace selection
-    });
-  } catch (error) {
-    console.error('Error fetching tenant:', error);
+  if (!tenant) {
     return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
+      { error: 'Tenant not found' },
+      { status: 404 }
     );
   }
-}
+
+  // Get organizations for this tenant
+  const organizations = await tenantService.getOrganizations(ctx.tenantId);
+
+  return NextResponse.json({
+    tenant,
+    organization: organizations[0] || null,
+    workspace: null, // TODO: Implement workspace selection
+  });
+})

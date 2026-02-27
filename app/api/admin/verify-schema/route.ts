@@ -13,9 +13,7 @@ export const GET = withAuth(async (req, ctx) => {
   if (error) {
     return NextResponse.json({
       success: false,
-      error: error.message,
-      hint: error.hint,
-      details: error.details,
+      error: 'Schema verification failed',
       message: 'Column last_activity might not exist in profiles table'
     }, { status: 500 })
   }
@@ -34,9 +32,7 @@ export const GET = withAuth(async (req, ctx) => {
     if (updateError) {
       return NextResponse.json({
         success: false,
-        error: updateError.message,
-        hint: updateError.hint,
-        details: updateError.details,
+        error: 'Schema update verification failed',
         message: 'Failed to update last_activity column'
       }, { status: 500 })
     }
