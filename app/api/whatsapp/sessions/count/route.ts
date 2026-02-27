@@ -3,47 +3,31 @@
  * Get count of active WhatsApp sessions
  */
 
-import { createClient } from '@/lib/supabase/server'
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
+import { withAuth } from '@/lib/rbac/with-auth'
 
-export async function GET() {
-  try {
-    const supabase = await createClient()
+export const GET = withAuth(async (req, ctx) => {
+  // Count active sessions
+  const { count, error } = await ctx.supabase
+    .from('whatsapp_sessions')
+    .select('*', { count: 'exact', head: true })
+    .in('status', ['connected', 'connecting'])
 
-    // Get current user
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    // Count active sessions
-    const { count, error } = await supabase
-      .from('whatsapp_sessions')
-      .select('*', { count: 'exact', head: true })
-      .in('status', ['connected', 'connecting'])
-
-    if (error) {
-      console.error('[Sessions Count API] Error:', error)
-      return NextResponse.json({ error: error.message }, { status: 500 })
-    }
-
-    const sessionCount = count || 0
-    const isSingleSession = sessionCount === 1
-    const autoAccessEnabled = isSingleSession
-
-    return NextResponse.json({
-      count: sessionCount,
-      isSingleSession,
-      autoAccessEnabled,
-      message: autoAccessEnabled 
-        ? 'Auto-access enabled: All users can access all conversations'
-        : `${sessionCount} sessions available`
-    })
-  } catch (error: any) {
+  if (error) {
     console.error('[Sessions Count API] Error:', error)
-    return NextResponse.json(
-      { error: error.message || 'Internal server error' },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: error.message }, { status: 500 })
   }
-}
+
+  const sessionCount = count || 0
+  const isSingleSession = sessionCount === 1
+  const autoAccessEnabled = isSingleSession
+
+  return NextResponse.json({
+    count: sessionCount,
+    isSingleSession,
+    autoAccessEnabled,
+    message: autoAccessEnabled 
+      ? 'Auto-access enabled: All users can access all conversations'
+      : `${sessionCount} sessions available`
+  })
+})

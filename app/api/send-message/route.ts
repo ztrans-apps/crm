@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { withAuth } from '@/lib/rbac/with-auth'
 import { getMetaCloudAPIForSession } from '@/lib/whatsapp/meta-api'
 
-export async function POST(request: NextRequest) {
-  try {
+export const POST = withAuth(async (request, ctx) => {
     // Check if request has a body
     const contentType = request.headers.get('content-type')
     if (!contentType || !contentType.includes('application/json')) {
@@ -40,48 +39,11 @@ export async function POST(request: NextRequest) {
     // Check if this is a bot message (userId is null or 'bot')
     const isBotMessage = !userId || userId === 'bot'
 
-    // Create Supabase client with service role for server-side operations
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
-      {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false
-        },
-        db: {
-          schema: 'public'
-        }
-      }
-    )
+    // Use service role client for write operations
+    const supabase = ctx.serviceClient
 
-    // Get default tenant ID or from request header
-    const tenantIdFromHeader = request.headers.get('x-tenant-id')
-    let defaultTenantId = tenantIdFromHeader || process.env.DEFAULT_TENANT_ID || '00000000-0000-0000-0000-000000000001'
-
-    // Verify tenant exists, if not use the first available tenant
-    const { data: tenant, error: tenantError } = await supabase
-      .from('tenants')
-      .select('id')
-      .eq('id', defaultTenantId)
-      .single()
-
-    if (tenantError || !tenant) {
-      const { data: firstTenant } = await supabase
-        .from('tenants')
-        .select('id')
-        .limit(1)
-        .single()
-      
-      if (firstTenant) {
-        defaultTenantId = firstTenant.id
-      } else {
-        return NextResponse.json(
-          { error: 'No tenant found in database. Please create a tenant first.' },
-          { status: 400 }
-        )
-      }
-    }
+    // Use tenant from auth context 
+    const defaultTenantId = ctx.tenantId
 
     // Save message to database first (if conversationId and userId provided)
     let savedMessage = null
@@ -223,11 +185,4 @@ export async function POST(request: NextRequest) {
       
       throw sendError
     }
-  } catch (error: any) {
-    console.error('Error sending message:', error)
-    return NextResponse.json(
-      { error: error.message || 'Failed to send message' },
-      { status: 500 }
-    )
-  }
-}
+}, { permission: 'chat.send' })

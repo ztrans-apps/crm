@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Activity, AlertCircle, CheckCircle, Clock, MessageSquare, Phone, TrendingUp, Zap } from 'lucide-react'
+import { PermissionGuard } from '@/lib/rbac/components/PermissionGuard';
 
 interface MonitoringData {
   apiStatus: 'connected' | 'error' | 'unknown'
@@ -93,6 +94,14 @@ export default function MonitoringPage() {
   if (!data) return null
 
   return (
+    <PermissionGuard 
+      permission={['admin.access']}
+      fallback={
+        <div className="flex items-center justify-center h-full">
+          <p className="text-muted-foreground">Anda tidak memiliki akses ke halaman ini.</p>
+        </div>
+      }
+    >
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold">System Monitoring</h1>
@@ -239,5 +248,6 @@ export default function MonitoringPage() {
         </CardContent>
       </Card>
     </div>
+    </PermissionGuard>
   )
 }

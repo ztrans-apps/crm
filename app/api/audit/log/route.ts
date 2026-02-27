@@ -5,52 +5,31 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { AuditService } from '@core/audit/service';
-import { createClient } from '@/lib/supabase/server';
+import { withAuth } from '@/lib/rbac/with-auth';
 
-export async function POST(request: NextRequest) {
-  try {
-    const tenantId = request.headers.get('X-Tenant-ID');
+export const POST = withAuth(async (req, ctx) => {
+  const body = await req.json();
+  const { action, resource_type, resource_id, old_value, new_value, metadata } = body;
 
-    if (!tenantId) {
-      return NextResponse.json(
-        { error: 'Tenant ID required' },
-        { status: 400 }
-      );
-    }
-
-    // Get current user
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-
-    const body = await request.json();
-    const { action, resource_type, resource_id, old_value, new_value, metadata } = body;
-
-    if (!action || !resource_type) {
-      return NextResponse.json(
-        { error: 'Action and resource_type are required' },
-        { status: 400 }
-      );
-    }
-
-    const auditService = new AuditService(tenantId);
-    const log = await auditService.log(
-      {
-        action,
-        resource_type,
-        resource_id,
-        old_value,
-        new_value,
-        metadata,
-      },
-      user?.id
-    );
-
-    return NextResponse.json(log);
-  } catch (error) {
-    console.error('Error creating audit log:', error);
+  if (!action || !resource_type) {
     return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
+      { error: 'Action and resource_type are required' },
+      { status: 400 }
     );
   }
-}
+
+  const auditService = new AuditService(ctx.tenantId);
+  const log = await auditService.log(
+    {
+      action,
+      resource_type,
+      resource_id,
+      old_value,
+      new_value,
+      metadata,
+    },
+    ctx.user.id
+  );
+
+  return NextResponse.json(log);
+});

@@ -1,36 +1,27 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { withAuth } from '@/lib/rbac/with-auth'
 
 /**
- * Get webhook logs
  * GET /api/webhooks/:webhookId/logs
+ * Permission: settings.manage (enforced by middleware)
  */
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { webhookId: string } }
-) {
-  try {
-    const supabase = await createClient()
-    const { searchParams } = new URL(request.url)
-    const limit = parseInt(searchParams.get('limit') || '50')
-    const offset = parseInt(searchParams.get('offset') || '0')
+export const GET = withAuth(async (request, ctx, params) => {
+  const { webhookId } = await params
+  const { searchParams } = new URL(request.url)
+  const limit = parseInt(searchParams.get('limit') || '50')
+  const offset = parseInt(searchParams.get('offset') || '0')
 
-    const { data: logs, error, count } = await supabase
-      .from('webhook_logs')
-      .select('*', { count: 'exact' })
-      .eq('webhook_id', params.webhookId)
-      .order('created_at', { ascending: false })
-      .range(offset, offset + limit - 1)
+  const { data: logs, error, count } = await ctx.supabase
+    .from('webhook_logs')
+    .select('*', { count: 'exact' })
+    .eq('webhook_id', webhookId)
+    .order('created_at', { ascending: false })
+    .range(offset, offset + limit - 1)
 
-    if (error) throw error
-
-    return NextResponse.json({ logs, total: count })
-  } catch (error: any) {
-    console.error('[API] Error getting webhook logs:', error)
-    return NextResponse.json(
-      { error: error.message || 'Failed to get webhook logs' },
-      { status: 500 }
-    )
+  if (error) {
+    return NextResponse.json({ error: error.message || 'Failed to get webhook logs' }, { status: 500 })
   }
-}
+
+  return NextResponse.json({ logs, total: count })
+})
 

@@ -49,17 +49,13 @@ export class ContactService extends BaseService {
         updated_at: new Date().toISOString(),
       }
 
-      // Extract email and phone from metadata if provided
       if (metadata) {
-        // Store email and mobile_phone in main fields
         if (metadata.email) {
           updateData.email = metadata.email
         }
         if (metadata.mobile_phone) {
           updateData.phone_number = metadata.mobile_phone
         }
-        
-        // Store everything in metadata
         updateData.metadata = metadata
       }
 
@@ -87,11 +83,9 @@ export class ContactService extends BaseService {
     try {
       this.log('ContactService', 'Updating contact metadata', { contactId })
 
-      // Get existing metadata
       const contact = await this.getContactById(contactId)
       const existingMetadata = contact?.metadata || {}
 
-      // Merge with new metadata
       const updatedMetadata = {
         ...existingMetadata,
         ...metadata,
@@ -192,7 +186,6 @@ export class ContactService extends BaseService {
     try {
       this.log('ContactService', 'Creating contact', { phoneNumber, name })
 
-      // Validate and sanitize phone number
       const { sanitizePhoneForStorage } = await import('@/lib/utils/phone')
       const cleanPhone = sanitizePhoneForStorage(phoneNumber)
       
@@ -200,17 +193,9 @@ export class ContactService extends BaseService {
         console.error('[ContactService] Invalid phone number:', phoneNumber)
         throw new Error(`Invalid phone number format: ${phoneNumber}`)
       }
-      
-      // Log if phone was modified
-      if (cleanPhone !== phoneNumber) {
-        console.warn('[ContactService] Phone number sanitized:', {
-          original: phoneNumber,
-          sanitized: cleanPhone
-        })
-      }
 
       const contactData: any = {
-        phone_number: cleanPhone, // Use sanitized phone
+        phone_number: cleanPhone,
         name: name || null,
         metadata: metadata || {},
         created_at: new Date().toISOString(),
@@ -321,7 +306,6 @@ export class ContactService extends BaseService {
         pushname 
       })
 
-      // Find contact by phone number
       const { data: contact, error: findError } = await this.supabase
         .from('contacts')
         .select('*')
@@ -332,8 +316,8 @@ export class ContactService extends BaseService {
         return null
       }
 
-      // Only update if name is not already set
       if (!contact.name || contact.name.trim() === '') {
+        // @ts-ignore
         const { data, error } = await this.supabase
           .from('contacts')
           .update({

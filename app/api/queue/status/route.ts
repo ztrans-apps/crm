@@ -1,54 +1,43 @@
 /**
  * Queue Status API
- * Returns broadcast processing status from Supabase (Vercel-compatible, no Redis needed)
+ * Permission: admin.access
  */
 
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { withAuth } from '@/lib/rbac/with-auth';
 
-export async function GET() {
-  try {
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    );
+export const GET = withAuth(async (request, ctx) => {
+  const { data: campaigns } = await ctx.serviceClient
+    .from('broadcast_campaigns')
+    .select('id, status, name, total_recipients, created_at')
+    .in('status', ['sending', 'scheduled', 'completed', 'failed'])
+    .order('created_at', { ascending: false })
+    .limit(20);
 
-    // Get broadcast campaign stats as a proxy for queue status
-    const { data: campaigns } = await supabase
-      .from('broadcast_campaigns')
-      .select('id, status, name, total_recipients, created_at')
-      .in('status', ['sending', 'scheduled', 'completed', 'failed'])
-      .order('created_at', { ascending: false })
-      .limit(20);
+  const activeCampaigns = campaigns?.filter(c => c.status === 'sending') || [];
+  const stats: Record<string, any> = {};
 
-    // Count recipients by status for active campaigns
-    const activeCampaigns = campaigns?.filter(c => c.status === 'sending') || [];
-    const stats: Record<string, any> = {};
+  for (const campaign of activeCampaigns.slice(0, 5)) {
+    const { data: recipients } = await ctx.serviceClient
+      .from('broadcast_recipients')
+      .select('status')
+      .eq('campaign_id', campaign.id);
 
-    for (const campaign of activeCampaigns.slice(0, 5)) {
-      const { data: recipients } = await supabase
-        .from('broadcast_recipients')
-        .select('status')
-        .eq('campaign_id', campaign.id);
-
-      if (recipients) {
-        stats[campaign.id] = {
-          name: campaign.name,
-          pending: recipients.filter(r => r.status === 'pending').length,
-          sent: recipients.filter(r => r.status === 'sent').length,
-          failed: recipients.filter(r => r.status === 'failed').length,
-          total: recipients.length,
-        };
-      }
+    if (recipients) {
+      stats[campaign.id] = {
+        name: campaign.name,
+        pending: recipients.filter(r => r.status === 'pending').length,
+        sent: recipients.filter(r => r.status === 'sent').length,
+        failed: recipients.filter(r => r.status === 'failed').length,
+        total: recipients.length,
+      };
     }
-
-    return NextResponse.json({
-      mode: 'serverless',
-      note: 'Queue processing handled by Vercel Cron + Meta Cloud API',
-      campaigns: campaigns || [],
-      activeCampaignStats: stats,
-    });
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
   }
-}
+
+  return NextResponse.json({
+    mode: 'serverless',
+    note: 'Queue processing handled by Vercel Cron + Meta Cloud API',
+    campaigns: campaigns || [],
+    activeCampaignStats: stats,
+  });
+}, { permission: 'admin.access' });

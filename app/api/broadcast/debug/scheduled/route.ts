@@ -1,56 +1,37 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { withAuth } from '@/lib/rbac/with-auth';
 
 /**
  * GET /api/broadcast/debug/scheduled
- * Debug scheduled campaigns (no auth for debugging)
+ * Permission: admin.access (debug endpoint)
  */
-export async function GET() {
-  try {
-    const supabase = await createClient();
-    
-    // Get all scheduled campaigns
-    const { data: campaigns, error } = await supabase
-      .from('broadcast_campaigns')
-      .select('id, name, status, scheduled_at, created_at')
-      .eq('status', 'scheduled')
-      .order('scheduled_at', { ascending: true });
+export const GET = withAuth(async (request, ctx) => {
+  const { data: campaigns, error } = await ctx.supabase
+    .from('broadcast_campaigns')
+    .select('id, name, status, scheduled_at, created_at')
+    .eq('status', 'scheduled')
+    .order('scheduled_at', { ascending: true });
 
-    if (error) {
-      throw error;
-    }
+  if (error) throw error;
 
-    const now = new Date();
-    const nowISO = now.toISOString();
-    const nowLocal = now.toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' });
+  const now = new Date();
 
-    return NextResponse.json({
-      currentTime: {
-        iso: nowISO,
-        local: nowLocal,
-        timestamp: now.getTime()
-      },
-      scheduledCampaigns: campaigns?.map(c => ({
-        id: c.id,
-        name: c.name,
-        status: c.status,
-        scheduled_at: c.scheduled_at,
-        scheduled_at_local: c.scheduled_at ? new Date(c.scheduled_at).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }) : null,
-        created_at: c.created_at,
-        isReady: c.scheduled_at ? new Date(c.scheduled_at) <= now : false,
-        timeUntil: c.scheduled_at ? Math.round((new Date(c.scheduled_at).getTime() - now.getTime()) / 1000) : null
-      })) || [],
-      count: campaigns?.length || 0
-    });
-
-  } catch (error) {
-    console.error('Error in GET /api/broadcast/debug/scheduled:', error);
-    return NextResponse.json(
-      { 
-        error: 'Internal server error', 
-        details: error instanceof Error ? error.message : 'Unknown error'
-      },
-      { status: 500 }
-    );
-  }
-}
+  return NextResponse.json({
+    currentTime: {
+      iso: now.toISOString(),
+      local: now.toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }),
+      timestamp: now.getTime()
+    },
+    scheduledCampaigns: campaigns?.map(c => ({
+      id: c.id,
+      name: c.name,
+      status: c.status,
+      scheduled_at: c.scheduled_at,
+      scheduled_at_local: c.scheduled_at ? new Date(c.scheduled_at).toLocaleString('id-ID', { timeZone: 'Asia/Jakarta' }) : null,
+      created_at: c.created_at,
+      isReady: c.scheduled_at ? new Date(c.scheduled_at) <= now : false,
+      timeUntil: c.scheduled_at ? Math.round((new Date(c.scheduled_at).getTime() - now.getTime()) / 1000) : null
+    })) || [],
+    count: campaigns?.length || 0
+  });
+}, { permission: 'admin.access' });

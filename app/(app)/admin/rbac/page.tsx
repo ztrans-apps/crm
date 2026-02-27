@@ -21,6 +21,7 @@ import {
   AlertCircle 
 } from 'lucide-react'
 import { usePermissions } from '@/lib/rbac/hooks/usePermissions'
+import { PermissionGuard } from '@/lib/rbac/components/PermissionGuard';
 import { createClient } from '@/lib/supabase/client'
 
 interface Role {
@@ -185,6 +186,14 @@ export default function RBACManagementPage() {
   }
 
   return (
+    <PermissionGuard 
+      permission={['role.view']}
+      fallback={
+        <div className="flex items-center justify-center h-full">
+          <p className="text-muted-foreground">Anda tidak memiliki akses ke halaman ini.</p>
+        </div>
+      }
+    >
     <div className="container mx-auto py-8 px-4">
       <div className="mb-8">
         <h1 className="text-3xl font-bold flex items-center gap-2">
@@ -401,5 +410,6 @@ export default function RBACManagementPage() {
         </TabsContent>
       </Tabs>
     </div>
+    </PermissionGuard>
   )
 }

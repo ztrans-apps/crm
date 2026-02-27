@@ -1,91 +1,67 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { withAuth } from '@/lib/rbac/with-auth'
 
 /**
- * Get campaign
  * GET /api/broadcasts/:campaignId
+ * Permission: broadcast.view (enforced by middleware)
  */
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { campaignId: string } }
-) {
-  try {
-    const supabase = await createClient()
+export const GET = withAuth(async (request, ctx, params) => {
+  const { campaignId } = await params
 
-    const { data: campaign, error } = await supabase
-      .from('broadcast_campaigns')
-      .select('*')
-      .eq('id', params.campaignId)
-      .single()
+  const { data: campaign, error } = await ctx.supabase
+    .from('broadcast_campaigns')
+    .select('*')
+    .eq('id', campaignId)
+    .eq('tenant_id', ctx.tenantId)
+    .single()
 
-    if (error) throw error
-
-    return NextResponse.json({ campaign })
-  } catch (error: any) {
-    console.error('[API] Error getting campaign:', error)
-    return NextResponse.json(
-      { error: error.message || 'Failed to get campaign' },
-      { status: 500 }
-    )
+  if (error || !campaign) {
+    return NextResponse.json({ error: 'Campaign not found' }, { status: 404 })
   }
-}
+
+  return NextResponse.json({ campaign })
+})
 
 /**
- * Update campaign
  * PATCH /api/broadcasts/:campaignId
+ * Permission: broadcast.manage
  */
-export async function PATCH(
-  request: NextRequest,
-  { params }: { params: { campaignId: string } }
-) {
-  try {
-    const supabase = await createClient()
-    const body = await request.json()
+export const PATCH = withAuth(async (request, ctx, params) => {
+  const { campaignId } = await params
+  const body = await request.json()
 
-    const { data: campaign, error } = await supabase
-      .from('broadcast_campaigns')
-      .update(body)
-      .eq('id', params.campaignId)
-      .select()
-      .single()
+  const { data: campaign, error } = await ctx.supabase
+    .from('broadcast_campaigns')
+    .update(body)
+    .eq('id', campaignId)
+    .eq('tenant_id', ctx.tenantId)
+    .select()
+    .single()
 
-    if (error) throw error
-
-    return NextResponse.json({ campaign })
-  } catch (error: any) {
-    console.error('[API] Error updating campaign:', error)
-    return NextResponse.json(
-      { error: error.message || 'Failed to update campaign' },
-      { status: 500 }
-    )
+  if (error) {
+    return NextResponse.json({ error: error.message || 'Failed to update campaign' }, { status: 500 })
   }
-}
+
+  return NextResponse.json({ campaign })
+}, { permission: 'broadcast.manage' })
 
 /**
- * Delete campaign
  * DELETE /api/broadcasts/:campaignId
+ * Permission: broadcast.manage
  */
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: { campaignId: string } }
-) {
-  try {
-    const supabase = await createClient()
+export const DELETE = withAuth(async (request, ctx, params) => {
+  const { campaignId } = await params
 
-    const { error } = await supabase
-      .from('broadcast_campaigns')
-      .delete()
-      .eq('id', params.campaignId)
+  const { error } = await ctx.supabase
+    .from('broadcast_campaigns')
+    .delete()
+    .eq('id', campaignId)
+    .eq('tenant_id', ctx.tenantId)
 
-    if (error) throw error
-
-    return NextResponse.json({ success: true })
-  } catch (error: any) {
-    console.error('[API] Error deleting campaign:', error)
-    return NextResponse.json(
-      { error: error.message || 'Failed to delete campaign' },
-      { status: 500 }
-    )
+  if (error) {
+    return NextResponse.json({ error: error.message || 'Failed to delete campaign' }, { status: 500 })
   }
-}
+
+  return NextResponse.json({ success: true })
+}, { permission: 'broadcast.manage' })
 

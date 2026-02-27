@@ -3,6 +3,7 @@
 
 import { useState, useEffect } from 'react'
 import { AuthGuard } from '@/core/auth'
+import { PermissionGuard } from '@/lib/rbac/components/PermissionGuard';
 import { createClient } from '@/lib/supabase/client'
 import { conversationService } from '@/features/chat/services'
 import { ArrowRight, TrendingUp, TrendingDown, Calendar, User } from 'lucide-react'
@@ -12,7 +13,16 @@ import { id as localeId } from 'date-fns/locale'
 export default function HandoverReportsPage() {
   return (
     <AuthGuard>
-      <HandoverReportsContent />
+      <PermissionGuard 
+        permission={['analytics.view']}
+        fallback={
+          <div className="flex items-center justify-center h-full">
+            <p className="text-muted-foreground">Anda tidak memiliki akses ke halaman ini.</p>
+          </div>
+        }
+      >
+        <HandoverReportsContent />
+      </PermissionGuard>
     </AuthGuard>
   )
 }

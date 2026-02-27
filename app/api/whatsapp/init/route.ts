@@ -4,71 +4,40 @@
  * No QR code or Baileys service needed.
  */
 
-import { createClient } from '@/lib/supabase/server';
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
+import { withAuth } from '@/lib/rbac/with-auth';
 import { randomUUID } from 'crypto';
 
-export async function POST(request: Request) {
-  try {
-    const supabase = await createClient();
-    const body = await request.json();
-    const { phoneNumber, name, metaPhoneNumberId } = body;
+export const POST = withAuth(async (req, ctx) => {
+  const body = await req.json();
+  const { phoneNumber, name, metaPhoneNumberId } = body;
 
-    // Get current user
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+  // Generate UUID for session ID
+  const sessionId = randomUUID();
 
-    // Get user's tenant_id
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('tenant_id')
-      .eq('id', user.id)
-      .single();
+  // Prepare session data
+  const sessionData: any = {
+    id: sessionId,
+    user_id: ctx.user.id,
+    phone_number: phoneNumber || '',
+    session_name: name || phoneNumber || 'WhatsApp Business',
+    status: 'connected', // Meta Cloud API numbers are always connected
+    meta_phone_number_id: metaPhoneNumberId || process.env.META_PHONE_NUMBER_ID || null,
+    tenant_id: ctx.tenantId,
+  };
 
-    // Generate UUID for session ID
-    const sessionId = randomUUID();
+  // Create session in database
+  const { data: session, error } = await ctx.supabase
+    .from('whatsapp_sessions')
+    .insert(sessionData)
+    .select()
+    .single();
 
-    // Prepare session data
-    const sessionData: any = {
-      id: sessionId,
-      user_id: user.id,
-      phone_number: phoneNumber || '',
-      session_name: name || phoneNumber || 'WhatsApp Business',
-      status: 'connected', // Meta Cloud API numbers are always connected
-      meta_phone_number_id: metaPhoneNumberId || process.env.META_PHONE_NUMBER_ID || null,
-    };
+  if (error) throw error;
 
-    // Add tenant_id
-    if (profile?.tenant_id) {
-      sessionData.tenant_id = profile.tenant_id;
-    } else {
-      const defaultTenantId = process.env.DEFAULT_TENANT_ID;
-      if (defaultTenantId) {
-        sessionData.tenant_id = defaultTenantId;
-      }
-    }
-
-    // Create session in database
-    const { data: session, error } = await supabase
-      .from('whatsapp_sessions')
-      .insert(sessionData)
-      .select()
-      .single();
-
-    if (error) throw error;
-
-    return NextResponse.json({ 
-      success: true, 
-      sessionId: session.id,
-      message: 'WhatsApp number registered successfully via Meta Cloud API',
-    });
-  } catch (error: any) {
-    console.error('[WhatsApp Init] Error:', error);
-    return NextResponse.json(
-      { error: error.message || 'Failed to register number' },
-      { status: 500 }
-    );
-  }
-}
+  return NextResponse.json({ 
+    success: true, 
+    sessionId: session.id,
+    message: 'WhatsApp number registered successfully via Meta Cloud API',
+  });
+}, { permission: 'whatsapp.session.manage' });

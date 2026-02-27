@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { withAuth } from '@/lib/rbac/with-auth'
 import { getMetaCloudAPIForSession } from '@/lib/whatsapp/meta-api'
 
-export async function POST(request: NextRequest) {
-  try {
+export const POST = withAuth(async (request, ctx) => {
     const formData = await request.formData()
     
     const sessionId = formData.get('sessionId') as string
@@ -25,22 +24,8 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Create Supabase client with service role for server-side operations
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
-      {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false
-        }
-      }
-    )
+    const supabase = ctx.serviceClient
 
-    // Get default tenant ID
-    const defaultTenantId = process.env.DEFAULT_TENANT_ID || '00000000-0000-0000-0000-000000000001'
-
-    // Prepare message data
     const messageData = {
       conversation_id: conversationId,
       sender_type: 'agent' as const,
@@ -54,11 +39,10 @@ export async function POST(request: NextRequest) {
       media_filename: mediaFilename,
       media_size: parseInt(mediaSize),
       media_mime_type: mimetype,
-      tenant_id: defaultTenantId,
+      tenant_id: ctx.tenantId,
       created_at: new Date().toISOString(),
     }
 
-    // Save message to database first
     const { data: savedMessage, error: dbError } = await supabase
       .from('messages')
       .insert(messageData)
@@ -74,20 +58,16 @@ export async function POST(request: NextRequest) {
     }
 
     try {
-      // Send media via Meta Cloud API (supports multi-number)
       const metaApi = await getMetaCloudAPIForSession(sessionId, supabase)
 
       if (!metaApi.isConfigured()) {
-        throw new Error('WhatsApp Cloud API not configured. Set WHATSAPP_API_TOKEN and WHATSAPP_PHONE_NUMBER_ID environment variables.')
+        throw new Error('WhatsApp Cloud API not configured.')
       }
 
       let result
-
-      // Determine media type for Meta API
       const waMediaType = (mediaType || 'image') as 'image' | 'video' | 'audio' | 'document'
 
       if (media) {
-        // Upload media to Meta first, then send by media ID
         const buffer = Buffer.from(await media.arrayBuffer())
         const uploadedMediaId = await metaApi.uploadMedia(buffer, mimetype, mediaFilename)
         
@@ -98,7 +78,6 @@ export async function POST(request: NextRequest) {
           filename: mediaFilename || undefined,
         })
       } else if (mediaUrl) {
-        // Send by URL directly
         result = await metaApi.sendMedia(to, {
           type: waMediaType,
           url: mediaUrl,
@@ -113,7 +92,6 @@ export async function POST(request: NextRequest) {
         throw new Error(result.error || 'Failed to send media via WhatsApp Cloud API')
       }
 
-      // Update message status to sent
       await supabase
         .from('messages')
         .update({
@@ -124,7 +102,6 @@ export async function POST(request: NextRequest) {
         })
         .eq('id', savedMessage.id)
 
-      // Update conversation last_message and first_response_at
       const updateData: any = {
         last_message: caption || '[Media]',
         last_message_at: new Date().toISOString(),
@@ -139,7 +116,6 @@ export async function POST(request: NextRequest) {
       
       if (conv && !conv.first_response_at) {
         updateData.first_response_at = new Date().toISOString()
-        
         if (conv.workflow_status === 'waiting' || conv.workflow_status === 'incoming') {
           updateData.workflow_status = 'in_progress'
           updateData.workflow_started_at = new Date().toISOString()
@@ -166,11 +142,4 @@ export async function POST(request: NextRequest) {
       
       throw sendError
     }
-  } catch (error: any) {
-    console.error('Error sending media:', error)
-    return NextResponse.json(
-      { error: error.message || 'Failed to send media' },
-      { status: 500 }
-    )
-  }
-}
+}, { permission: 'chat.send' })

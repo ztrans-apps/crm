@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import UserFormModal from './components/UserFormModal';
 import UserSessionsModal from './components/UserSessionsModal';
+import { PermissionGuard } from '@/lib/rbac/components/PermissionGuard';
 
 interface User {
   id: string;
@@ -184,6 +185,14 @@ export default function AgentsPage() {
   };
 
   return (
+    <PermissionGuard 
+      permission={['agent.view']}
+      fallback={
+        <div className="flex items-center justify-center h-full">
+          <p className="text-muted-foreground">Anda tidak memiliki akses ke halaman ini.</p>
+        </div>
+      }
+    >
     <div className="h-full bg-vx-surface-elevated p-6">
       {/* Header */}
       <div className="mb-6">
@@ -410,5 +419,6 @@ export default function AgentsPage() {
         />
       )}
     </div>
+    </PermissionGuard>
   );
 }

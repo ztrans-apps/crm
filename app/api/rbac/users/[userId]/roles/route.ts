@@ -4,153 +4,104 @@
 // DELETE /api/rbac/users/[userId]/roles - Remove role from user
 
 import { NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
-import { requirePermission } from '@/lib/rbac/middleware'
+import { withAuth } from '@/lib/rbac/with-auth'
 
-export async function GET(
-  request: Request,
-  { params }: { params: Promise<{ userId: string }> }
-) {
-  try {
-    const supabase = await createClient()
-    const { userId } = await params
-    
-    // Get current user
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    
-    if (authError || !user) {
+export const GET = withAuth(async (req, ctx, params) => {
+  const { userId } = await params
+
+  // If viewing another user's roles, check permission
+  if (ctx.user.id !== userId) {
+    // @ts-ignore - Supabase RPC type inference issue
+    const { data: allowed } = await ctx.supabase.rpc('user_has_permission', {
+      p_user_id: ctx.user.id,
+      p_permission_key: 'user.view',
+    })
+    if (!allowed) {
       return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
+        { error: 'Forbidden', message: "Permission 'user.view' required" },
+        { status: 403 }
       )
     }
+  }
 
-    // Check if user can view (either viewing own roles or has user.view permission)
-    if (user.id !== userId) {
-      const hasPermission = await requirePermission('user.view')
-      if (hasPermission !== true) return hasPermission
-    }
+  // Get user roles
+  const { data: roles, error: rolesError } = await ctx.supabase
+    // @ts-ignore - Supabase RPC type inference issue
+    .rpc('get_user_roles', { p_user_id: userId })
 
-    // Get user roles
-    const { data: roles, error: rolesError } = await supabase
-      // @ts-ignore - Supabase RPC type inference issue
-      .rpc('get_user_roles', { p_user_id: userId })
-
-    if (rolesError) {
-      console.error('Error fetching user roles:', rolesError)
-      return NextResponse.json(
-        { error: 'Failed to fetch user roles' },
-        { status: 500 }
-      )
-    }
-
-    return NextResponse.json({ roles: roles || [] })
-  } catch (error) {
-    console.error('Error in get user roles API:', error)
+  if (rolesError) {
+    console.error('Error fetching user roles:', rolesError)
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: 'Failed to fetch user roles' },
       { status: 500 }
     )
   }
-}
 
-export async function POST(
-  request: Request,
-  { params }: { params: Promise<{ userId: string }> }
-) {
-  try {
-    // Check permission
-    const hasPermission = await requirePermission('user.manage_roles')
-    if (hasPermission !== true) return hasPermission
+  return NextResponse.json({ roles: roles || [] })
+})
 
-    const supabase = await createClient()
-    const { userId } = await params
-    const body = await request.json()
-    
-    const { role_ids } = body
+export const POST = withAuth(async (req, ctx, params) => {
+  const { userId } = await params
+  const body = await req.json()
 
-    if (!role_ids || !Array.isArray(role_ids)) {
-      return NextResponse.json(
-        { error: 'role_ids array is required' },
-        { status: 400 }
-      )
-    }
+  const { role_ids } = body
 
-    // Get current user for assigned_by
-    const { data: { user } } = await supabase.auth.getUser()
-
-    // Assign roles
-    const userRoles = role_ids.map((roleId: string) => ({
-      user_id: userId,
-      role_id: roleId,
-      assigned_by: user?.id,
-    }))
-
-    const { error: assignError } = await supabase
-      .from('user_roles')
-      // @ts-ignore - Supabase type inference issue
-      .upsert(userRoles, { onConflict: 'user_id,role_id' })
-
-    if (assignError) {
-      console.error('Error assigning roles:', assignError)
-      return NextResponse.json(
-        { error: 'Failed to assign roles' },
-        { status: 500 }
-      )
-    }
-
-    return NextResponse.json({ success: true })
-  } catch (error) {
-    console.error('Error in assign roles API:', error)
+  if (!role_ids || !Array.isArray(role_ids)) {
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: 'role_ids array is required' },
+      { status: 400 }
+    )
+  }
+
+  // Assign roles
+  const userRoles = role_ids.map((roleId: string) => ({
+    user_id: userId,
+    role_id: roleId,
+    assigned_by: ctx.user.id,
+  }))
+
+  const { error: assignError } = await ctx.supabase
+    .from('user_roles')
+    // @ts-ignore - Supabase type inference issue
+    .upsert(userRoles, { onConflict: 'user_id,role_id' })
+
+  if (assignError) {
+    console.error('Error assigning roles:', assignError)
+    return NextResponse.json(
+      { error: 'Failed to assign roles' },
       { status: 500 }
     )
   }
-}
 
-export async function DELETE(
-  request: Request,
-  { params }: { params: Promise<{ userId: string }> }
-) {
-  try {
-    // Check permission
-    const hasPermission = await requirePermission('user.manage_roles')
-    if (hasPermission !== true) return hasPermission
+  return NextResponse.json({ success: true })
+}, { permission: 'user.manage_roles' })
 
-    const supabase = await createClient()
-    const { userId } = await params
-    const { searchParams } = new URL(request.url)
-    const roleId = searchParams.get('role_id')
+export const DELETE = withAuth(async (req, ctx, params) => {
+  const { userId } = await params
+  const { searchParams } = new URL(req.url)
+  const roleId = searchParams.get('role_id')
 
-    if (!roleId) {
-      return NextResponse.json(
-        { error: 'role_id query parameter is required' },
-        { status: 400 }
-      )
-    }
-
-    // Remove role from user
-    const { error: removeError } = await supabase
-      .from('user_roles')
-      .delete()
-      .eq('user_id', userId)
-      .eq('role_id', roleId)
-
-    if (removeError) {
-      console.error('Error removing role:', removeError)
-      return NextResponse.json(
-        { error: 'Failed to remove role' },
-        { status: 500 }
-      )
-    }
-
-    return NextResponse.json({ success: true })
-  } catch (error) {
-    console.error('Error in remove role API:', error)
+  if (!roleId) {
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: 'role_id query parameter is required' },
+      { status: 400 }
+    )
+  }
+
+  // Remove role from user
+  const { error: removeError } = await ctx.supabase
+    .from('user_roles')
+    .delete()
+    .eq('user_id', userId)
+    .eq('role_id', roleId)
+
+  if (removeError) {
+    console.error('Error removing role:', removeError)
+    return NextResponse.json(
+      { error: 'Failed to remove role' },
       { status: 500 }
     )
   }
-}
+
+  return NextResponse.json({ success: true })
+}, { permission: 'user.manage_roles' })

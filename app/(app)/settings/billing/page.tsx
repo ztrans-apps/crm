@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { useSubscription, useUsageLimit } from '@/core/billing';
 import { PLAN_LIMITS } from '@/core/billing';
+import { PermissionGuard } from '@/lib/rbac/components/PermissionGuard';
 
 export default function BillingPage() {
   const { subscription, limits, isActive, loading } = useSubscription(''); // Get from context
@@ -24,6 +25,14 @@ export default function BillingPage() {
   const plans = ['free', 'starter', 'professional', 'enterprise'] as const;
 
   return (
+    <PermissionGuard 
+      permission={['settings.manage']}
+      fallback={
+        <div className="flex items-center justify-center h-full">
+          <p className="text-muted-foreground">Anda tidak memiliki akses ke halaman ini.</p>
+        </div>
+      }
+    >
     <div className="container mx-auto py-8">
       <div className="mb-8">
         <h1 className="text-3xl font-bold">Billing & Subscription</h1>
@@ -168,5 +177,6 @@ export default function BillingPage() {
         })}
       </div>
     </div>
+    </PermissionGuard>
   );
 }

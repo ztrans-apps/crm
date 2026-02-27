@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef } from 'react'
+import { PermissionGuard } from '@/lib/rbac/components/PermissionGuard';
 
 export default function ApiDocsPage() {
   const containerRef = useRef<HTMLDivElement>(null)
@@ -48,6 +49,14 @@ export default function ApiDocsPage() {
   }, [])
 
   return (
+    <PermissionGuard 
+      permission={['admin.access']}
+      fallback={
+        <div className="flex items-center justify-center h-full">
+          <p className="text-muted-foreground">Anda tidak memiliki akses ke halaman ini.</p>
+        </div>
+      }
+    >
     <div className="min-h-screen bg-vx-surface">
       <div className="border-b border-vx-border bg-vx-surface px-6 py-4">
         <div className="max-w-7xl mx-auto">
@@ -62,6 +71,7 @@ export default function ApiDocsPage() {
         <div id="swagger-ui" ref={containerRef}></div>
       </div>
     </div>
+    </PermissionGuard>
   )
 }
 

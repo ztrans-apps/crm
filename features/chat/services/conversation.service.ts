@@ -191,7 +191,7 @@ export class ConversationService extends BaseService {
           updated_at: new Date().toISOString(),
         })
         .eq('id', conversationId)
-        .is('assigned_to', null) // Only pick if unassigned
+        .is('assigned_to', null)
 
       if (error) {
         this.handleError(error, 'ConversationService.pickConversation')
@@ -248,7 +248,6 @@ export class ConversationService extends BaseService {
         reason,
       })
 
-      // Update conversation
       // @ts-ignore
       const { error: updateError } = await this.supabase
         .from('conversations')
@@ -259,7 +258,7 @@ export class ConversationService extends BaseService {
           updated_at: new Date().toISOString(),
         })
         .eq('id', conversationId)
-        .eq('assigned_to', fromAgentId) // Only if currently assigned to fromAgent
+        .eq('assigned_to', fromAgentId)
 
       if (updateError) {
         this.handleError(updateError, 'ConversationService.handoverConversation')
@@ -280,7 +279,6 @@ export class ConversationService extends BaseService {
 
       if (logError) {
         console.error('Failed to log handover:', logError)
-        // Don't throw error, handover already succeeded
       }
 
       return true

@@ -260,7 +260,7 @@ export class ChatService extends BaseService {
       // Fetch user data separately for each note
       if (data && data.length > 0) {
         const notesWithUsers = await Promise.all(
-          data.map(async (note) => {
+          data.map(async (note: any) => {
             if (note.created_by) {
               const { data: userData } = await this.supabase
                 .from('profiles')
@@ -300,24 +300,15 @@ export class ChatService extends BaseService {
         throw new Error('Rating must be between 0 and 10')
       }
 
-      // Determine note_type if not provided
-      let finalNoteType = noteType
-      if (!finalNoteType) {
-        // Auto-detect: if has rating, it's a review, otherwise internal
-        finalNoteType = (rating && rating > 0) ? 'review' : 'internal'
-      }
-
-      // @ts-ignore - Supabase type issue
+      // @ts-ignore
       const { data, error } = await this.supabase
         .from('conversation_notes')
-        // @ts-ignore - Supabase type issue
         .insert({
           conversation_id: conversationId,
           content: content.trim(),
           rating,
+          note_type: noteType || 'internal',
           created_by: userId,
-          note_type: finalNoteType,
-          is_visible_to_customer: finalNoteType === 'review',
           tenant_id: this.defaultTenantId,
         })
         .select()
@@ -362,35 +353,17 @@ export class ChatService extends BaseService {
     try {
       this.log('ChatService', 'Getting all labels')
 
-      // Get current user
-      const { data: { user } } = await this.supabase.auth.getUser()
-      if (!user) {
-        throw new Error('No user found')
-      }
-
-      // Get user profile to check role
-      const { data: profile } = await this.supabase
-        .from('profiles')
-        .select('role')
-        .eq('id', user.id)
-        .single()
-
-      // Try to get all labels
       const { data, error } = await this.supabase
         .from('labels')
         .select('*')
         .order('created_at', { ascending: true })
 
       if (error) {
-        // Fallback for agents
-        if (profile?.role === 'agent') {
-          return await this.getOrCreateDefaultLabels(user.id)
-        }
         this.handleError(error, 'ChatService.getAllLabels')
       }
 
       if (!data || data.length === 0) {
-        return await this.getOrCreateDefaultLabels(user.id)
+        return await this.getOrCreateDefaultLabels('')
       }
 
       // Remove duplicates by name
@@ -409,17 +382,6 @@ export class ChatService extends BaseService {
 
   async getOrCreateDefaultLabels(userId: string) {
     try {
-      // Check if user has labels
-      const { data: existingLabels } = await this.supabase
-        .from('labels')
-        .select('*')
-        .eq('user_id', userId)
-
-      if (existingLabels && existingLabels.length > 0) {
-        return existingLabels
-      }
-
-      // Create default labels
       const defaultLabels = [
         { name: 'Important', color: '#EF4444' },
         { name: 'Follow-up', color: '#F59E0B' },
@@ -428,13 +390,15 @@ export class ChatService extends BaseService {
         { name: 'Not Important', color: '#6B7280' },
       ]
 
+      // @ts-ignore
       const { data, error } = await this.supabase
         .from('labels')
         .insert(
           defaultLabels.map((label) => ({
-            user_id: userId,
+            user_id: userId || null,
             name: label.name,
             color: label.color,
+            tenant_id: this.defaultTenantId,
           }))
         )
         .select()
@@ -476,6 +440,7 @@ export class ChatService extends BaseService {
       }
 
       // Apply label
+      // @ts-ignore
       const { data, error } = await this.supabase
         .from('conversation_labels')
         .insert({

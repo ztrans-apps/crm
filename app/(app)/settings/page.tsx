@@ -3,9 +3,18 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Settings, User, Bell, Lock } from 'lucide-react'
+import { PermissionGuard } from '@/lib/rbac/components/PermissionGuard';
 
 export default function SettingsPage() {
   return (
+    <PermissionGuard 
+      permission={['settings.manage']}
+      fallback={
+        <div className="flex items-center justify-center h-full">
+          <p className="text-muted-foreground">Anda tidak memiliki akses ke halaman ini.</p>
+        </div>
+      }
+    >
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold">Settings</h1>
@@ -82,5 +91,6 @@ export default function SettingsPage() {
         </Card>
       </div>
     </div>
+    </PermissionGuard>
   )
 }

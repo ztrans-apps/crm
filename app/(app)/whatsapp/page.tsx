@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Plus, AlertCircle, Signal, CheckCircle2, MessageSquare, Shield } from 'lucide-react';
 import { SessionList, AddNumberModal, EditNumberModal } from '@/modules/whatsapp/components';
 import { usePermissions } from '@/lib/rbac';
+import { PermissionGuard } from '@/lib/rbac/components/PermissionGuard';
 
 interface MetaApiStatus {
   configured: boolean;
@@ -106,6 +107,14 @@ export default function WhatsAppPage() {
   };
 
   return (
+    <PermissionGuard 
+      permission={['whatsapp.session.view']}
+      fallback={
+        <div className="flex items-center justify-center h-full">
+          <p className="text-muted-foreground">Anda tidak memiliki akses ke halaman ini.</p>
+        </div>
+      }
+    >
     <div className="p-8 max-w-7xl mx-auto">
       {/* Header */}
       <div className="mb-8 flex items-center justify-between">
@@ -257,5 +266,6 @@ export default function WhatsAppPage() {
         }}
       />
     </div>
+    </PermissionGuard>
   );
 }

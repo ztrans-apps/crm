@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
+import { withAuth } from '@/lib/rbac/with-auth'
 import { getMetaCloudAPIForSession } from '@/lib/whatsapp/meta-api'
 
-export async function POST(request: NextRequest) {
-  try {
+export const POST = withAuth(async (request, ctx) => {
     const body = await request.json()
     const { sessionId, to, latitude, longitude, address, name, conversationId, userId } = body
 
@@ -14,26 +13,13 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Create Supabase client with service role for server-side operations
-    const supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
-      {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false
-        }
-      }
-    )
+    const supabase = ctx.serviceClient
 
     // Store coordinates in content field (format: "lat,lng")
     const locationContent = `${latitude},${longitude}`
     
     // Store Google Maps URL in media_url
     const mediaUrl = `https://www.google.com/maps?q=${latitude},${longitude}`
-
-    // Get default tenant ID
-    const defaultTenantId = process.env.DEFAULT_TENANT_ID || '00000000-0000-0000-0000-000000000001'
 
     // Prepare message data
     const messageData = {
@@ -47,7 +33,7 @@ export async function POST(request: NextRequest) {
       media_url: mediaUrl,
       media_type: 'location' as const,
       media_filename: address || name || null,
-      tenant_id: defaultTenantId,
+      tenant_id: ctx.tenantId,
       created_at: new Date().toISOString(),
     }
 
@@ -67,11 +53,10 @@ export async function POST(request: NextRequest) {
     }
 
     try {
-      // Send location via Meta Cloud API (supports multi-number)
       const metaApi = await getMetaCloudAPIForSession(sessionId, supabase)
 
       if (!metaApi.isConfigured()) {
-        throw new Error('WhatsApp Cloud API not configured. Set WHATSAPP_API_TOKEN and WHATSAPP_PHONE_NUMBER_ID environment variables.')
+        throw new Error('WhatsApp Cloud API not configured.')
       }
 
       const result = await metaApi.sendLocation(to, {
@@ -85,9 +70,6 @@ export async function POST(request: NextRequest) {
         throw new Error(result.error || 'Failed to send location via WhatsApp Cloud API')
       }
 
-      console.log('[Send Location API] Location sent successfully via Meta Cloud API')
-
-      // Update message status
       await supabase
         .from('messages')
         .update({
@@ -98,7 +80,6 @@ export async function POST(request: NextRequest) {
         })
         .eq('id', savedMessage.id)
 
-      // Update conversation last_message
       await supabase
         .from('conversations')
         .update({
@@ -117,7 +98,6 @@ export async function POST(request: NextRequest) {
     } catch (sendError: any) {
       console.error('WhatsApp Cloud API error:', sendError)
       
-      // Update message status to failed
       await supabase
         .from('messages')
         .update({ status: 'failed', metadata: { error: sendError.message } })
@@ -125,11 +105,4 @@ export async function POST(request: NextRequest) {
       
       throw sendError
     }
-  } catch (error: any) {
-    console.error('Error sending location:', error)
-    return NextResponse.json(
-      { error: error.message || 'Failed to send location' },
-      { status: 500 }
-    )
-  }
-}
+}, { permission: 'chat.send' })

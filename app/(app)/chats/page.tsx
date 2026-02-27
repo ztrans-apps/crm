@@ -5,6 +5,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { chatService } from '@/features/chat/services'
 import type { QuickReply } from '@/lib/types/chat'
 import { AuthGuard } from '@/core/auth'
+import { PermissionGuard } from '@/lib/rbac/components/PermissionGuard';
 import { ArrowLeft, PanelRightOpen } from 'lucide-react'
 
 // Import hooks
@@ -16,7 +17,16 @@ import { ConversationList, RightSidebar, ChatWindow, QuickRepliesModal } from '@
 export default function UnifiedChatsPage() {
   return (
     <AuthGuard>
-      <UnifiedChatsContent />
+      <PermissionGuard 
+        permission={['chat.view']}
+        fallback={
+          <div className="flex items-center justify-center h-full">
+            <p className="text-muted-foreground">Anda tidak memiliki akses ke halaman ini.</p>
+          </div>
+        }
+      >
+        <UnifiedChatsContent />
+      </PermissionGuard>
     </AuthGuard>
   )
 }

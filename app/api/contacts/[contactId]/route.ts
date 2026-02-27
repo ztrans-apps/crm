@@ -1,155 +1,104 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
-import { getCurrentTenant } from '@/core/tenant';
+import { withAuth } from '@/lib/rbac/with-auth';
 
 /**
  * GET /api/contacts/[contactId]
- * Get a specific contact
+ * Permission: contact.view (enforced by middleware)
  */
-export async function GET(
-  req: NextRequest,
-  context: { params: Promise<{ contactId: string }> }
-) {
-  try {
-    const params = await context.params;
-    const tenant = await getCurrentTenant();
-    if (!tenant) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+export const GET = withAuth(async (req, ctx, params) => {
+  const { contactId } = await params;
 
-    const supabase = await createClient();
-    const { data, error } = await supabase
-      .from('contacts')
-      .select('*')
-      .eq('id', params.contactId)
-      .eq('tenant_id', tenant.id)
-      .single();
+  const { data, error } = await ctx.supabase
+    .from('contacts')
+    .select('*')
+    .eq('id', contactId)
+    .eq('tenant_id', ctx.tenantId)
+    .single();
 
-    if (error || !data) {
-      return NextResponse.json({ error: 'Contact not found' }, { status: 404 });
-    }
-
-    return NextResponse.json({ contact: data });
-  } catch (error) {
-    console.error('Error in GET /api/contacts/[contactId]:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  if (error || !data) {
+    return NextResponse.json({ error: 'Contact not found' }, { status: 404 });
   }
-}
+
+  return NextResponse.json({ contact: data });
+});
 
 /**
  * PUT /api/contacts/[contactId]
- * Update a contact
+ * Permission: contact.edit
  */
-export async function PUT(
-  req: NextRequest,
-  context: { params: Promise<{ contactId: string }> }
-) {
-  try {
-    const params = await context.params;
-    const tenant = await getCurrentTenant();
-    if (!tenant) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+export const PUT = withAuth(async (req, ctx, params) => {
+  const { contactId } = await params;
+  const body = await req.json();
+  const { name, phone_number, email, notes, tags, avatar_url, metadata } = body;
 
-    const body = await req.json();
-    const { name, phone_number, email, notes, tags, avatar_url, metadata } = body;
-
-    // Validation
-    if (!phone_number) {
-      return NextResponse.json(
-        { error: 'Phone number is required' },
-        { status: 400 }
-      );
-    }
-
-    const supabase = await createClient();
-
-    // Check if contact exists and belongs to tenant
-    const { data: existing } = await supabase
-      .from('contacts')
-      .select('id')
-      .eq('id', params.contactId)
-      .eq('tenant_id', tenant.id)
-      .single();
-
-    if (!existing) {
-      return NextResponse.json({ error: 'Contact not found' }, { status: 404 });
-    }
-
-    // Update contact
-    const { data, error } = await supabase
-      .from('contacts')
-      .update({
-        name: name || null,
-        phone_number,
-        email: email || null,
-        notes: notes || null,
-        tags: tags || [],
-        avatar_url: avatar_url || null,
-        metadata: metadata || {},
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', params.contactId)
-      .eq('tenant_id', tenant.id)
-      .select()
-      .single();
-
-    if (error) {
-      console.error('Error updating contact:', error);
-      return NextResponse.json({ error: 'Failed to update contact' }, { status: 500 });
-    }
-
-    return NextResponse.json({ contact: data });
-  } catch (error) {
-    console.error('Error in PUT /api/contacts/[contactId]:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  if (!phone_number) {
+    return NextResponse.json({ error: 'Phone number is required' }, { status: 400 });
   }
-}
+
+  const { data: existing } = await ctx.supabase
+    .from('contacts')
+    .select('id')
+    .eq('id', contactId)
+    .eq('tenant_id', ctx.tenantId)
+    .single();
+
+  if (!existing) {
+    return NextResponse.json({ error: 'Contact not found' }, { status: 404 });
+  }
+
+  const { data, error } = await ctx.supabase
+    .from('contacts')
+    .update({
+      name: name || null,
+      phone_number,
+      email: email || null,
+      notes: notes || null,
+      tags: tags || [],
+      avatar_url: avatar_url || null,
+      metadata: metadata || {},
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', contactId)
+    .eq('tenant_id', ctx.tenantId)
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Error updating contact:', error);
+    return NextResponse.json({ error: 'Failed to update contact' }, { status: 500 });
+  }
+
+  return NextResponse.json({ contact: data });
+}, { permission: 'contact.edit' });
 
 /**
  * DELETE /api/contacts/[contactId]
- * Delete a contact
+ * Permission: contact.delete
  */
-export async function DELETE(
-  req: NextRequest,
-  context: { params: Promise<{ contactId: string }> }
-) {
-  try {
-    const params = await context.params;
-    const tenant = await getCurrentTenant();
-    if (!tenant) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
+export const DELETE = withAuth(async (req, ctx, params) => {
+  const { contactId } = await params;
 
-    const supabase = await createClient();
+  const { data: existing } = await ctx.supabase
+    .from('contacts')
+    .select('id')
+    .eq('id', contactId)
+    .eq('tenant_id', ctx.tenantId)
+    .single();
 
-    // Check if contact exists and belongs to tenant
-    const { data: existing } = await supabase
-      .from('contacts')
-      .select('id')
-      .eq('id', params.contactId)
-      .eq('tenant_id', tenant.id)
-      .single();
-
-    if (!existing) {
-      return NextResponse.json({ error: 'Contact not found' }, { status: 404 });
-    }
-
-    // Delete contact
-    const { error } = await supabase
-      .from('contacts')
-      .delete()
-      .eq('id', params.contactId)
-      .eq('tenant_id', tenant.id);
-
-    if (error) {
-      console.error('Error deleting contact:', error);
-      return NextResponse.json({ error: 'Failed to delete contact' }, { status: 500 });
-    }
-
-    return NextResponse.json({ success: true });
-  } catch (error) {
-    console.error('Error in DELETE /api/contacts/[contactId]:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  if (!existing) {
+    return NextResponse.json({ error: 'Contact not found' }, { status: 404 });
   }
-}
+
+  const { error } = await ctx.supabase
+    .from('contacts')
+    .delete()
+    .eq('id', contactId)
+    .eq('tenant_id', ctx.tenantId);
+
+  if (error) {
+    console.error('Error deleting contact:', error);
+    return NextResponse.json({ error: 'Failed to delete contact' }, { status: 500 });
+  }
+
+  return NextResponse.json({ success: true });
+}, { permission: 'contact.delete' });

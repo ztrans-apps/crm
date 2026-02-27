@@ -1,6 +1,6 @@
 // app/api/dashboard/kpi/route.ts
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { withAuth, AuthContext } from '@/lib/rbac/with-auth'
 import { withCache, getCacheKey } from '@/lib/cache/redis'
 
 export const dynamic = 'force-dynamic'
@@ -20,47 +20,23 @@ interface KPIResponse {
   messagesToday: KPIMetric
 }
 
-export async function GET(request: NextRequest) {
-  try {
-    const supabase = await createClient()
-    
-    // Get current user
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+export const GET = withAuth(async (req, ctx) => {
+  const userRole = ctx.profile.role || 'agent'
+  const isAgent = userRole === 'agent'
 
-    // Get user profile and role
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role, id')
-      .eq('id', user.id)
-      .single()
+  // Use cache with 30 second TTL
+  const cacheKey = getCacheKey('kpi', ctx.user.id, userRole)
+  const response = await withCache<KPIResponse>(
+    cacheKey,
+    async () => await fetchKPIMetrics(ctx, userRole, isAgent),
+    30 // 30 seconds TTL
+  )
 
-    const userRole = profile?.role || 'agent'
-    const isAgent = userRole === 'agent'
-
-    // Use cache with 30 second TTL
-    const cacheKey = getCacheKey('kpi', user.id, userRole)
-    const response = await withCache<KPIResponse>(
-      cacheKey,
-      async () => await fetchKPIMetrics(supabase, user.id, userRole, isAgent),
-      30 // 30 seconds TTL
-    )
-
-    return NextResponse.json(response)
-  } catch (error) {
-    console.error('Error fetching KPI metrics:', error)
-    return NextResponse.json(
-      { error: 'Failed to fetch KPI metrics' },
-      { status: 500 }
-    )
-  }
-}
+  return NextResponse.json(response)
+})
 
 async function fetchKPIMetrics(
-  supabase: any,
-  userId: string,
+  ctx: AuthContext,
   userRole: string,
   isAgent: boolean
 ): Promise<KPIResponse> {
@@ -71,19 +47,19 @@ async function fetchKPIMetrics(
     yesterday.setDate(yesterday.getDate() - 1)
 
     // 1. Active Conversations
-    let activeConvQuery = supabase
+    let activeConvQuery = ctx.supabase
       .from('conversations')
       .select('status', { count: 'exact' })
       .eq('status', 'active')
 
     if (isAgent) {
-      activeConvQuery = activeConvQuery.eq('assigned_to', user.id)
+      activeConvQuery = activeConvQuery.eq('assigned_to', ctx.user.id)
     }
 
     const { count: activeCount } = await activeConvQuery
     
     // Get previous period for trend
-    const { count: yesterdayActiveCount } = await supabase
+    const { count: yesterdayActiveCount } = await ctx.supabase
       .from('conversations')
       .select('*', { count: 'exact', head: true })
       .eq('status', 'active')
@@ -94,7 +70,7 @@ async function fetchKPIMetrics(
       ((activeCount || 0) - yesterdayActiveCount) / yesterdayActiveCount * 100 : 0
     
     // Get by status breakdown
-    const { data: statusBreakdown } = await supabase
+    const { data: statusBreakdown } = await ctx.supabase
       .from('conversations')
       .select('status')
       .in('status', ['active', 'pending', 'waiting'])
@@ -105,7 +81,7 @@ async function fetchKPIMetrics(
     }, {} as Record<string, number>) || {}
 
     // 2. Average Response Time
-    const { data: responseTimeData } = await supabase
+    const { data: responseTimeData } = await ctx.supabase
       .from('conversation_metrics')
       .select('avg_response_time_seconds')
       .not('avg_response_time_seconds', 'is', null)
@@ -122,7 +98,7 @@ async function fetchKPIMetrics(
       avgResponseTime <= slaThreshold * 1.5 ? 'warning' : 'critical'
 
     // Get yesterday's avg for trend
-    const { data: yesterdayResponseTime } = await supabase
+    const { data: yesterdayResponseTime } = await ctx.supabase
       .from('conversation_metrics')
       .select('avg_response_time_seconds')
       .not('avg_response_time_seconds', 'is', null)
@@ -137,7 +113,7 @@ async function fetchKPIMetrics(
       (avgResponseTime - yesterdayAvg) / yesterdayAvg * 100 : 0
 
     // 3. WhatsApp Delivery Rate
-    const { data: messagesData } = await supabase
+    const { data: messagesData } = await ctx.supabase
       .from('messages')
       .select('delivery_status')
       .eq('is_from_me', true)
@@ -151,7 +127,7 @@ async function fetchKPIMetrics(
     const deliveryRate = totalSent > 0 ? (delivered / totalSent) * 100 : 100
 
     // Yesterday's delivery rate
-    const { data: yesterdayMessages } = await supabase
+    const { data: yesterdayMessages } = await ctx.supabase
       .from('messages')
       .select('delivery_status')
       .eq('is_from_me', true)
@@ -167,13 +143,13 @@ async function fetchKPIMetrics(
     const deliveryChange = yesterdayRate ? (deliveryRate - yesterdayRate) / yesterdayRate * 100 : 0
 
     // 4. Open Tickets
-    let ticketsQuery = supabase
+    let ticketsQuery = ctx.supabase
       .from('tickets')
       .select('priority')
       .neq('status', 'closed')
 
     if (isAgent) {
-      ticketsQuery = ticketsQuery.eq('assigned_to', user.id)
+      ticketsQuery = ticketsQuery.eq('assigned_to', ctx.user.id)
     }
 
     const { data: ticketsData } = await ticketsQuery
@@ -186,7 +162,7 @@ async function fetchKPIMetrics(
     }
 
     // Yesterday's open tickets
-    const { count: yesterdayTickets } = await supabase
+    const { count: yesterdayTickets } = await ctx.supabase
       .from('tickets')
       .select('*', { count: 'exact', head: true })
       .neq('status', 'closed')
@@ -196,12 +172,12 @@ async function fetchKPIMetrics(
       (openTicketsCount - yesterdayTickets) / yesterdayTickets * 100 : 0
 
     // 5. Messages Today
-    const { count: messagesTodayCount } = await supabase
+    const { count: messagesTodayCount } = await ctx.supabase
       .from('messages')
       .select('*', { count: 'exact', head: true })
       .gte('created_at', today.toISOString())
 
-    const { count: yesterdayMessagesCount } = await supabase
+    const { count: yesterdayMessagesCount } = await ctx.supabase
       .from('messages')
       .select('*', { count: 'exact', head: true })
       .gte('created_at', yesterday.toISOString())

@@ -35,7 +35,7 @@ export {
 export {
   usePermissions,
   usePermission,
-  usePermissionCheck,
+  useRole,
 } from './hooks/usePermissions'
 
 // Components

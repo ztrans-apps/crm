@@ -1,91 +1,67 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { withAuth } from '@/lib/rbac/with-auth'
 
 /**
- * Get webhook
  * GET /api/webhooks/:webhookId
+ * Permission: settings.manage (enforced by middleware)
  */
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { webhookId: string } }
-) {
-  try {
-    const supabase = await createClient()
+export const GET = withAuth(async (request, ctx, params) => {
+  const { webhookId } = await params
 
-    const { data: webhook, error } = await supabase
-      .from('webhooks')
-      .select('*')
-      .eq('id', params.webhookId)
-      .single()
+  const { data: webhook, error } = await ctx.supabase
+    .from('webhooks')
+    .select('*')
+    .eq('id', webhookId)
+    .eq('tenant_id', ctx.tenantId)
+    .single()
 
-    if (error) throw error
-
-    return NextResponse.json({ webhook })
-  } catch (error: any) {
-    console.error('[API] Error getting webhook:', error)
-    return NextResponse.json(
-      { error: error.message || 'Failed to get webhook' },
-      { status: 500 }
-    )
+  if (error || !webhook) {
+    return NextResponse.json({ error: 'Webhook not found' }, { status: 404 })
   }
-}
+
+  return NextResponse.json({ webhook })
+})
 
 /**
- * Update webhook
  * PATCH /api/webhooks/:webhookId
+ * Permission: settings.manage
  */
-export async function PATCH(
-  request: NextRequest,
-  { params }: { params: { webhookId: string } }
-) {
-  try {
-    const supabase = await createClient()
-    const body = await request.json()
+export const PATCH = withAuth(async (request, ctx, params) => {
+  const { webhookId } = await params
+  const body = await request.json()
 
-    const { data: webhook, error } = await supabase
-      .from('webhooks')
-      .update(body)
-      .eq('id', params.webhookId)
-      .select()
-      .single()
+  const { data: webhook, error } = await ctx.supabase
+    .from('webhooks')
+    .update(body)
+    .eq('id', webhookId)
+    .eq('tenant_id', ctx.tenantId)
+    .select()
+    .single()
 
-    if (error) throw error
-
-    return NextResponse.json({ webhook })
-  } catch (error: any) {
-    console.error('[API] Error updating webhook:', error)
-    return NextResponse.json(
-      { error: error.message || 'Failed to update webhook' },
-      { status: 500 }
-    )
+  if (error) {
+    return NextResponse.json({ error: error.message || 'Failed to update webhook' }, { status: 500 })
   }
-}
+
+  return NextResponse.json({ webhook })
+})
 
 /**
- * Delete webhook
  * DELETE /api/webhooks/:webhookId
+ * Permission: settings.manage
  */
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: { webhookId: string } }
-) {
-  try {
-    const supabase = await createClient()
+export const DELETE = withAuth(async (request, ctx, params) => {
+  const { webhookId } = await params
 
-    const { error } = await supabase
-      .from('webhooks')
-      .delete()
-      .eq('id', params.webhookId)
+  const { error } = await ctx.supabase
+    .from('webhooks')
+    .delete()
+    .eq('id', webhookId)
+    .eq('tenant_id', ctx.tenantId)
 
-    if (error) throw error
-
-    return NextResponse.json({ success: true })
-  } catch (error: any) {
-    console.error('[API] Error deleting webhook:', error)
-    return NextResponse.json(
-      { error: error.message || 'Failed to delete webhook' },
-      { status: 500 }
-    )
+  if (error) {
+    return NextResponse.json({ error: error.message || 'Failed to delete webhook' }, { status: 500 })
   }
-}
+
+  return NextResponse.json({ success: true })
+})
 

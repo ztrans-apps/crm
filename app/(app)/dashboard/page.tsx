@@ -9,12 +9,21 @@ import { AutomationImpact } from './components/AutomationImpact'
 import { BusinessImpact } from './components/BusinessImpact'
 import { DateRangePicker } from './components/DateRangePicker'
 import { useState } from 'react'
+import { PermissionGuard } from '@/lib/rbac/components/PermissionGuard';
 
 export default function DashboardPage() {
   const [dateRange, setDateRange] = useState<'today' | 'week' | 'month'>('today')
   const [customDates, setCustomDates] = useState<{ start?: Date; end?: Date }>({})
 
   return (
+    <PermissionGuard 
+      permission={['analytics.view']}
+      fallback={
+        <div className="flex items-center justify-center h-full">
+          <p className="text-muted-foreground">Anda tidak memiliki akses ke halaman ini.</p>
+        </div>
+      }
+    >
     <div className="space-y-6 p-6">
       {/* Header */}
       <div className="flex items-center justify-between">
@@ -72,5 +81,6 @@ export default function DashboardPage() {
         </section>
       </div>
     </div>
+    </PermissionGuard>
   )
 }

@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { useSubscription } from '@/core/billing';
+import { PermissionGuard } from '@/lib/rbac/components/PermissionGuard';
 
 interface Module {
   name: string;
@@ -43,6 +44,14 @@ export default function ModulesPage() {
   }
 
   return (
+    <PermissionGuard 
+      permission={['settings.manage']}
+      fallback={
+        <div className="flex items-center justify-center h-full">
+          <p className="text-muted-foreground">Anda tidak memiliki akses ke halaman ini.</p>
+        </div>
+      }
+    >
     <div className="container mx-auto py-8">
       <div className="mb-8">
         <h1 className="text-3xl font-bold">Modules</h1>
@@ -108,5 +117,6 @@ export default function ModulesPage() {
         </Card>
       )}
     </div>
+    </PermissionGuard>
   );
 }
