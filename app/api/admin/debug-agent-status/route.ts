@@ -3,11 +3,27 @@ import { NextRequest, NextResponse } from 'next/server'
 import { withAuth } from '@/lib/rbac/with-auth'
 
 export const GET = withAuth(async (req, ctx) => {
-  // Get all agents with their status
+  // Dynamic: find users with chat.send permission (agents)
+  const { data: roleUsers } = await ctx.serviceClient
+    .from('user_roles')
+    .select('user_id, roles!inner(role_permissions!inner(permissions!inner(permission_key)))')
+  const agentIds: string[] = []
+  for (const ur of (roleUsers || [])) {
+    const role = (ur as any).roles
+    if (!role?.role_permissions) continue
+    for (const rp of role.role_permissions) {
+      if (rp.permissions?.permission_key === 'chat.send') {
+        agentIds.push((ur as any).user_id)
+        break
+      }
+    }
+  }
+
+  // Get profiles for those agents
   const { data: agents, error } = await ctx.supabase
     .from('profiles')
-    .select('id, email, full_name, role, agent_status, updated_at')
-    .eq('role', 'agent')
+    .select('id, email, full_name, agent_status, updated_at')
+    .in('id', agentIds.length > 0 ? agentIds : ['__none__'])
     .order('email')
 
   if (error) {
@@ -23,7 +39,7 @@ export const GET = withAuth(async (req, ctx) => {
     agents,
     count: agents?.length || 0
   })
-})
+}, { permission: 'admin.access' })
 
 export const POST = withAuth(async (req, ctx) => {
   const body = await req.json()
@@ -36,7 +52,7 @@ export const POST = withAuth(async (req, ctx) => {
     )
   }
 
-  // Update specific agent status
+  // Update specific agent status (no role filter - dynamic RBAC)
   const { data, error } = await ctx.supabase
     .from('profiles')
     // @ts-ignore - Supabase type inference issue
@@ -45,7 +61,6 @@ export const POST = withAuth(async (req, ctx) => {
       updated_at: new Date().toISOString()
     })
     .eq('id', agentId)
-    .eq('role', 'agent')
     .select()
 
   if (error) {

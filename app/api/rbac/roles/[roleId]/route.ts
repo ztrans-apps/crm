@@ -9,8 +9,8 @@ import { withAuth } from '@/lib/rbac/with-auth'
 export const GET = withAuth(async (req, ctx, params) => {
   const { roleId } = await params
 
-  // Get role with permissions
-  const { data: role, error: roleError } = await ctx.supabase
+  // Get role with permissions (use serviceClient to bypass RLS)
+  const { data: role, error: roleError } = await ctx.serviceClient
     .from('roles')
     .select(`
       *,
@@ -45,8 +45,8 @@ export const PATCH = withAuth(async (req, ctx, params) => {
   
   const { role_name, description, permission_ids } = body
 
-  // Update role basic info
-  const { data: role, error: roleError } = await ctx.supabase
+  // Update role basic info (use serviceClient to bypass RLS)
+  const { data: role, error: roleError } = await ctx.serviceClient
     .from('roles')
     // @ts-ignore - Supabase type inference issue
     .update({
@@ -68,7 +68,7 @@ export const PATCH = withAuth(async (req, ctx, params) => {
   // Update permissions if provided
   if (permission_ids !== undefined) {
     // Delete existing permissions
-    await ctx.supabase
+    await ctx.serviceClient
       .from('role_permissions')
       .delete()
       .eq('role_id', roleId)
@@ -80,7 +80,7 @@ export const PATCH = withAuth(async (req, ctx, params) => {
         permission_id: permId,
       }))
 
-      const { error: permError } = await ctx.supabase
+      const { error: permError } = await ctx.serviceClient
         .from('role_permissions')
         .insert(rolePermissions)
 
@@ -97,7 +97,7 @@ export const DELETE = withAuth(async (req, ctx, params) => {
   const { roleId } = await params
 
   // Check if role is master template
-  const { data: role } = await ctx.supabase
+  const { data: role } = await ctx.serviceClient
     .from('roles')
     .select('is_master_template')
     .eq('id', roleId)
@@ -112,7 +112,7 @@ export const DELETE = withAuth(async (req, ctx, params) => {
   }
 
   // Delete role (cascade will handle role_permissions and user_roles)
-  const { error: deleteError } = await ctx.supabase
+  const { error: deleteError } = await ctx.serviceClient
     .from('roles')
     .delete()
     .eq('id', roleId)

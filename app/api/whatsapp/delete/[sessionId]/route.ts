@@ -28,4 +28,4 @@ export const DELETE = withAuth(async (req, ctx, params) => {
     .eq('id', sessionId);
 
   return NextResponse.json({ success: true });
-}, { permission: 'whatsapp.session.manage' });
+}, { permission: 'whatsapp.session.delete' });

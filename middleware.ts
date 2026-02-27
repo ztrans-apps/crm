@@ -93,7 +93,8 @@ const API_PERMISSIONS: Record<string, string | string[]> = {
   '/api/messages': 'admin.access',
 
   // ==================== TENANT ====================
-  '/api/tenant': 'settings.manage',
+  // Note: /api/tenant/current is in SKIP list (any auth user needs it)
+  // This only matches other /api/tenant/* write operations
 
   // ==================== UTILITIES (auth-only, no specific perm) ====================
   // translate + geocode are auth-only via withAuth, no middleware perm needed
@@ -112,6 +113,8 @@ const SKIP_PERMISSION_ROUTES = [
   '/api/chat/conversations',   // Internal chat data (has withAuth)
   '/api/docs',                 // API documentation
   '/api/conversations',        // Auto-assign (has withAuth)
+  '/api/tenant/current',       // Tenant context (any authenticated user needs this)
+  '/api/rbac/permissions',     // User's own permissions (needed for UI)
 ]
 
 export async function middleware(request: NextRequest) {

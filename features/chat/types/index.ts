@@ -26,7 +26,7 @@ export interface ConversationListProps {
   loading?: boolean
   onPickConversation?: (conversationId: string) => void
   currentUserId?: string | null
-  userRole: 'owner' | 'agent' | 'supervisor'
+  userRole: string
 }
 
 export interface RightSidebarProps {
@@ -43,7 +43,7 @@ export interface RightSidebarProps {
   onCloseConversation?: () => Promise<void>
   onStatusChanged: () => void
   currentUserId: string | null
-  userRole: 'owner' | 'agent' | 'supervisor'
+  userRole: string
   canEditContact: boolean
   canApplyLabel: boolean
   canCreateNote: boolean

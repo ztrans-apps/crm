@@ -3,30 +3,38 @@ import { NextRequest, NextResponse } from 'next/server'
 import { withAuth } from '@/lib/rbac/with-auth'
 
 export const POST = withAuth(async (req, ctx) => {
-  // Get all agent user IDs
-  const { data: agents, error: agentsError } = await ctx.supabase
-    .from('profiles')
-    .select('id')
-    .eq('role', 'agent')
+  // Dynamic: find users with chat.send permission (agents)
+  const { data: roleUsers } = await ctx.serviceClient
+    .from('user_roles')
+    .select('user_id, roles!inner(role_permissions!inner(permissions!inner(permission_key)))')
+  const agentIds: string[] = []
+  for (const ur of (roleUsers || [])) {
+    const role = (ur as any).roles
+    if (!role?.role_permissions) continue
+    for (const rp of role.role_permissions) {
+      if (rp.permissions?.permission_key === 'chat.send') {
+        agentIds.push((ur as any).user_id)
+        break
+      }
+    }
+  }
 
-  if (agentsError) {
-    console.error('Error fetching agents:', agentsError)
-    return NextResponse.json(
-      { error: 'Failed to fetch agents' },
-      { status: 500 }
-    )
+  if (agentIds.length === 0) {
+    return NextResponse.json({
+      success: true,
+      message: 'No agents found to logout',
+      loggedOutCount: 0
+    })
   }
 
   // Sign out all agents by invalidating their sessions
   let loggedOutCount = 0
-  const agentsList = (agents || []) as Array<{ id: string }>
-  for (const agent of agentsList) {
+  for (const agentId of agentIds) {
     try {
-      // Sign out user (requires service role key)
-      await ctx.serviceClient.auth.admin.signOut(agent.id)
+      await ctx.serviceClient.auth.admin.signOut(agentId)
       loggedOutCount++
     } catch (error) {
-      console.error(`Failed to logout agent ${agent.id}:`, error)
+      console.error(`Failed to logout agent ${agentId}:`, error)
     }
   }
 
@@ -38,11 +46,11 @@ export const POST = withAuth(async (req, ctx) => {
       agent_status: 'offline',
       updated_at: new Date().toISOString()
     })
-    .eq('role', 'agent')
+    .in('id', agentIds)
 
   return NextResponse.json({
     success: true,
     message: `Force logged out ${loggedOutCount} agents and reset statuses`,
     loggedOutCount
   })
-}, { roles: ['owner'] })
+}, { permission: 'admin.access' })

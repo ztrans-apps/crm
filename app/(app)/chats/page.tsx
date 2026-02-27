@@ -47,7 +47,7 @@ function UnifiedChatsContent() {
     refreshConversations,
   } = useChat()
 
-  const { conversationActions, permissions } = usePermissions({
+  const { conversationActions, permissions, userPermissions } = usePermissions({
     role: userRole,
     userId,
     conversation: selectedConversation,
@@ -288,9 +288,10 @@ function UnifiedChatsContent() {
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
           loading={conversationsLoading}
-          onPickConversation={userRole === 'agent' ? handlePickConversation : undefined}
+          onPickConversation={!permissions.canViewAllConversations ? handlePickConversation : undefined}
           currentUserId={userId}
           userRole={userRole}
+          isLimitedView={!permissions.canViewAllConversations}
         />
       </div>
 
@@ -362,6 +363,8 @@ function UnifiedChatsContent() {
               onStatusChanged={refreshConversations}
               currentUserId={userId}
               userRole={userRole}
+              isLimitedView={!permissions.canViewAllConversations}
+              hasManagePermission={permissions.canManageAgents}
               canEditContact={permissions.canEditContact}
               canApplyLabel={permissions.canApplyLabel}
               canCreateNote={permissions.canCreateNote}
@@ -396,6 +399,8 @@ function UnifiedChatsContent() {
                   onStatusChanged={refreshConversations}
                   currentUserId={userId}
                   userRole={userRole}
+                  isLimitedView={!permissions.canViewAllConversations}
+                  hasManagePermission={permissions.canManageAgents}
                   canEditContact={permissions.canEditContact}
                   canApplyLabel={permissions.canApplyLabel}
                   canCreateNote={permissions.canCreateNote}

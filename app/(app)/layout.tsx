@@ -25,10 +25,36 @@ export default async function AppLayout({
     .eq('id', user.id)
     .single()
 
+  // Dynamic: check if user has agent capability (chat.send permission)
+  const { data: permData } = await supabase
+    .from('user_roles')
+    .select(`
+      roles!inner (
+        role_permissions!inner (
+          permissions!inner (
+            permission_key
+          )
+        )
+      )
+    `)
+    .eq('user_id', user.id)
+
+  const userPermissions = new Set<string>()
+  for (const ur of (permData || [])) {
+    const role = (ur as any).roles
+    if (!role?.role_permissions) continue
+    for (const rp of role.role_permissions) {
+      if (rp.permissions?.permission_key) {
+        userPermissions.add(rp.permissions.permission_key)
+      }
+    }
+  }
+  const isAgent = userPermissions.has('chat.send')
+
   return (
     <div className="flex h-screen bg-background">
-      {/* Agent Status Manager - only for agents */}
-      {(profile as any)?.role === 'agent' && (
+      {/* Agent Status Manager - for users with chat.send permission */}
+      {isAgent && (
         <AgentStatusManager userId={user.id} role={(profile as any)?.role} />
       )}
       

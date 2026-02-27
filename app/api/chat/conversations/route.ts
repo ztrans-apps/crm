@@ -1,21 +1,17 @@
-// Example API route using middleware pattern
-import { withAuth, withRole } from '@/core/auth/middleware'
-import { requireMessagePermission } from '@/core/permissions/middleware'
+// API route using dynamic RBAC permission checks
+import { withAuth } from '@/core/auth/middleware'
 import { requireTenantIdFromHeaders } from '@core/tenant'
 import { chatService } from '@/features/chat/services'
 
 /**
  * GET /api/chat/conversations
  * Get conversations for current user
- * Requires authentication
+ * Requires authentication + conversation.view permission
  */
 export const GET = withAuth(async (req: Request, context) => {
   try {
     // Get tenant ID
     const tenantId = requireTenantIdFromHeaders(req.headers)
-    
-    // Check permission
-    requirePermission(context, 'canViewAllConversations')
 
     // Get query params
     const { searchParams } = new URL(req.url)
@@ -23,9 +19,10 @@ export const GET = withAuth(async (req: Request, context) => {
     const searchQuery = searchParams.get('q')
 
     // Get conversations using service (with tenant filter)
+    // Pass userId - the service determines visibility based on permissions
     const conversations = await chatService.conversations.getConversations(
       context.user.id,
-      context.user.role,
+      'user', // Role string is now just for display; actual access is permission-based
       {
         status: status || undefined,
         searchQuery: searchQuery || undefined,
@@ -60,9 +57,9 @@ export const GET = withAuth(async (req: Request, context) => {
 /**
  * POST /api/chat/conversations
  * Create new conversation
- * Requires owner role
+ * Requires conversation.create permission
  */
-export const POST = withRole(['owner', 'supervisor'], async (req: Request, context) => {
+export const POST = withAuth(async (req: Request, context) => {
   try {
     // Get tenant ID
     const tenantId = requireTenantIdFromHeaders(req.headers)

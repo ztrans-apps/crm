@@ -277,14 +277,9 @@ export async function getAllAvailableLabels(): Promise<Label[]> {
   if (error) {
     console.error('Error fetching available labels:', error)
     
-    // Fallback: If agent can't access all labels, try to get labels from their own user_id
-    // or create default labels
-    if (profileData?.role === 'agent') {
-      console.log('Agent cannot access all labels, trying fallback...')
-      return await getOrCreateDefaultLabels(user.id)
-    }
-    
-    throw new Error(error.message)
+    // Fallback: If user can't access all labels, create defaults
+    console.log('User cannot access all labels, trying fallback...')
+    return await getOrCreateDefaultLabels(user.id)
   }
 
   console.log('Labels fetched successfully:', data?.length || 0, 'labels')

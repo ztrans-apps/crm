@@ -150,9 +150,9 @@ export default function RolesPage() {
           <div className="bg-vx-surface rounded-lg border p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-vx-text-secondary mb-1">System Roles</p>
+                <p className="text-sm text-vx-text-secondary mb-1">Master Templates</p>
                 <p className="text-3xl font-bold text-vx-text">
-                  {roles.filter(r => (r as any).is_system_role).length}
+                  {roles.filter(r => r.is_master_template).length}
                 </p>
               </div>
               <div className="w-12 h-12 bg-vx-purple/10 rounded-lg flex items-center justify-center">
@@ -201,9 +201,11 @@ export default function RolesPage() {
                           <div className="text-sm font-medium text-vx-text">
                             {role.role_name}
                           </div>
-                          <div className="text-xs text-vx-text-muted">
-                            {(role as any).role_key}
-                          </div>
+                          {role.description && (
+                            <div className="text-xs text-vx-text-muted truncate max-w-[200px]">
+                              {role.description}
+                            </div>
+                          )}
                         </div>
                       </div>
                     </td>
@@ -223,10 +225,6 @@ export default function RolesPage() {
                       {role.is_master_template ? (
                         <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-vx-purple/10 text-vx-purple">
                           Master Template
-                        </span>
-                      ) : (role as any).is_system_role ? (
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-vx-teal/10 text-vx-teal">
-                          System Role
                         </span>
                       ) : (
                         <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-vx-surface-hover text-vx-text">

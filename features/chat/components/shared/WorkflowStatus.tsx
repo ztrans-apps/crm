@@ -24,8 +24,9 @@ interface WorkflowStatusManagerProps {
   currentStatus: WorkflowStatus
   onStatusChanged: () => void
   conversation?: any
-  userRole?: 'owner' | 'agent' | 'supervisor'
+  userRole?: string
   currentUserId?: string | null
+  isLimitedView?: boolean // Dynamic: user without full conversation access
 }
 
 export function WorkflowStatusManager({
@@ -35,6 +36,7 @@ export function WorkflowStatusManager({
   conversation,
   userRole,
   currentUserId,
+  isLimitedView = false,
 }: WorkflowStatusManagerProps) {
   const [updating, setUpdating] = useState(false)
 
@@ -54,14 +56,14 @@ export function WorkflowStatusManager({
       return
     }
 
-    // Check if agent needs to pick conversation first
-    if (userRole === 'agent' && conversation && !conversation.assigned_to) {
+    // Check if limited user needs to pick conversation first
+    if (isLimitedView && conversation && !conversation.assigned_to) {
       alert('⚠️ Silakan ambil obrolan terlebih dahulu sebelum mengubah status!')
       return
     }
 
-    // Check if agent is assigned to this conversation
-    if (userRole === 'agent' && conversation && conversation.assigned_to !== currentUserId) {
+    // Check if limited user is assigned to this conversation
+    if (isLimitedView && conversation && conversation.assigned_to !== currentUserId) {
       alert('⚠️ Anda tidak memiliki akses untuk mengubah status obrolan ini!')
       return
     }
@@ -87,8 +89,8 @@ export function WorkflowStatusManager({
     }
   }
 
-  // Check if dropdown should be disabled for agent
-  const isDisabledForAgent = userRole === 'agent' && conversation && !conversation.assigned_to
+  // Check if dropdown should be disabled for limited-view user
+  const isDisabledForAgent = isLimitedView && conversation && !conversation.assigned_to
   
   // Check if status is done (cannot be changed)
   const isStatusDone = currentStatus === 'done'

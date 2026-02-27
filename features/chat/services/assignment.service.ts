@@ -1,7 +1,41 @@
-// Assignment service - handles agent assignment logic
+// Assignment service - handles agent assignment logic (Dynamic RBAC)
 import { BaseService } from './base.service'
 
 export type AssignmentMethod = 'manual' | 'round_robin' | 'least_active' | 'random'
+
+/**
+ * Helper: Get IDs of users who have agent-capable roles
+ * Looks up users who have the 'chat.send' permission via dynamic RBAC
+ */
+async function getAgentUserIds(supabase: any): Promise<string[]> {
+  const { data } = await supabase
+    .from('user_roles')
+    .select(`
+      user_id,
+      roles!inner (
+        role_permissions!inner (
+          permissions!inner (
+            permission_key
+          )
+        )
+      )
+    `)
+
+  if (!data) return []
+
+  const agentIds = new Set<string>()
+  for (const ur of data) {
+    const role = (ur as any).roles
+    if (!role?.role_permissions) continue
+    for (const rp of role.role_permissions) {
+      if (rp.permissions?.permission_key === 'chat.send') {
+        agentIds.add((ur as any).user_id)
+      }
+    }
+  }
+
+  return Array.from(agentIds)
+}
 
 export class AssignmentService extends BaseService {
   /**
@@ -11,11 +45,17 @@ export class AssignmentService extends BaseService {
     try {
       this.log('AssignmentService', 'Getting next agent (round-robin)')
 
-      // Get all active agents
+      // Get all active agents (dynamic: via user_roles permissions)
+      const agentIds = await getAgentUserIds(this.supabase)
+      if (agentIds.length === 0) {
+        console.warn('No agents with chat.send permission found')
+        return null
+      }
+
       const { data: agents, error: agentsError } = await this.supabase
         .from('profiles')
         .select('id, full_name, email')
-        .eq('role', 'agent')
+        .in('id', agentIds)
         .eq('agent_status', 'available')
         .order('full_name')
 
@@ -68,11 +108,17 @@ export class AssignmentService extends BaseService {
     try {
       this.log('AssignmentService', 'Getting agent with least active conversations')
 
-      // Get all active agents
+      // Get all active agents (dynamic: via user_roles permissions)
+      const agentIds = await getAgentUserIds(this.supabase)
+      if (agentIds.length === 0) {
+        console.warn('No agents with chat.send permission found')
+        return null
+      }
+
       const { data: agents, error: agentsError } = await this.supabase
         .from('profiles')
         .select('id, full_name')
-        .eq('role', 'agent')
+        .in('id', agentIds)
         .eq('agent_status', 'available')
 
       if (agentsError) {
@@ -122,10 +168,16 @@ export class AssignmentService extends BaseService {
     try {
       this.log('AssignmentService', 'Getting random agent')
 
+      const agentIds = await getAgentUserIds(this.supabase)
+      if (agentIds.length === 0) {
+        console.warn('No agents with chat.send permission found')
+        return null
+      }
+
       const { data: agents, error } = await this.supabase
         .from('profiles')
         .select('id')
-        .eq('role', 'agent')
+        .in('id', agentIds)
         .eq('agent_status', 'available')
 
       if (error) {

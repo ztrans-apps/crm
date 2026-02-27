@@ -1,9 +1,9 @@
-// Hook for checking user permissions
+// Hook for checking user permissions — Dynamic RBAC
 import { useMemo, useEffect, useState } from 'react'
-import { UserRole, getAvailableActions } from '@/lib/rbac/chat-permissions'
+import { getAvailableActions, getUserPermissions } from '@/lib/rbac/chat-permissions'
 
 interface UsePermissionsProps {
-  role: UserRole
+  role: string  // kept for backward compat but not used for access control
   userId: string | null
   conversation?: any
 }
@@ -20,6 +20,14 @@ export function usePermissions({ role, userId, conversation }: UsePermissionsPro
     canCreateNote: false,
     canChangeStatus: false,
   })
+  
+  const [userPerms, setUserPerms] = useState<Set<string>>(new Set())
+  
+  // Load user permissions dynamically from DB
+  useEffect(() => {
+    if (!userId) return
+    getUserPermissions(userId).then(setUserPerms)
+  }, [userId])
   
   useEffect(() => {
     if (!conversation || !userId) {
@@ -41,18 +49,19 @@ export function usePermissions({ role, userId, conversation }: UsePermissionsPro
   }, [userId, conversation])
   
   const permissions = useMemo(() => ({
-    canViewAllConversations: role === 'owner' || role === 'supervisor',
-    canManageAgents: role === 'owner' || role === 'supervisor',
-    // Add permissions from conversationActions for easier access
+    // Dynamic permission checks — no hardcoded role names
+    canViewAllConversations: userPerms.has('conversation.view.all') || userPerms.has('conversation.manage'),
+    canManageAgents: userPerms.has('conversation.assign') || userPerms.has('conversation.manage'),
     canEditContact: conversationActions.canEditContact,
     canApplyLabel: conversationActions.canApplyLabel,
     canCreateNote: conversationActions.canCreateNote,
     canChangeWorkflowStatus: conversationActions.canChangeStatus,
     canClose: conversationActions.canClose,
-  }), [role, conversationActions])
+  }), [userPerms, conversationActions])
   
   return {
     permissions,
     conversationActions,
+    userPermissions: userPerms,
   }
 }

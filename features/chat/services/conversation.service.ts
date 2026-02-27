@@ -1,7 +1,6 @@
 // Conversation service - handles conversation business logic
 import { BaseService } from './base.service'
-import type { UserRole } from '@/lib/rbac/chat-permissions'
-import { canViewConversation } from '@/lib/rbac/chat-permissions'
+import { canViewConversation, getUserPermissions } from '@/lib/rbac/chat-permissions'
 
 export interface ConversationFilters {
   status?: 'open' | 'closed'
@@ -16,11 +15,11 @@ export class ConversationService extends BaseService {
    */
   async getConversations(
     userId: string,
-    role: UserRole,
+    _role: string,
     filters?: ConversationFilters
   ) {
     try {
-      this.log('ConversationService', 'Getting conversations', { userId, role, filters })
+      this.log('ConversationService', 'Getting conversations', { userId, filters })
 
       let query = this.supabase
         .from('conversations')
@@ -35,14 +34,16 @@ export class ConversationService extends BaseService {
           )
         `)
 
-      // Apply role-based filtering
-      if (role === 'agent') {
-        // Agents see:
-        // 1. Conversations assigned to them
-        // 2. Unassigned conversations (incoming/waiting status only)
+      // Dynamic permission-based filtering
+      // Users with conversation.view.all or conversation.manage see all
+      // Others only see their assigned + unassigned conversations
+      const permissions = await getUserPermissions(userId)
+      const hasFullAccess = permissions.has('conversation.view.all') || permissions.has('conversation.manage')
+      
+      if (!hasFullAccess) {
         query = query.or(`and(assigned_to.eq.${userId}),and(assigned_to.is.null,workflow_status.in.(incoming,waiting))`)
       }
-      // Owners and supervisors see all (no filter)
+      // Users with full access see all (no filter)
 
       // Apply additional filters
       if (filters?.status) {

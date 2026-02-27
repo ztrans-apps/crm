@@ -44,7 +44,8 @@ interface UnifiedConversationListProps {
   loading?: boolean
   onPickConversation?: (conversationId: string) => void
   currentUserId?: string | null
-  userRole: 'owner' | 'agent' | 'supervisor'
+  userRole: string
+  isLimitedView?: boolean // Dynamic: true if user can only see their own conversations
 }
 
 export function ConversationList({
@@ -57,6 +58,7 @@ export function ConversationList({
   onPickConversation,
   currentUserId,
   userRole,
+  isLimitedView = false,
 }: UnifiedConversationListProps) {
   const [activeFilter, setActiveFilter] = useState<FilterType>('inbox')
   const [sortBy, setSortBy] = useState<SortType>('newest')
@@ -74,7 +76,7 @@ export function ConversationList({
     if (activeFilter === 'inbox') {
       // For agents: show unassigned + assigned to me
       // For owners: show all open conversations
-      if (userRole === 'agent') {
+      if (isLimitedView) {
         return (conv.status === 'open' || conv.workflow_status !== 'done') && 
                (!conv.assigned_to || conv.assigned_to === currentUserId)
       } else {
@@ -145,7 +147,7 @@ export function ConversationList({
   // Calculate counts
   const counts = {
     inbox: conversations.filter(c => {
-      if (userRole === 'agent') {
+      if (isLimitedView) {
         return (c.status === 'open' || c.workflow_status !== 'done') && 
                (!c.assigned_to || c.assigned_to === currentUserId)
       }
@@ -497,7 +499,7 @@ export function ConversationList({
         ) : (
           sortedConversations.map((conv) => {
             const isUnassigned = !conv.assigned_to
-            const canPick = userRole === 'agent' && isUnassigned && conv.status === 'open'
+            const canPick = isLimitedView && isUnassigned && conv.status === 'open'
             
             return (
               <ConversationItem

@@ -29,4 +29,4 @@ export const POST = withAuth(async (req, ctx) => {
       { status: 500 }
     )
   }
-}, { permission: 'whatsapp.session.manage' })
+}, { permission: 'admin.access' })

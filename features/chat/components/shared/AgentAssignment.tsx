@@ -15,7 +15,8 @@ interface AgentAssignmentProps {
   onAutoAssign?: (conversationId: string) => Promise<void>
   canHandover?: boolean
   canAssign?: boolean
-  userRole?: 'owner' | 'agent' | 'supervisor'
+  userRole?: string
+  hasManagePermission?: boolean // Dynamic: can manage conversations (assign, remove, auto-assign)
 }
 
 interface Agent {
@@ -35,7 +36,8 @@ export function AgentAssignment({
   onAutoAssign,
   canHandover = false,
   canAssign = false,
-  userRole = 'agent'
+  userRole = 'user',
+  hasManagePermission = false,
 }: AgentAssignmentProps) {
   const [availableAgents, setAvailableAgents] = useState<Agent[]>([])
   const [loading, setLoading] = useState(false)
@@ -60,10 +62,35 @@ export function AgentAssignment({
       // 2. last_activity is within last 2 minutes
       const twoMinutesAgo = new Date(Date.now() - 2 * 60 * 1000).toISOString()
       
+      // Dynamic: find agents via user_roles → permissions (chat.send)
+      const { data: roleUsers } = await supabase
+        .from('user_roles')
+        .select(`
+          user_id,
+          roles!inner (
+            role_permissions!inner (
+              permissions!inner (
+                permission_key
+              )
+            )
+          )
+        `)
+      const agentIds: string[] = []
+      for (const ur of (roleUsers || [])) {
+        const role = (ur as any).roles
+        if (!role?.role_permissions) continue
+        for (const rp of role.role_permissions) {
+          if (rp.permissions?.permission_key === 'chat.send') {
+            agentIds.push((ur as any).user_id)
+            break
+          }
+        }
+      }
+
       let query = supabase
         .from('profiles')
         .select('id, full_name, email, agent_status, last_activity')
-        .eq('role', 'agent')
+        .in('id', agentIds.length > 0 ? agentIds : ['__none__'])
         .in('agent_status', ['available', 'busy'])
         .not('last_activity', 'is', null)
         .gte('last_activity', twoMinutesAgo)
@@ -155,7 +182,7 @@ export function AgentAssignment({
                 </p>
               )}
             </div>
-            {canHandover && userRole === 'owner' && (
+            {canHandover && hasManagePermission && (
               <button
                 onClick={handleRemoveAgent}
                 className="p-1 hover:bg-vx-surface-hover rounded transition-colors"
@@ -183,8 +210,8 @@ export function AgentAssignment({
             {currentAgentId ? 'Handover ke Agent Lain' : 'Pilih Agent'}
           </label>
 
-          {/* Auto-assign button (only for owner when no agent assigned) */}
-          {!currentAgentId && userRole === 'owner' && onAutoAssign && (
+          {/* Auto-assign button (only for users with manage permission when no agent assigned) */}
+          {!currentAgentId && hasManagePermission && onAutoAssign && (
             <Button
               onClick={handleAutoAssign}
               className="w-full h-9 bg-vx-purple hover:bg-vx-purple/90 text-white flex items-center justify-center gap-2"
@@ -195,7 +222,7 @@ export function AgentAssignment({
           )}
 
           {/* Manual assignment label */}
-          {!currentAgentId && userRole === 'owner' && onAutoAssign && (
+          {!currentAgentId && hasManagePermission && onAutoAssign && (
             <div className="relative">
               <div className="absolute inset-0 flex items-center">
                 <div className="w-full border-t border-vx-border"></div>

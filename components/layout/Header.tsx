@@ -36,16 +36,16 @@ export default function Header({ user }: HeaderProps) {
     const { data: { user } } = await supabase.auth.getUser()
     
     if (user) {
-      // Get user profile to check if agent
+      // Get user profile to check agent_status
       const { data: profile } = await supabase
         .from('profiles')
-        .select('role')
+        .select('agent_status')
         .eq('id', user.id)
         .single()
       
       const profileData = profile as any
-      // Update agent status to 'offline' if user is an agent
-      if (profileData?.role === 'agent') {
+      // Update agent status to 'offline' for any user with agent_status set
+      if (profileData?.agent_status && profileData.agent_status !== 'offline') {
         await supabase
           .from('profiles')
           // @ts-ignore - Supabase type issue

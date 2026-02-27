@@ -51,33 +51,51 @@ export interface Database {
         Row: {
           id: string
           user_id: string
+          tenant_id: string | null
           phone_number: string
           session_name: string
           qr_code: string | null
           status: 'connected' | 'disconnected' | 'connecting'
+          meta_phone_number_id: string | null
+          meta_verified_name: string | null
+          meta_quality_rating: string | null
+          metadata: Json
           last_connected_at: string | null
+          last_activity: string | null
           created_at: string
           updated_at: string
         }
         Insert: {
           id?: string
           user_id: string
+          tenant_id?: string | null
           phone_number: string
           session_name: string
           qr_code?: string | null
           status?: 'connected' | 'disconnected' | 'connecting'
+          meta_phone_number_id?: string | null
+          meta_verified_name?: string | null
+          meta_quality_rating?: string | null
+          metadata?: Json
           last_connected_at?: string | null
+          last_activity?: string | null
           created_at?: string
           updated_at?: string
         }
         Update: {
           id?: string
           user_id?: string
+          tenant_id?: string | null
           phone_number?: string
           session_name?: string
           qr_code?: string | null
           status?: 'connected' | 'disconnected' | 'connecting'
+          meta_phone_number_id?: string | null
+          meta_verified_name?: string | null
+          meta_quality_rating?: string | null
+          metadata?: Json
           last_connected_at?: string | null
+          last_activity?: string | null
           created_at?: string
           updated_at?: string
         }

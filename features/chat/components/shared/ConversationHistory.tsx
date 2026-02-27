@@ -10,7 +10,8 @@ interface ConversationHistoryProps {
   currentConversationId: string
   onSelectConversation?: (conversationId: string) => void
   onViewInModal?: (conversationId: string) => void
-  userRole?: 'owner' | 'agent' | 'supervisor'
+  userRole?: string
+  isLimitedView?: boolean // Dynamic: user without full access opens resolved chats in modal
 }
 
 interface HistoryItem {
@@ -27,7 +28,8 @@ export function ConversationHistory({
   currentConversationId,
   onSelectConversation,
   onViewInModal,
-  userRole = 'agent'
+  userRole = 'user',
+  isLimitedView = false,
 }: ConversationHistoryProps) {
   const [history, setHistory] = useState<HistoryItem[]>([])
   const [loading, setLoading] = useState(true)
@@ -106,15 +108,15 @@ export function ConversationHistory({
   }
 
   const handleConversationClick = (conversationId: string, status: string, workflowStatus: string) => {
-    // For agents: if conversation is closed/resolved, open in modal (read-only)
-    // For owner/supervisor: can jump directly to conversation
+    // For limited-view users: if conversation is closed/resolved, open in modal (read-only)
+    // For full-access users: can jump directly to conversation
     const isResolved = status === 'closed' || workflowStatus === 'resolved'
     
-    if (userRole === 'agent' && isResolved) {
-      // Agent viewing closed conversation - open in modal
+    if (isLimitedView && isResolved) {
+      // Limited user viewing closed conversation - open in modal
       onViewInModal?.(conversationId)
     } else {
-      // Owner/supervisor or open conversation - jump directly
+      // Full-access user or open conversation - jump directly
       onSelectConversation?.(conversationId)
     }
   }

@@ -6,7 +6,7 @@ import { withAuth } from '@/lib/rbac/with-auth'
 
 export const GET = withAuth(async (req, ctx) => {
   // Get user permissions
-  const { data: permissions, error: permError } = await ctx.supabase
+  const { data: permissions, error: permError } = await ctx.serviceClient
     // @ts-ignore - Supabase RPC type inference issue
     .rpc('get_user_permissions', { p_user_id: ctx.user.id })
 
@@ -19,7 +19,7 @@ export const GET = withAuth(async (req, ctx) => {
   }
 
   // Get user roles
-  const { data: roles, error: roleError } = await ctx.supabase
+  const { data: roles, error: roleError } = await ctx.serviceClient
     // @ts-ignore - Supabase RPC type inference issue
     .rpc('get_user_roles', { p_user_id: ctx.user.id })
 

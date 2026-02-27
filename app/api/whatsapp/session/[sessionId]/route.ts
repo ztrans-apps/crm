@@ -43,4 +43,4 @@ export const PATCH = withAuth(async (request, ctx, params) => {
   }
 
   return NextResponse.json(session);
-}, { permission: 'whatsapp.session.manage' });
+}, { permission: 'whatsapp.session.edit' });

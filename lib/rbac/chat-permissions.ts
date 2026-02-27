@@ -1,10 +1,13 @@
 /**
- * Chat-specific permission helpers using RBAC system
+ * Chat-specific permission helpers using dynamic RBAC system
+ * All permission checks go through user_roles → role_permissions → permissions
+ * NO hardcoded role names - everything is driven by DB permissions
  */
 
 import { createClient } from '@/lib/supabase/client'
 
-export type UserRole = 'owner' | 'supervisor' | 'agent'
+/** @deprecated Use string type directly - roles are dynamic from DB */
+export type UserRole = string
 
 interface Conversation {
   id: string
@@ -14,102 +17,195 @@ interface Conversation {
 }
 
 /**
- * Get user's primary role from database
+ * Check if user has a specific permission via dynamic RBAC
+ * Queries: user_roles → roles → role_permissions → permissions
  */
-export async function getUserRole(userId: string): Promise<UserRole> {
+export async function userHasPermission(userId: string, permissionKey: string): Promise<boolean> {
+  const supabase = createClient()
+  
+  try {
+    const { data, error } = await supabase
+      .from('user_roles')
+      .select(`
+        roles!inner (
+          role_permissions!inner (
+            permissions!inner (
+              permission_key
+            )
+          )
+        )
+      `)
+      .eq('user_id', userId)
+
+    if (error || !data) return false
+
+    for (const ur of data) {
+      const role = (ur as any).roles
+      if (!role?.role_permissions) continue
+      for (const rp of role.role_permissions) {
+        if (rp.permissions?.permission_key === permissionKey) {
+          return true
+        }
+      }
+    }
+
+    return false
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Get all permission keys for a user (cached per call)
+ */
+export async function getUserPermissions(userId: string): Promise<Set<string>> {
+  const supabase = createClient()
+  const permissions = new Set<string>()
+  
+  try {
+    const { data, error } = await supabase
+      .from('user_roles')
+      .select(`
+        roles!inner (
+          role_permissions!inner (
+            permissions!inner (
+              permission_key
+            )
+          )
+        )
+      `)
+      .eq('user_id', userId)
+
+    if (error || !data) return permissions
+
+    for (const ur of data) {
+      const role = (ur as any).roles
+      if (!role?.role_permissions) continue
+      for (const rp of role.role_permissions) {
+        if (rp.permissions?.permission_key) {
+          permissions.add(rp.permissions.permission_key)
+        }
+      }
+    }
+  } catch {
+    // Return empty set on error
+  }
+
+  return permissions
+}
+
+/**
+ * Get user's primary role name from dynamic RBAC
+ * Returns actual role name from DB, not a hardcoded mapping
+ */
+export async function getUserRoleName(userId: string): Promise<string> {
   const supabase = createClient()
   
   try {
     const { data: userRoles } = await supabase
       .from('user_roles')
-      .select('role:roles(role_key, hierarchy_level)')
+      .select('roles(role_name)')
       .eq('user_id', userId)
       .limit(1)
-    
+
     if (!userRoles || userRoles.length === 0) {
-      return 'agent'
+      return 'User'
     }
-    
-    // Type assertion to handle Supabase's complex type inference
-    const firstRole = userRoles[0] as any
-    const roleKey = firstRole?.role?.role_key
-    
-    if (roleKey === 'owner' || roleKey?.includes('owner')) {
-      return 'owner'
-    } else if (roleKey === 'supervisor' || roleKey?.includes('supervisor')) {
-      return 'supervisor'
-    } else {
-      return 'agent'
-    }
-  } catch (error) {
-    console.error('Error getting user role:', error)
-    return 'agent'
+
+    return (userRoles[0] as any)?.roles?.role_name || 'User'
+  } catch {
+    return 'User'
   }
 }
 
 /**
+ * Get user role (backward compatible alias)
+ * Returns actual role name from DB
+ */
+export async function getUserRole(userId: string): Promise<string> {
+  return getUserRoleName(userId)
+}
+
+/**
  * Check if user can send message to conversation
+ * Uses dynamic permissions instead of hardcoded role names
  */
 export async function canSendMessageToConversation(
   userId: string,
   conversation: Conversation
 ): Promise<boolean> {
-  const role = await getUserRole(userId)
+  const permissions = await getUserPermissions(userId)
   
   // Check if conversation is closed
   if (conversation.status === 'closed' || conversation.workflow_status === 'done') {
-    return role === 'owner' // Only owner can send to closed
+    return permissions.has('conversation.manage') || permissions.has('chat.send')
   }
   
   // Check if conversation is unassigned
   if (!conversation.assigned_to) {
-    return role === 'owner' || role === 'supervisor' // Owner and supervisor can send to unassigned
+    return permissions.has('conversation.manage') || permissions.has('conversation.assign')
   }
   
-  // For agents, must be assigned to them
-  if (role === 'agent') {
-    return conversation.assigned_to === userId
+  // If user is assigned, they can send
+  if (conversation.assigned_to === userId) {
+    return permissions.has('chat.send')
   }
-  
-  return true
+
+  // Users with conversation.manage can send to any conversation
+  return permissions.has('conversation.manage')
 }
 
 /**
  * Check if user can view conversation
+ * Uses permission-aware logic
  */
 export function canViewConversation(
-  role: UserRole,
+  _role: string,
   userId: string,
   conversation: Conversation
 ): boolean {
-  // Owner and supervisor can view all
-  if (role === 'owner' || role === 'supervisor') {
-    return true
-  }
-  
-  // Agents can view unassigned or assigned to them
+  // Sync backward-compat: allow based on assignment
+  // For full permission check, use canViewConversationAsync
   return !conversation.assigned_to || conversation.assigned_to === userId
 }
 
 /**
- * Get available actions for conversation
+ * Async version with full permission check
+ */
+export async function canViewConversationAsync(
+  userId: string,
+  conversation: Conversation
+): Promise<boolean> {
+  const permissions = await getUserPermissions(userId)
+  
+  if (permissions.has('conversation.view.all') || permissions.has('conversation.manage')) {
+    return true
+  }
+  
+  return !conversation.assigned_to || conversation.assigned_to === userId
+}
+
+/**
+ * Get available actions for conversation based on dynamic permissions
  */
 export async function getAvailableActions(
   userId: string,
   conversation: Conversation
 ) {
-  const role = await getUserRole(userId)
+  const permissions = await getUserPermissions(userId)
   const canSend = await canSendMessageToConversation(userId, conversation)
+  const hasManage = permissions.has('conversation.manage')
+  const hasAssign = permissions.has('conversation.assign')
   
   return {
     canSendMessage: canSend,
-    canPick: role !== 'owner' && !conversation.assigned_to && conversation.status === 'open',
-    canAssign: role === 'owner' || role === 'supervisor',
+    canPick: !hasManage && !conversation.assigned_to && conversation.status === 'open' && permissions.has('chat.send'),
+    canAssign: hasManage || hasAssign,
     canHandover: conversation.assigned_to === userId,
-    canClose: role === 'owner' || role === 'supervisor',
-    canEditContact: true,
-    canApplyLabel: true,
-    canCreateNote: true,
-    canChangeStatus: true,
+    canClose: hasManage || permissions.has('conversation.close'),
+    canEditContact: permissions.has('contact.edit') || permissions.has('contact.manage'),
+    canApplyLabel: permissions.has('chat.send') || hasManage,
+    canCreateNote: permissions.has('chat.send') || hasManage,
+    canChangeStatus: permissions.has('chat.send') || hasManage,
   }
 }

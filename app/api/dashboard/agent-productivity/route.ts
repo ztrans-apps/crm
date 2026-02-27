@@ -23,8 +23,9 @@ interface AgentProductivityResponse {
 }
 
 export const GET = withAuth(async (req, ctx) => {
-  const userRole = ctx.profile.role || 'agent'
-  const isAgent = userRole === 'agent'
+  // Dynamic: check if user has full analytics access via permissions
+  const hasFullAccess = await checkPermissionAP(ctx.serviceClient, ctx.user.id, 'analytics.view.all')
+  const isLimitedView = !hasFullAccess
 
   // Get query params
   const searchParams = req.nextUrl.searchParams
@@ -51,12 +52,18 @@ export const GET = withAuth(async (req, ctx) => {
   }
 
   // Get all agents (or just current agent if role is agent)
+  // Dynamic: get users who have roles (any role = potential agent/user)
+  const { data: roleUsers } = await ctx.serviceClient
+    .from('user_roles')
+    .select('user_id')
+  const roleUserIds = roleUsers?.map((r: any) => r.user_id) || []
+
   let agentsQuery = ctx.supabase
     .from('profiles')
     .select('id, full_name, status')
-    .in('role', ['agent', 'supervisor', 'owner'])
+    .in('id', roleUserIds.length > 0 ? roleUserIds : ['__none__'])
 
-  if (isAgent) {
+  if (isLimitedView) {
     agentsQuery = agentsQuery.eq('id', ctx.user.id)
   }
 
@@ -181,3 +188,21 @@ export const GET = withAuth(async (req, ctx) => {
 
   return NextResponse.json(response)
 })
+
+// Helper to check permission via serviceClient
+async function checkPermissionAP(client: any, userId: string, permKey: string): Promise<boolean> {
+  try {
+    const { data } = await client
+      .from('user_roles')
+      .select('roles!inner(role_permissions!inner(permissions!inner(permission_key)))')
+      .eq('user_id', userId)
+    for (const ur of (data || [])) {
+      const role = (ur as any).roles
+      if (!role?.role_permissions) continue
+      for (const rp of role.role_permissions) {
+        if (rp.permissions?.permission_key === permKey) return true
+      }
+    }
+    return false
+  } catch { return false }
+}

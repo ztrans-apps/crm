@@ -40,4 +40,4 @@ export const POST = withAuth(async (req, ctx) => {
     sessionId: session.id,
     message: 'WhatsApp number registered successfully via Meta Cloud API',
   });
-}, { permission: 'whatsapp.session.manage' });
+}, { permission: 'whatsapp.session.create' });

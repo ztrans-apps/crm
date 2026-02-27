@@ -57,10 +57,17 @@ function HandoverReportsContent() {
   const loadAgents = async () => {
     try {
       setLoading(true)
+
+      // Dynamic: find all users with roles via user_roles
+      const { data: roleUsers } = await supabase
+        .from('user_roles')
+        .select('user_id')
+      const roleUserIds = [...new Set((roleUsers || []).map((r: any) => r.user_id))]
+
       const { data, error } = await supabase
         .from('profiles')
         .select('id, full_name, email, role')
-        .in('role', ['agent', 'owner', 'supervisor'])
+        .in('id', roleUserIds.length > 0 ? roleUserIds : ['__none__'])
         .order('full_name')
 
       if (error) throw error

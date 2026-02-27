@@ -291,12 +291,37 @@ export async function getAllAgentsWorkflowStats(
 }[]> {
   const supabase = createClient()
 
+  // Dynamic: find agent user IDs via user_roles → permissions
+  const { data: roleUsers } = await supabase
+    .from('user_roles')
+    .select(`
+      user_id,
+      roles!inner (
+        role_permissions!inner (
+          permissions!inner (
+            permission_key
+          )
+        )
+      )
+    `)
+  const agentIds: string[] = []
+  for (const ur of (roleUsers || [])) {
+    const role = (ur as any).roles
+    if (!role?.role_permissions) continue
+    for (const rp of role.role_permissions) {
+      if (rp.permissions?.permission_key === 'chat.send') {
+        agentIds.push((ur as any).user_id)
+        break
+      }
+    }
+  }
+
   // Get all active agents
   // @ts-ignore - Supabase type issue
   const { data: agents, error: agentsError } = await supabase
     .from('profiles')
     .select('id, full_name, email')
-    .eq('role', 'agent')
+    .in('id', agentIds.length > 0 ? agentIds : ['__none__'])
     .eq('is_active', true)
 
   if (agentsError) {

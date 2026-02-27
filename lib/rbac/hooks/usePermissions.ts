@@ -46,25 +46,51 @@ export function usePermissions(): PermissionContext {
         return
       }
 
-      // Get user permissions
-      // @ts-ignore - Supabase type issue
-      const { data: perms, error: permError } = await supabase
-        // @ts-ignore - Supabase type issue
-        .rpc('get_user_permissions', { p_user_id: user.id })
+      // Get user permissions via direct query (avoids RPC function overload issue)
+      const { data: userRolesData, error: urError } = await supabase
+        .from('user_roles')
+        .select(`
+          role_id,
+          roles!inner (
+            role_name,
+            role_permissions (
+              permissions (
+                id,
+                permission_key,
+                permission_name,
+                module,
+                page,
+                action,
+                description,
+                created_at
+              )
+            )
+          )
+        `)
+        .eq('user_id', user.id)
 
-      if (permError) throw permError
+      if (urError) throw urError
 
-      // Get user roles
-      // @ts-ignore - Supabase type issue
-      const { data: userRoles, error: roleError } = await supabase
-        // @ts-ignore - Supabase type issue
-        .rpc('get_user_roles', { p_user_id: user.id })
+      // Extract permissions from roles
+      const permMap = new Map<string, Permission>()
+      const roleList: any[] = []
 
-      if (roleError) throw roleError
+      for (const ur of (userRolesData || [])) {
+        const role = (ur as any).roles
+        if (role) {
+          roleList.push({ role_id: ur.role_id, role_name: role.role_name })
+          for (const rp of (role.role_permissions || [])) {
+            if (rp.permissions) {
+              permMap.set(rp.permissions.permission_key, rp.permissions)
+            }
+          }
+        }
+      }
 
-      setPermissions(perms || [])
-      setPermissionSet(createPermissionSet(perms || []))
-      setRoles(userRoles || [])
+      const permArray = Array.from(permMap.values())
+      setPermissions(permArray)
+      setPermissionSet(createPermissionSet(permArray))
+      setRoles(roleList)
     } catch (error) {
       console.error('Error loading permissions:', error)
     } finally {
@@ -76,7 +102,7 @@ export function usePermissions(): PermissionContext {
     loadPermissions()
   }, [loadPermissions])
 
-  // Permission check functions
+  // Permission check functions — fully dynamic via DB
   const hasPermission = useCallback((key: string): boolean => {
     return permissionSet.has(key)
   }, [permissionSet])
@@ -90,11 +116,11 @@ export function usePermissions(): PermissionContext {
   }, [permissionSet])
 
   const hasRole = useCallback((roleKey: string): boolean => {
-    return roles.some(role => role.role_key === roleKey)
+    return roles.some(role => role.role_name === roleKey || role.role_key === roleKey)
   }, [roles])
 
   const hasAnyRole = useCallback((roleKeys: string[]): boolean => {
-    return roles.some(role => roleKeys.includes(role.role_key))
+    return roles.some(role => roleKeys.includes(role.role_name) || roleKeys.includes(role.role_key))
   }, [roles])
 
   return {

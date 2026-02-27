@@ -12,7 +12,7 @@ export const GET = withAuth(async (req, ctx, params) => {
   // If viewing another user's roles, check permission
   if (ctx.user.id !== userId) {
     // @ts-ignore - Supabase RPC type inference issue
-    const { data: allowed } = await ctx.supabase.rpc('user_has_permission', {
+    const { data: allowed } = await ctx.serviceClient.rpc('user_has_permission', {
       p_user_id: ctx.user.id,
       p_permission_key: 'user.view',
     })
@@ -25,7 +25,7 @@ export const GET = withAuth(async (req, ctx, params) => {
   }
 
   // Get user roles
-  const { data: roles, error: rolesError } = await ctx.supabase
+  const { data: roles, error: rolesError } = await ctx.serviceClient
     // @ts-ignore - Supabase RPC type inference issue
     .rpc('get_user_roles', { p_user_id: userId })
 
@@ -60,7 +60,7 @@ export const POST = withAuth(async (req, ctx, params) => {
     assigned_by: ctx.user.id,
   }))
 
-  const { error: assignError } = await ctx.supabase
+  const { error: assignError } = await ctx.serviceClient
     .from('user_roles')
     // @ts-ignore - Supabase type inference issue
     .upsert(userRoles, { onConflict: 'user_id,role_id' })
@@ -89,7 +89,7 @@ export const DELETE = withAuth(async (req, ctx, params) => {
   }
 
   // Remove role from user
-  const { error: removeError } = await ctx.supabase
+  const { error: removeError } = await ctx.serviceClient
     .from('user_roles')
     .delete()
     .eq('user_id', userId)

@@ -146,13 +146,32 @@ async function aggregateAgentActivity(
 ): Promise<AggregatedMetrics['agents']> {
   const supabase = await createClient()
 
-  // Get all agents
-  const { data: agents } = await supabase
-    .from('profiles')
-    .select('id')
-    .eq('role', 'agent')
+  // Dynamic: find agent user IDs via user_roles → permissions
+  const { data: roleUsers } = await supabase
+    .from('user_roles')
+    .select(`
+      user_id,
+      roles!inner (
+        role_permissions!inner (
+          permissions!inner (
+            permission_key
+          )
+        )
+      )
+    `)
+  const agentIds: string[] = []
+  for (const ur of (roleUsers || [])) {
+    const role = (ur as any).roles
+    if (!role?.role_permissions) continue
+    for (const rp of role.role_permissions) {
+      if (rp.permissions?.permission_key === 'chat.send') {
+        agentIds.push((ur as any).user_id)
+        break
+      }
+    }
+  }
 
-  const totalAgents = agents?.length || 0
+  const totalAgents = agentIds.length
 
   // Get active agents (those who handled conversations)
   const { data: activeAgentData } = await supabase

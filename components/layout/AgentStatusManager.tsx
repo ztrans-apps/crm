@@ -13,7 +13,10 @@ export default function AgentStatusManager({ userId, role }: AgentStatusManagerP
   const heartbeatIntervalRef = useRef<NodeJS.Timeout | null>(null)
 
   useEffect(() => {
-    if (role !== 'agent') return
+    // Dynamic: check permission instead of hardcoded role
+    // Component should work for any user with agent capabilities
+    // The parent layout already gates rendering based on permissions
+    if (!userId) return
 
     const supabase = createClient()
 

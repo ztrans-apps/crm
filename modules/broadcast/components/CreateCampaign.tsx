@@ -127,10 +127,8 @@ export function CreateCampaign({ onSuccess }: CreateCampaignProps) {
 
       if (usersRes.ok) {
         const data = await usersRes.json();
-        // Filter only users with Agent role
-        const agentUsers = data.users?.filter((u: any) => 
-          u.roles?.includes('Agent')
-        ) || [];
+        // All users are potential agents - no hardcoded role filter
+        const agentUsers = data.users || [];
         setAgents(agentUsers);
       }
 

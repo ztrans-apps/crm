@@ -6,8 +6,8 @@ import { NextResponse } from 'next/server'
 import { withAuth } from '@/lib/rbac/with-auth'
 
 export const GET = withAuth(async (req, ctx) => {
-  // Get all roles with their permissions
-  const { data: roles, error: rolesError } = await ctx.supabase
+  // Get all roles with their permissions (use serviceClient to bypass RLS)
+  const { data: roles, error: rolesError } = await ctx.serviceClient
     .from('roles')
     .select(`
       *,
@@ -46,8 +46,8 @@ export const POST = withAuth(async (req, ctx) => {
     )
   }
 
-  // Create role
-  const { data: role, error: roleError } = await ctx.supabase
+  // Create role (use serviceClient to bypass RLS)
+  const { data: role, error: roleError } = await ctx.serviceClient
     .from('roles')
     // @ts-ignore - Supabase type inference issue
     .insert({
@@ -74,7 +74,7 @@ export const POST = withAuth(async (req, ctx) => {
       permission_id: permId,
     }))
 
-    const { error: permError } = await ctx.supabase
+    const { error: permError } = await ctx.serviceClient
       .from('role_permissions')
       // @ts-ignore - Supabase type inference issue
       .insert(rolePermissions)

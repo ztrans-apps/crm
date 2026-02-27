@@ -1,114 +1,45 @@
 /**
- * Role Checker Helper
- * Helper functions to check user roles
+ * Role Checker Helper — Dynamic RBAC
+ * All checks go through user_roles → role_permissions → permissions
+ * NO hardcoded role arrays — everything is driven by DB
  */
 
 import { createClient } from '@/lib/supabase/server'
 
 /**
- * Full access roles (can see all conversations)
- * Based on role hierarchy:
- * - Owner (typically highest level)
- * - Supervisor (Level 7+)
- * - Super Admin (Level 10)
- * - Admin (Level 9)
- * - Manager (Level 8)
- */
-export const FULL_ACCESS_ROLES = ['Owner', 'Supervisor', 'Super Admin', 'Admin', 'Manager'] as const
-
-/**
- * Admin-level roles (hierarchy level >= 8)
- * Can manage system settings and assignments
- */
-export const ADMIN_ROLES = ['Super Admin', 'Admin', 'Manager'] as const
-
-/**
- * Management-level roles (hierarchy level >= 7)
- * Includes admin roles + Team Lead
- */
-export const MANAGEMENT_ROLES = [...ADMIN_ROLES, 'Team Lead'] as const
-
-/**
- * Agent-level roles (hierarchy level >= 4)
- * All roles that can handle conversations
- */
-export const AGENT_ROLES = [
-  ...MANAGEMENT_ROLES,
-  'Senior Agent',
-  'Agent',
-  'Junior Agent'
-] as const
-
-/**
- * Check if user has full access role (Owner, Supervisor, Admin, etc.)
- * These roles can see all conversations without assignment
+ * Check if user has full access (can see all conversations)
+ * Dynamic: checks for 'conversation.view.all' or 'conversation.manage' permission
  */
 export async function userHasFullAccess(userId: string): Promise<boolean> {
-  const supabase = await createClient()
-
-  const { data: userRoles } = await supabase
-    .from('user_roles')
-    .select('roles(role_name)')
-    .eq('user_id', userId)
-
-  return userRoles?.some((ur: any) =>
-    FULL_ACCESS_ROLES.includes(ur.roles?.role_name)
-  ) || false
+  return await userHasAnyPermission(userId, ['conversation.view.all', 'conversation.manage'])
 }
 
 /**
- * Check if user has admin-level role
- * Admin roles: Super Admin, Admin, Manager (level >= 8)
+ * Check if user has admin-level access
+ * Dynamic: checks for 'admin.access' permission
  */
 export async function isUserAdmin(userId: string): Promise<boolean> {
-  const supabase = await createClient()
-
-  const { data: userRoles } = await supabase
-    .from('user_roles')
-    .select('roles(role_name)')
-    .eq('user_id', userId)
-
-  return userRoles?.some((ur: any) =>
-    ADMIN_ROLES.includes(ur.roles?.role_name)
-  ) || false
+  return await userHasPermissionServer(userId, 'admin.access')
 }
 
 /**
- * Check if user has management-level role
- * Management roles: Super Admin, Admin, Manager, Team Lead (level >= 7)
+ * Check if user has management-level access
+ * Dynamic: checks for 'conversation.assign' or 'admin.access' permission
  */
 export async function isUserManagement(userId: string): Promise<boolean> {
-  const supabase = await createClient()
-
-  const { data: userRoles } = await supabase
-    .from('user_roles')
-    .select('roles(role_name)')
-    .eq('user_id', userId)
-
-  return userRoles?.some((ur: any) =>
-    MANAGEMENT_ROLES.includes(ur.roles?.role_name)
-  ) || false
+  return await userHasAnyPermission(userId, ['admin.access', 'conversation.assign', 'conversation.manage'])
 }
 
 /**
- * Check if user has agent-level role
- * Agent roles: All roles that can handle conversations (level >= 4)
+ * Check if user has agent-level role (can handle conversations)
+ * Dynamic: checks for 'chat.send' or 'chat.view' permission
  */
 export async function isUserAgent(userId: string): Promise<boolean> {
-  const supabase = await createClient()
-
-  const { data: userRoles } = await supabase
-    .from('user_roles')
-    .select('roles(role_name)')
-    .eq('user_id', userId)
-
-  return userRoles?.some((ur: any) =>
-    AGENT_ROLES.includes(ur.roles?.role_name)
-  ) || false
+  return await userHasAnyPermission(userId, ['chat.send', 'chat.view'])
 }
 
 /**
- * Get user's role name
+ * Get user's role name from dynamic RBAC
  */
 export async function getUserRole(userId: string): Promise<string | null> {
   const supabase = await createClient()
@@ -119,11 +50,11 @@ export async function getUserRole(userId: string): Promise<string | null> {
     .eq('user_id', userId)
     .limit(1)
 
-  return userRoles?.[0]?.roles?.role_name || null
+  return (userRoles as any)?.[0]?.roles?.role_name || null
 }
 
 /**
- * Check if user has specific role
+ * Check if user has specific role by name
  */
 export async function userHasRole(
   userId: string,
@@ -158,4 +89,121 @@ export async function userHasAnyRole(
   return userRoles?.some((ur: any) =>
     roleNames.includes(ur.roles?.role_name)
   ) || false
+}
+
+/**
+ * Check if user has a specific permission (server-side)
+ * Queries: user_roles → roles → role_permissions → permissions
+ */
+export async function userHasPermissionServer(userId: string, permissionKey: string): Promise<boolean> {
+  const supabase = await createClient()
+
+  try {
+    const { data, error } = await supabase
+      .from('user_roles')
+      .select(`
+        roles!inner (
+          role_permissions!inner (
+            permissions!inner (
+              permission_key
+            )
+          )
+        )
+      `)
+      .eq('user_id', userId)
+
+    if (error || !data) return false
+
+    for (const ur of data) {
+      const role = (ur as any).roles
+      if (!role?.role_permissions) continue
+      for (const rp of role.role_permissions) {
+        if (rp.permissions?.permission_key === permissionKey) {
+          return true
+        }
+      }
+    }
+
+    return false
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Check if user has any of the given permissions (server-side)
+ */
+export async function userHasAnyPermission(userId: string, permissionKeys: string[]): Promise<boolean> {
+  const supabase = await createClient()
+
+  try {
+    const { data, error } = await supabase
+      .from('user_roles')
+      .select(`
+        roles!inner (
+          role_permissions!inner (
+            permissions!inner (
+              permission_key
+            )
+          )
+        )
+      `)
+      .eq('user_id', userId)
+
+    if (error || !data) return false
+
+    for (const ur of data) {
+      const role = (ur as any).roles
+      if (!role?.role_permissions) continue
+      for (const rp of role.role_permissions) {
+        if (permissionKeys.includes(rp.permissions?.permission_key)) {
+          return true
+        }
+      }
+    }
+
+    return false
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Get IDs of users who have a specific permission
+ * Useful for finding "agents" dynamically (users with 'chat.send' permission)
+ */
+export async function getUserIdsWithPermission(permissionKey: string): Promise<string[]> {
+  const supabase = await createClient()
+
+  try {
+    const { data, error } = await supabase
+      .from('user_roles')
+      .select(`
+        user_id,
+        roles!inner (
+          role_permissions!inner (
+            permissions!inner (
+              permission_key
+            )
+          )
+        )
+      `)
+
+    if (error || !data) return []
+
+    const userIds = new Set<string>()
+    for (const ur of data) {
+      const role = (ur as any).roles
+      if (!role?.role_permissions) continue
+      for (const rp of role.role_permissions) {
+        if (rp.permissions?.permission_key === permissionKey) {
+          userIds.add((ur as any).user_id)
+        }
+      }
+    }
+
+    return Array.from(userIds)
+  } catch {
+    return []
+  }
 }

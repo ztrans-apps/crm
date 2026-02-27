@@ -92,6 +92,13 @@ export function withAuth(handler: AuthHandler, options?: WithAuthOptions) {
         process.env.NEXT_PUBLIC_DEFAULT_TENANT_ID || 
         '00000000-0000-0000-0000-000000000001'
 
+      // Create service client early — needed for reliable permission checks
+      const serviceClient = createServiceRoleClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!,
+        { auth: { autoRefreshToken: false, persistSession: false } }
+      )
+
       // 3. Check permissions from middleware header (set by middleware.ts)
       const headerPermission = request.headers.get('X-Required-Permission')
       const permissionMode = request.headers.get('X-Permission-Mode')
@@ -99,7 +106,7 @@ export function withAuth(handler: AuthHandler, options?: WithAuthOptions) {
       if (headerPermission) {
         const permissions = headerPermission.split(',')
         if (permissionMode === 'any') {
-          const allowed = await checkUserAnyPermission(supabase, user.id, permissions)
+          const allowed = await checkUserAnyPermission(serviceClient, user.id, permissions)
           if (!allowed) {
             return NextResponse.json(
               { error: 'Forbidden', message: `One of these permissions required: ${headerPermission}` },
@@ -107,7 +114,7 @@ export function withAuth(handler: AuthHandler, options?: WithAuthOptions) {
             )
           }
         } else {
-          const allowed = await checkUserPermission(supabase, user.id, permissions[0])
+          const allowed = await checkUserPermission(serviceClient, user.id, permissions[0])
           if (!allowed) {
             return NextResponse.json(
               { error: 'Forbidden', message: `Permission '${permissions[0]}' required` },
@@ -119,7 +126,7 @@ export function withAuth(handler: AuthHandler, options?: WithAuthOptions) {
 
       // 4. Check permissions from options (handler-level override)
       if (options?.permission) {
-        const allowed = await checkUserPermission(supabase, user.id, options.permission)
+        const allowed = await checkUserPermission(serviceClient, user.id, options.permission)
         if (!allowed) {
           return NextResponse.json(
             { error: 'Forbidden', message: `Permission '${options.permission}' required` },
@@ -129,7 +136,7 @@ export function withAuth(handler: AuthHandler, options?: WithAuthOptions) {
       }
 
       if (options?.anyPermission) {
-        const allowed = await checkUserAnyPermission(supabase, user.id, options.anyPermission)
+        const allowed = await checkUserAnyPermission(serviceClient, user.id, options.anyPermission)
         if (!allowed) {
           return NextResponse.json(
             { error: 'Forbidden', message: `One of these permissions required: ${options.anyPermission.join(', ')}` },
@@ -140,7 +147,7 @@ export function withAuth(handler: AuthHandler, options?: WithAuthOptions) {
 
       if (options?.allPermissions) {
         for (const perm of options.allPermissions) {
-          const allowed = await checkUserPermission(supabase, user.id, perm)
+          const allowed = await checkUserPermission(serviceClient, user.id, perm)
           if (!allowed) {
             return NextResponse.json(
               { error: 'Forbidden', message: `Permission '${perm}' required` },
@@ -150,11 +157,17 @@ export function withAuth(handler: AuthHandler, options?: WithAuthOptions) {
         }
       }
 
-      // 5. Role check (if required)
+      // 5. Role check (if required) — uses dynamic user_roles, not profile.role
       if (options?.roles && options.roles.length > 0) {
-        const userRole = profile?.role || 'agent'
+        // Query user's actual roles from user_roles → roles  
+        const { data: userRolesData } = await serviceClient
+          .from('user_roles')
+          .select('roles(role_name)')
+          .eq('user_id', user.id)
+
+        const userRoleNames = (userRolesData || []).map((ur: any) => ur.roles?.role_name?.toLowerCase()).filter(Boolean)
         const hasRole = options.roles.some(r => 
-          r.toLowerCase() === userRole.toLowerCase()
+          userRoleNames.includes(r.toLowerCase())
         )
         if (!hasRole) {
           return NextResponse.json(
@@ -165,15 +178,10 @@ export function withAuth(handler: AuthHandler, options?: WithAuthOptions) {
       }
 
       // 6. Call handler with context
-      const serviceClient = createServiceRoleClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.SUPABASE_SERVICE_ROLE_KEY!,
-        { auth: { autoRefreshToken: false, persistSession: false } }
-      )
 
       const ctx: AuthContext = {
         user: { id: user.id, email: user.email },
-        profile: profile || { id: user.id, tenant_id: tenantId, role: 'agent' },
+        profile: profile || { id: user.id, tenant_id: tenantId, role: 'user' },
         tenantId,
         supabase,
         serviceClient,
@@ -193,21 +201,44 @@ export function withAuth(handler: AuthHandler, options?: WithAuthOptions) {
 // ---- Internal helpers ----
 
 async function checkUserPermission(
-  supabase: SupabaseClient,
+  client: SupabaseClient,
   userId: string,
   permissionKey: string
 ): Promise<boolean> {
   try {
-    // @ts-ignore - Supabase RPC type issue
-    const { data, error } = await supabase.rpc('user_has_permission', {
-      p_user_id: userId,
-      p_permission_key: permissionKey,
-    })
+    // Direct query instead of RPC to avoid function overload ambiguity
+    // Check: user_roles → role_permissions → permissions
+    const { data, error } = await client
+      .from('user_roles')
+      .select(`
+        role_id,
+        roles!inner (
+          role_permissions!inner (
+            permissions!inner (
+              permission_key
+            )
+          )
+        )
+      `)
+      .eq('user_id', userId)
+
     if (error) {
       console.error('[withAuth] Permission check error:', error)
       return false
     }
-    return !!data
+
+    // Flatten and check if permissionKey exists
+    for (const ur of (data || [])) {
+      const role = (ur as any).roles
+      if (!role?.role_permissions) continue
+      for (const rp of role.role_permissions) {
+        if (rp.permissions?.permission_key === permissionKey) {
+          return true
+        }
+      }
+    }
+
+    return false
   } catch {
     return false
   }

@@ -26,11 +26,9 @@ import { createClient } from '@/lib/supabase/client'
 
 interface Role {
   id: string
-  role_key: string
   role_name: string
   description: string | null
-  is_system_role: boolean
-  is_active: boolean
+  is_master_template: boolean
   permissions: Permission[]
 }
 
@@ -39,7 +37,7 @@ interface Permission {
   permission_key: string
   permission_name: string
   module: string
-  resource: string | null
+  page: string | null
   action: string
   description: string | null
 }
@@ -50,12 +48,10 @@ interface UserRole {
   role_id: string
   assigned_at: string
   user: {
-    email: string
     full_name: string
   }
   role: {
     role_name: string
-    role_key: string
   }
 }
 
@@ -124,12 +120,10 @@ export default function RBACManagementPage() {
         .select(`
           *,
           user:profiles!user_roles_user_id_fkey (
-            email,
             full_name
           ),
           role:roles!user_roles_role_id_fkey (
-            role_name,
-            role_key
+            role_name
           )
         `)
         .order('assigned_at', { ascending: false })
@@ -257,21 +251,13 @@ export default function RBACManagementPage() {
                     <div>
                       <CardTitle className="flex items-center gap-2">
                         {role.role_name}
-                        {role.is_system_role && (
-                          <Badge variant="secondary">System</Badge>
-                        )}
-                        {!role.is_active && (
-                          <Badge variant="destructive">Inactive</Badge>
+                        {role.is_master_template && (
+                          <Badge variant="secondary">Master Template</Badge>
                         )}
                       </CardTitle>
                       <CardDescription className="mt-1">
                         {role.description || 'No description'}
                       </CardDescription>
-                      <div className="mt-2">
-                        <code className="text-xs bg-vx-surface-hover px-2 py-1 rounded">
-                          {role.role_key}
-                        </code>
-                      </div>
                     </div>
                     <div className="flex gap-2">
                       {canEditRoles && (
@@ -388,8 +374,8 @@ export default function RBACManagementPage() {
                     className="flex items-center justify-between p-3 border rounded-lg hover:bg-vx-surface-hover"
                   >
                     <div className="flex-1">
-                      <p className="font-medium">{ur.user.full_name || ur.user.email}</p>
-                      <p className="text-sm text-vx-text-secondary">{ur.user.email}</p>
+                      <p className="font-medium">{ur.user?.full_name || 'Unknown User'}</p>
+                      <p className="text-sm text-vx-text-secondary">User ID: {ur.user_id.slice(0, 8)}...</p>
                     </div>
                     <div className="flex items-center gap-3">
                       <Badge>{ur.role.role_name}</Badge>

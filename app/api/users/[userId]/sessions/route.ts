@@ -97,7 +97,7 @@ export const POST = withAuth(async (req, ctx, params) => {
     message: `Assigned ${session_ids.length} session(s) to user`,
     assignments: data
   })
-}, { permission: 'sessions.assign' })
+}, { permission: 'whatsapp.session.edit' })
 
 // DELETE: Remove session assignment
 export const DELETE = withAuth(async (req, ctx, params) => {
@@ -128,4 +128,4 @@ export const DELETE = withAuth(async (req, ctx, params) => {
     success: true,
     message: 'Session assignment removed'
   })
-}, { permission: 'sessions.assign' })
+}, { permission: 'whatsapp.session.edit' })

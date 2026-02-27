@@ -89,6 +89,17 @@ ALTER TABLE IF EXISTS tickets DISABLE ROW LEVEL SECURITY;
 -- ==================== QUICK REPLIES ====================
 ALTER TABLE IF EXISTS quick_replies DISABLE ROW LEVEL SECURITY;
 
+-- ==================== TABEL TAMBAHAN (ditemukan masih RLS enabled) ====================
+ALTER TABLE IF EXISTS assignment_queue DISABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS audit_logs DISABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS broadcast_segments DISABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS campaign_audit_logs DISABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS campaign_messages DISABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS campaigns DISABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS contact_preferences DISABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS segments DISABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS whatsapp_templates DISABLE ROW LEVEL SECURITY;
+
 -- ============================================================
 -- VERIFIKASI: Cek tabel mana yang masih RLS enabled
 -- ============================================================

@@ -52,7 +52,9 @@ interface RightSidebarProps {
   onSelectConversation?: (conversationId: string) => void
   onStatusChanged: () => void
   currentUserId: string | null
-  userRole: 'owner' | 'agent' | 'supervisor'
+  userRole: string
+  isLimitedView?: boolean
+  hasManagePermission?: boolean
   canEditContact: boolean
   canApplyLabel: boolean
   canCreateNote: boolean
@@ -76,6 +78,8 @@ export function RightSidebar({
   onStatusChanged,
   currentUserId,
   userRole,
+  isLimitedView = false,
+  hasManagePermission = false,
   canEditContact,
   canApplyLabel,
   canCreateNote,
@@ -555,6 +559,7 @@ export function RightSidebar({
                   conversation={conversation}
                   userRole={userRole}
                   currentUserId={currentUserId}
+                  isLimitedView={isLimitedView}
                 />
               </div>
             )}
@@ -593,6 +598,7 @@ export function RightSidebar({
               canHandover={!!onHandoverToAgent}
               canAssign={!!onAssignAgent}
               userRole={userRole}
+              hasManagePermission={hasManagePermission}
             />
           </div>
         )}
@@ -649,6 +655,7 @@ export function RightSidebar({
               onSelectConversation={onSelectConversation}
               onViewInModal={handleViewHistoryInModal}
               userRole={userRole}
+              isLimitedView={isLimitedView}
             />
           </div>
         )}

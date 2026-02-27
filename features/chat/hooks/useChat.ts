@@ -1,6 +1,6 @@
 // Main chat logic hook
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { UserRole, canViewConversation, getUserRole } from '@/lib/rbac/chat-permissions'
+import { canViewConversation, getUserRole } from '@/lib/rbac/chat-permissions'
 import { chatService } from '../services'
 import { createClient } from '@/lib/supabase/client'
 
@@ -10,7 +10,7 @@ export function useChat() {
   const [conversations, setConversations] = useState<any[]>([])
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null)
   const [userId, setUserId] = useState<string | null>(null)
-  const [userRole, setUserRole] = useState<UserRole>('agent')
+  const [userRole, setUserRole] = useState<string>('User')
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [loading, setLoading] = useState(true)
@@ -62,7 +62,7 @@ export function useChat() {
   }, [supabase])
 
   // Load conversations
-  const loadConversations = useCallback(async (uid?: string, role?: UserRole) => {
+  const loadConversations = useCallback(async (uid?: string, role?: string) => {
     try {
       const currentUserId = uid || userId
       const currentRole = role || userRole

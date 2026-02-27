@@ -4,10 +4,11 @@ import { withAuth } from '@/lib/rbac/with-auth'
 
 export const GET = withAuth(async (req, ctx) => {
   // Try to query profiles with last_activity
+  // Get any profile with agent_status to verify schema (no role filter)
   const { data, error } = await ctx.supabase
     .from('profiles')
     .select('id, email, agent_status, last_activity, updated_at')
-    .eq('role', 'agent')
+    .not('agent_status', 'is', null)
     .limit(1)
 
   if (error) {

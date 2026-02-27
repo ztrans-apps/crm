@@ -57,16 +57,42 @@ export default function UserSessionsModal({
         setInitialAssignedIds(ids)
       }
 
-      // Load user's role to check for full access
+      // Load user's role to check for full access via permissions
       const userRes = await fetch(`/api/users/${userId}`)
       if (userRes.ok) {
         const userData = await userRes.json()
         const role = userData.user?.roles?.[0]?.role_name || null
         setUserRole(role)
         
-        // Check if user has full access role
-        const fullAccessRoles = ['Owner', 'Supervisor', 'Super Admin', 'Admin', 'Manager']
-        setHasFullAccess(role && fullAccessRoles.includes(role))
+        // Dynamic: check if user has admin.access permission via their roles
+        const { createClient } = await import('@/lib/supabase/client')
+        const supabase = createClient()
+        const { data: permData } = await supabase
+          .from('user_roles')
+          .select(`
+            roles!inner (
+              role_permissions!inner (
+                permissions!inner (
+                  permission_key
+                )
+              )
+            )
+          `)
+          .eq('user_id', userId)
+        
+        let hasAdmin = false
+        for (const ur of (permData || [])) {
+          const r = (ur as any).roles
+          if (!r?.role_permissions) continue
+          for (const rp of r.role_permissions) {
+            if (rp.permissions?.permission_key === 'admin.access') {
+              hasAdmin = true
+              break
+            }
+          }
+          if (hasAdmin) break
+        }
+        setHasFullAccess(hasAdmin)
       }
     } catch (error) {
       console.error('Error loading data:', error)

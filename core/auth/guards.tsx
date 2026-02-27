@@ -1,14 +1,14 @@
-// Route guards for client-side protection
+// Route guards for client-side protection — Dynamic RBAC
 'use client'
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import type { UserRole } from '@/lib/rbac/chat-permissions'
 
 interface RouteGuardProps {
   children: React.ReactNode
-  allowedRoles?: UserRole[]
+  allowedRoles?: string[]
+  requiredPermission?: string | string[]
   redirectTo?: string
   fallback?: React.ReactNode
 }
@@ -57,11 +57,13 @@ export function AuthGuard({
 }
 
 /**
- * Protect routes that require specific roles
+ * Protect routes that require specific roles or permissions
+ * Uses dynamic RBAC: user_roles → role_permissions → permissions
  */
 export function RoleGuard({ 
   children, 
   allowedRoles = [],
+  requiredPermission,
   redirectTo = '/unauthorized',
   fallback = <LoadingScreen />
 }: RouteGuardProps) {
@@ -69,10 +71,10 @@ export function RoleGuard({
   const [hasAccess, setHasAccess] = useState<boolean | null>(null)
 
   useEffect(() => {
-    checkRole()
+    checkAccess()
   }, [])
 
-  const checkRole = async () => {
+  const checkAccess = async () => {
     try {
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
@@ -82,36 +84,74 @@ export function RoleGuard({
         return
       }
 
-      // Get user profile with role
-      // @ts-ignore - Supabase type issue
+      // Check if user is active
       const { data: profile } = await supabase
         .from('profiles')
-        .select('role, is_active')
+        .select('is_active')
         .eq('id', user.id)
         .single()
 
-      if (!profile) {
-        router.push('/login')
-        return
-      }
-
-      // Check if user is active
-      // @ts-ignore
-      if (profile.is_active === false) {
+      if (!profile || (profile as any).is_active === false) {
         router.push('/inactive')
         return
       }
 
-      // Check if user has required role
-      // @ts-ignore
-      if (allowedRoles.length > 0 && !allowedRoles.includes(profile.role as UserRole)) {
-        router.push(redirectTo)
-        return
+      // Check permission dynamically via user_roles → role_permissions → permissions
+      if (requiredPermission) {
+        const permKeys = Array.isArray(requiredPermission) ? requiredPermission : [requiredPermission]
+        
+        const { data: userRolesData } = await supabase
+          .from('user_roles')
+          .select(`
+            roles!inner (
+              role_permissions!inner (
+                permissions!inner (
+                  permission_key
+                )
+              )
+            )
+          `)
+          .eq('user_id', user.id)
+
+        const userPermissions = new Set<string>()
+        for (const ur of (userRolesData || [])) {
+          const role = (ur as any).roles
+          if (!role?.role_permissions) continue
+          for (const rp of role.role_permissions) {
+            if (rp.permissions?.permission_key) {
+              userPermissions.add(rp.permissions.permission_key)
+            }
+          }
+        }
+
+        const hasPermission = permKeys.some(key => userPermissions.has(key))
+        if (!hasPermission) {
+          router.push(redirectTo)
+          return
+        }
+      }
+
+      // Check role dynamically via user_roles if allowedRoles specified
+      if (allowedRoles.length > 0) {
+        const { data: userRolesData } = await supabase
+          .from('user_roles')
+          .select('roles(role_name)')
+          .eq('user_id', user.id)
+
+        const userRoleNames = (userRolesData || []).map((ur: any) => ur.roles?.role_name).filter(Boolean)
+        const hasRole = allowedRoles.some(r => 
+          userRoleNames.some((rn: string) => rn.toLowerCase() === r.toLowerCase())
+        )
+        
+        if (!hasRole) {
+          router.push(redirectTo)
+          return
+        }
       }
 
       setHasAccess(true)
     } catch (error) {
-      console.error('Role check error:', error)
+      console.error('Access check error:', error)
       router.push(redirectTo)
     }
   }
@@ -128,44 +168,47 @@ export function RoleGuard({
 }
 
 /**
- * Protect owner-only routes
+ * @deprecated Use RoleGuard with requiredPermission or PermissionGuard from lib/rbac/components/PermissionGuard
+ * Protect owner-only routes — now checks 'admin.access' permission dynamically
  */
-export function OwnerGuard({ children, ...props }: Omit<RouteGuardProps, 'allowedRoles'>) {
+export function OwnerGuard({ children, ...props }: Omit<RouteGuardProps, 'allowedRoles' | 'requiredPermission'>) {
   return (
-    <RoleGuard allowedRoles={['owner']} {...props}>
+    <RoleGuard requiredPermission="admin.access" {...props}>
       {children}
     </RoleGuard>
   )
 }
 
 /**
- * Protect agent-only routes
+ * @deprecated Use RoleGuard with requiredPermission or PermissionGuard from lib/rbac/components/PermissionGuard
+ * Protect agent-only routes — now checks 'chat.view' permission dynamically
  */
-export function AgentGuard({ children, ...props }: Omit<RouteGuardProps, 'allowedRoles'>) {
+export function AgentGuard({ children, ...props }: Omit<RouteGuardProps, 'allowedRoles' | 'requiredPermission'>) {
   return (
-    <RoleGuard allowedRoles={['agent']} {...props}>
+    <RoleGuard requiredPermission="chat.view" {...props}>
       {children}
     </RoleGuard>
   )
 }
 
 /**
- * Protect supervisor-only routes
+ * @deprecated Use RoleGuard with requiredPermission or PermissionGuard from lib/rbac/components/PermissionGuard
+ * Protect supervisor-only routes — now checks 'conversation.manage' permission dynamically
  */
-export function SupervisorGuard({ children, ...props }: Omit<RouteGuardProps, 'allowedRoles'>) {
+export function SupervisorGuard({ children, ...props }: Omit<RouteGuardProps, 'allowedRoles' | 'requiredPermission'>) {
   return (
-    <RoleGuard allowedRoles={['supervisor']} {...props}>
+    <RoleGuard requiredPermission="conversation.manage" {...props}>
       {children}
     </RoleGuard>
   )
 }
 
 /**
- * Protect routes for owner or supervisor
+ * @deprecated Use RoleGuard with requiredPermission or PermissionGuard from lib/rbac/components/PermissionGuard
  */
-export function OwnerOrSupervisorGuard({ children, ...props }: Omit<RouteGuardProps, 'allowedRoles'>) {
+export function OwnerOrSupervisorGuard({ children, ...props }: Omit<RouteGuardProps, 'allowedRoles' | 'requiredPermission'>) {
   return (
-    <RoleGuard allowedRoles={['owner', 'supervisor']} {...props}>
+    <RoleGuard requiredPermission={['admin.access', 'conversation.manage']} {...props}>
       {children}
     </RoleGuard>
   )

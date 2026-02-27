@@ -1,12 +1,14 @@
-// Auth middleware - inspired by reference project's validateUser/validateAgent
+// Auth middleware - uses dynamic RBAC for all permission checks
 import { createClient } from '@/lib/supabase/client'
 import type { SupabaseClient } from '@supabase/supabase-js'
-import type { UserRole } from '@/lib/rbac/chat-permissions'
+
+/** @deprecated UserRole is now dynamic string from DB */
+export type UserRole = string
 
 export interface AuthUser {
   id: string
   email: string
-  role: UserRole
+  role: string      // Display role from profiles, NOT used for access control
   full_name?: string
   avatar_url?: string
   is_active?: boolean
@@ -19,13 +21,11 @@ export interface AuthContext {
 
 /**
  * Get authenticated user from Supabase
- * Similar to validateUser in reference project
  */
 export async function getAuthUser(): Promise<AuthUser | null> {
   try {
     const supabase = createClient()
     
-    // Get current session
     const { data: { user }, error: authError } = await supabase.auth.getUser()
     
     if (authError || !user) {
@@ -33,7 +33,6 @@ export async function getAuthUser(): Promise<AuthUser | null> {
       return null
     }
 
-    // Get user profile with role
     // @ts-ignore - Supabase type issue
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
@@ -50,7 +49,7 @@ export async function getAuthUser(): Promise<AuthUser | null> {
     return {
       id: profileData.id,
       email: profileData.email,
-      role: profileData.role as UserRole,
+      role: profileData.role || 'user',  // Display only, not for access control
       full_name: profileData.full_name,
       avatar_url: profileData.avatar_url,
       is_active: profileData.is_active,
@@ -63,7 +62,6 @@ export async function getAuthUser(): Promise<AuthUser | null> {
 
 /**
  * Require authentication
- * Throws error if user is not authenticated
  */
 export async function requireAuth(): Promise<AuthContext> {
   const user = await getAuthUser()
@@ -83,62 +81,69 @@ export async function requireAuth(): Promise<AuthContext> {
 }
 
 /**
- * Require specific role
- * Similar to role check in reference project's middleware
+ * @deprecated Use dynamic permission checks via withAuth in lib/rbac/with-auth.ts instead
+ * Keeping for backward compatibility but checks are best-effort
  */
-export async function requireRole(allowedRoles: UserRole[]): Promise<AuthContext> {
+export async function requireRole(allowedRoles: string[]): Promise<AuthContext> {
   const context = await requireAuth()
-  
-  if (!allowedRoles.includes(context.user.role)) {
+  // Note: This checks profiles.role for backward compat
+  // New code should use permission-based checks via withAuth
+  if (allowedRoles.length > 0 && !allowedRoles.includes(context.user.role)) {
     throw new Error(`Access denied. Required roles: ${allowedRoles.join(', ')}`)
   }
-
   return context
 }
 
 /**
- * Require owner role
+ * Check if user has permission (dynamic, via DB)
  */
-export async function requireOwner(): Promise<AuthContext> {
-  return requireRole(['owner'])
-}
+export async function hasPermission(user: AuthUser, permission: string): Promise<boolean> {
+  const supabase = createClient()
+  
+  try {
+    const { data, error } = await supabase
+      .from('user_roles')
+      .select(`
+        roles!inner (
+          role_permissions!inner (
+            permissions!inner (
+              permission_key
+            )
+          )
+        )
+      `)
+      .eq('user_id', user.id)
 
-/**
- * Require agent role
- */
-export async function requireAgent(): Promise<AuthContext> {
-  return requireRole(['agent'])
-}
+    if (error || !data) return false
 
-/**
- * Require supervisor role
- */
-export async function requireSupervisor(): Promise<AuthContext> {
-  return requireRole(['supervisor'])
-}
+    for (const ur of data) {
+      const role = (ur as any).roles
+      if (!role?.role_permissions) continue
+      for (const rp of role.role_permissions) {
+        if (rp.permissions?.permission_key === permission) {
+          return true
+        }
+      }
+    }
 
-/**
- * Require owner or supervisor
- */
-export async function requireOwnerOrSupervisor(): Promise<AuthContext> {
-  return requireRole(['owner', 'supervisor'])
+    return false
+  } catch {
+    return false
+  }
 }
 
 /**
  * Get owner info for agent
- * Similar to reference project's agent middleware that attaches owner info
  */
 export async function getAgentOwner(agentId: string) {
   try {
     const supabase = createClient()
     
-    // Get agent info
     // @ts-ignore - Supabase type issue
     const { data: agent, error: agentError } = await supabase
       .from('profiles')
       .select('owner_id')
       .eq('id', agentId)
-      .eq('role', 'agent')
       .single()
 
     if (agentError || !agent) {
@@ -146,7 +151,6 @@ export async function getAgentOwner(agentId: string) {
     }
 
     const agentData = agent as any
-    // Get owner info
     const { data: owner, error: ownerError } = await supabase
       .from('profiles')
       .select('*')
@@ -162,15 +166,6 @@ export async function getAgentOwner(agentId: string) {
     console.error('getAgentOwner error:', error)
     throw error
   }
-}
-
-/**
- * Check if user has permission
- */
-export function hasPermission(user: AuthUser, permission: string): boolean {
-  // This can be extended with more complex permission logic
-  // For now, we use role-based permissions from lib/permissions
-  return true
 }
 
 /**
@@ -201,11 +196,11 @@ export function withAuth<T = any>(
 }
 
 /**
- * Middleware wrapper with role requirement
- * Usage: export const GET = withRole(['owner'], async (req, context) => { ... })
+ * @deprecated Use withAuth from lib/rbac/with-auth.ts with permission option instead
+ * Middleware wrapper with role requirement (backward compat)
  */
 export function withRole<T = any>(
-  allowedRoles: UserRole[],
+  allowedRoles: string[],
   handler: (req: Request, context: AuthContext) => Promise<Response>
 ) {
   return async (req: Request): Promise<Response> => {
