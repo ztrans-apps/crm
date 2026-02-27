@@ -46,75 +46,126 @@
   --radius-2xl: calc(var(--radius) + 8px);
   --radius-3xl: calc(var(--radius) + 12px);
   --radius-4xl: calc(var(--radius) + 16px);
+
+  /* Voxentra Brand Colors */
+  --color-vx-purple: var(--vx-purple);
+  --color-vx-purple-light: var(--vx-purple-light);
+  --color-vx-purple-dark: var(--vx-purple-dark);
+  --color-vx-teal: var(--vx-teal);
+  --color-vx-teal-light: var(--vx-teal-light);
+  --color-vx-cyan: var(--vx-cyan);
+  --color-vx-surface: var(--vx-surface);
+  --color-vx-surface-elevated: var(--vx-surface-elevated);
+  --color-vx-surface-hover: var(--vx-surface-hover);
+  --color-vx-text: var(--vx-text);
+  --color-vx-text-secondary: var(--vx-text-secondary);
+  --color-vx-text-muted: var(--vx-text-muted);
+  --color-vx-border: var(--vx-border);
+  --color-vx-bubble-in: var(--vx-bubble-in);
+  --color-vx-bubble-in-border: var(--vx-bubble-in-border);
 }
 
 :root {
   --radius: 0.625rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.646 0.222 41.116);
-  --chart-2: oklch(0.6 0.118 184.704);
-  --chart-3: oklch(0.398 0.07 227.392);
-  --chart-4: oklch(0.828 0.189 84.429);
-  --chart-5: oklch(0.769 0.188 70.08);
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  --background: #FFFFFF;
+  --foreground: #1A0E2E;
+  --card: #FFFFFF;
+  --card-foreground: #1A0E2E;
+  --popover: #FFFFFF;
+  --popover-foreground: #1A0E2E;
+  --primary: #6C2BD9;
+  --primary-foreground: #FFFFFF;
+  --secondary: #F0EDF7;
+  --secondary-foreground: #1A0E2E;
+  --muted: #F8F7FC;
+  --muted-foreground: #6B5E7B;
+  --accent: #F0EDF7;
+  --accent-foreground: #1A0E2E;
+  --destructive: #EF4444;
+  --border: #E8E0F0;
+  --input: #E8E0F0;
+  --ring: #6C2BD9;
+  --chart-1: #6C2BD9;
+  --chart-2: #14B8A6;
+  --chart-3: #22D3EE;
+  --chart-4: #F59E0B;
+  --chart-5: #EF4444;
+  --sidebar: #FFFFFF;
+  --sidebar-foreground: #1A0E2E;
+  --sidebar-primary: #6C2BD9;
+  --sidebar-primary-foreground: #FFFFFF;
+  --sidebar-accent: #F0EDF7;
+  --sidebar-accent-foreground: #1A0E2E;
+  --sidebar-border: #E8E0F0;
+  --sidebar-ring: #6C2BD9;
+
+  /* Voxentra Brand Tokens - Light */
+  --vx-purple: #6C2BD9;
+  --vx-purple-light: #A78BFA;
+  --vx-purple-dark: #4A1A8A;
+  --vx-teal: #14B8A6;
+  --vx-teal-light: #5EEAD4;
+  --vx-cyan: #22D3EE;
+  --vx-surface: #FFFFFF;
+  --vx-surface-elevated: #F8F7FC;
+  --vx-surface-hover: #F0EDF7;
+  --vx-text: #1A0E2E;
+  --vx-text-secondary: #6B5E7B;
+  --vx-text-muted: #9B8FB0;
+  --vx-border: #E8E0F0;
+  --vx-bubble-in: #FFFFFF;
+  --vx-bubble-in-border: #E8E0F0;
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.488 0.243 264.376);
-  --chart-2: oklch(0.696 0.17 162.48);
-  --chart-3: oklch(0.769 0.188 70.08);
-  --chart-4: oklch(0.627 0.265 303.9);
-  --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  --background: #0F0A1A;
+  --foreground: #F3F0FF;
+  --card: #1A1128;
+  --card-foreground: #F3F0FF;
+  --popover: #1A1128;
+  --popover-foreground: #F3F0FF;
+  --primary: #A78BFA;
+  --primary-foreground: #0F0A1A;
+  --secondary: #241A36;
+  --secondary-foreground: #F3F0FF;
+  --muted: #241A36;
+  --muted-foreground: #A89BBE;
+  --accent: #241A36;
+  --accent-foreground: #F3F0FF;
+  --destructive: #F87171;
+  --border: #2E2244;
+  --input: #2E2244;
+  --ring: #A78BFA;
+  --chart-1: #A78BFA;
+  --chart-2: #2DD4BF;
+  --chart-3: #67E8F9;
+  --chart-4: #FBBF24;
+  --chart-5: #F87171;
+  --sidebar: #0F0A1A;
+  --sidebar-foreground: #F3F0FF;
+  --sidebar-primary: #A78BFA;
+  --sidebar-primary-foreground: #0F0A1A;
+  --sidebar-accent: #241A36;
+  --sidebar-accent-foreground: #F3F0FF;
+  --sidebar-border: #2E2244;
+  --sidebar-ring: #A78BFA;
+
+  /* Voxentra Brand Tokens - Dark */
+  --vx-purple: #A78BFA;
+  --vx-purple-light: #C4B5FD;
+  --vx-purple-dark: #7C3AED;
+  --vx-teal: #2DD4BF;
+  --vx-teal-light: #5EEAD4;
+  --vx-cyan: #67E8F9;
+  --vx-surface: #1A1128;
+  --vx-surface-elevated: #241A36;
+  --vx-surface-hover: #2E2244;
+  --vx-text: #F3F0FF;
+  --vx-text-secondary: #A89BBE;
+  --vx-text-muted: #6B5E7B;
+  --vx-border: #2E2244;
+  --vx-bubble-in: #241A36;
+  --vx-bubble-in-border: #2E2244;
 }
 
 @layer base {
@@ -138,8 +189,53 @@
   }
 }
 
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes slideInLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes messageIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 .animate-fadeIn {
   animation: fadeIn 0.3s ease-out;
+}
+
+.animate-slideInRight {
+  animation: slideInRight 0.3s ease-out;
+}
+
+.animate-slideInLeft {
+  animation: slideInLeft 0.3s ease-out;
+}
+
+.animate-messageIn {
+  animation: messageIn 0.2s ease-out;
 }
 
 /* Smooth scroll behavior */
@@ -150,4 +246,78 @@
 /* Prevent layout shift during updates */
 .prevent-shift {
   contain: layout;
+}
+
+/* Voxentra gradient utilities */
+.vx-gradient {
+  background: linear-gradient(135deg, #6C2BD9, #14B8A6);
+}
+
+.dark .vx-gradient {
+  background: linear-gradient(135deg, #A78BFA, #2DD4BF);
+}
+
+.vx-gradient-text {
+  background: linear-gradient(135deg, #6C2BD9, #14B8A6);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.dark .vx-gradient-text {
+  background: linear-gradient(135deg, #A78BFA, #2DD4BF);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Voxentra shadow utilities */
+.vx-shadow-sm {
+  box-shadow: 0 1px 3px rgba(106, 43, 217, 0.04);
+}
+
+.dark .vx-shadow-sm {
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.vx-shadow-md {
+  box-shadow: 0 4px 12px rgba(106, 43, 217, 0.08);
+}
+
+.dark .vx-shadow-md {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+.vx-shadow-lg {
+  box-shadow: 0 8px 30px rgba(106, 43, 217, 0.12);
+}
+
+.dark .vx-shadow-lg {
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5);
+}
+
+/* Custom scrollbar - Voxentra themed */
+.vx-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+
+.vx-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.vx-scrollbar::-webkit-scrollbar-thumb {
+  background: #E8E0F0;
+  border-radius: 3px;
+}
+
+.vx-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #9B8FB0;
+}
+
+.dark .vx-scrollbar::-webkit-scrollbar-thumb {
+  background: #2E2244;
+}
+
+.dark .vx-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #6B5E7B;
 }

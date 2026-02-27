@@ -227,8 +227,8 @@ export function RightSidebar({
 
   if (!conversation) {
     return (
-      <div className="w-80 border-l bg-white flex items-center justify-center p-4">
-        <p className="text-sm text-gray-400">Pilih conversation untuk melihat detail</p>
+      <div className="w-80 border-l border-vx-border bg-vx-surface flex items-center justify-center p-4">
+        <p className="text-sm text-vx-text-muted">Pilih conversation untuk melihat detail</p>
       </div>
     )
   }
@@ -236,29 +236,29 @@ export function RightSidebar({
   const isContactSaved = conversation?.contact?.name && conversation.contact.name.trim() !== ''
 
   return (
-    <div className="w-80 border-l bg-white flex flex-col h-full">
+    <div className="w-80 border-l border-vx-border bg-vx-surface flex flex-col h-full">
       {/* Header - Compact Design with Frame */}
-      <div className="bg-gray-50 p-4">
+      <div className="bg-vx-surface-elevated p-4">
         {/* Contact Details Frame - Avatar + Info */}
-        <div className="mx-auto max-w-sm border border-gray-200 rounded-2xl overflow-hidden bg-white shadow-sm">
+        <div className="mx-auto max-w-sm border border-vx-border rounded-2xl overflow-hidden bg-vx-surface vx-shadow-sm">
           {/* Large Avatar - Inside Frame */}
-          <div className="py-6 px-4 flex justify-center bg-gray-50">
-            <div className="w-24 h-24 rounded-full border-4 border-teal-200 bg-white flex items-center justify-center">
-              <div className="w-20 h-20 rounded-full bg-teal-600 flex items-center justify-center text-white text-3xl font-semibold">
+          <div className="py-6 px-4 flex justify-center bg-vx-surface-elevated">
+            <div className="w-24 h-24 rounded-full border-4 border-vx-purple/30 bg-vx-surface flex items-center justify-center">
+              <div className="w-20 h-20 rounded-full vx-gradient flex items-center justify-center text-white text-3xl font-semibold">
                 {getAvatarInitial()}
               </div>
             </div>
           </div>
 
           {/* Contact Details - Sender and Mobile */}
-          <div className="px-4 py-4 space-y-3 bg-white">
+          <div className="px-4 py-4 space-y-3 bg-vx-surface">
             {/* Sender - With Edit */}
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-full bg-teal-100 flex items-center justify-center flex-shrink-0">
-                <User className="h-4 w-4 text-teal-600" />
+              <div className="w-8 h-8 rounded-full bg-vx-purple/10 flex items-center justify-center shrink-0">
+                <User className="h-4 w-4 text-vx-purple" />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-xs text-gray-500 mb-0.5">Sender:</p>
+                <p className="text-xs text-vx-text-muted mb-0.5">Sender:</p>
                 {editingContact ? (
                   <div className="flex items-center gap-1.5">
                     <Input
@@ -270,7 +270,7 @@ export function RightSidebar({
                     />
                     <button
                       onClick={handleSaveContact}
-                      className="p-1 hover:bg-green-50 rounded text-green-600 flex-shrink-0"
+                      className="p-1 hover:bg-vx-teal/10 rounded text-vx-teal shrink-0"
                     >
                       <Save className="h-3 w-3" />
                     </button>
@@ -279,20 +279,20 @@ export function RightSidebar({
                         setEditingContact(false)
                         setContactName(conversation?.contact?.name || '')
                       }}
-                      className="p-1 hover:bg-gray-100 rounded text-gray-500 flex-shrink-0"
+                      className="p-1 hover:bg-vx-surface-hover rounded text-vx-text-muted shrink-0"
                     >
                       <X className="h-3 w-3" />
                     </button>
                   </div>
                 ) : (
                   <div className="flex items-center gap-1.5">
-                    <p className="text-sm font-semibold text-gray-900 truncate">
+                    <p className="text-sm font-semibold text-vx-text truncate">
                       {contactName || conversation?.contact?.phone_number || 'Unknown'}
                     </p>
                     {canEditContact && (
                       <button
                         onClick={() => setEditingContact(true)}
-                        className="p-0.5 hover:bg-gray-100 rounded text-gray-400 hover:text-gray-600 flex-shrink-0"
+                        className="p-0.5 hover:bg-vx-surface-hover rounded text-vx-text-muted hover:text-vx-text shrink-0"
                       >
                         <Edit2 className="h-3 w-3" />
                       </button>
@@ -303,16 +303,16 @@ export function RightSidebar({
             </div>
 
             {/* Divider */}
-            <div className="border-t border-gray-100"></div>
+            <div className="border-t border-vx-border"></div>
 
             {/* Mobile */}
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0">
-                <Phone className="h-4 w-4 text-green-600" />
+              <div className="w-8 h-8 rounded-full bg-vx-teal/10 flex items-center justify-center shrink-0">
+                <Phone className="h-4 w-4 text-vx-teal" />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-xs text-gray-500 mb-0.5">Mobile:</p>
-                <p className="text-sm font-semibold text-gray-900 truncate">
+                <p className="text-xs text-vx-text-muted mb-0.5">Mobile:</p>
+                <p className="text-sm font-semibold text-vx-text truncate">
                   {conversation?.contact?.phone_number || '-'}
                 </p>
               </div>
@@ -330,20 +330,20 @@ export function RightSidebar({
       )}
 
       {/* Scrollable Menu Items */}
-      <div className="flex-1 overflow-y-auto py-2">
+      <div className="flex-1 overflow-y-auto py-2 vx-scrollbar">
         {/* Profile Section */}
         <button
           onClick={() => {
             setContactDetailEditMode(false)
             setShowContactDetail(true)
           }}
-          className="w-full px-6 py-3 flex items-center gap-3 hover:bg-gray-50 transition-colors text-left group"
+          className="w-full px-6 py-3 flex items-center gap-3 hover:bg-vx-surface-hover transition-colors text-left group"
         >
-          <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center group-hover:bg-blue-100 transition-colors">
-            <User className="h-4 w-4 text-blue-600" />
+          <div className="w-8 h-8 rounded-lg bg-vx-purple/10 flex items-center justify-center group-hover:bg-vx-purple/20 transition-colors">
+            <User className="h-4 w-4 text-vx-purple" />
           </div>
           <div className="flex-1 flex items-center gap-2">
-            <p className="text-sm font-medium text-gray-900">Profile</p>
+            <p className="text-sm font-medium text-vx-text">Profile</p>
             {!isContactSaved ? (
               <span 
                 className="shrink-0 w-2 h-2 rounded-full bg-orange-500 animate-pulse" 
@@ -374,50 +374,50 @@ export function RightSidebar({
         {/* Details Progress Section */}
         <button
           onClick={() => toggleSection('details')}
-          className="w-full px-6 py-3 flex items-center gap-3 hover:bg-gray-50 transition-colors text-left group"
+          className="w-full px-6 py-3 flex items-center gap-3 hover:bg-vx-surface-hover transition-colors text-left group"
         >
-          <div className="w-8 h-8 rounded-lg bg-gray-50 flex items-center justify-center group-hover:bg-gray-100 transition-colors">
-            <FileText className="h-4 w-4 text-gray-600" />
+          <div className="w-8 h-8 rounded-lg bg-vx-surface-hover flex items-center justify-center group-hover:bg-vx-purple/10 transition-colors">
+            <FileText className="h-4 w-4 text-vx-text-secondary" />
           </div>
           <div className="flex-1">
-            <p className="text-sm font-medium text-gray-900">Details Progress</p>
+            <p className="text-sm font-medium text-vx-text">Details Progress</p>
           </div>
           {expandedSections.details ? (
-            <ChevronUp className="h-4 w-4 text-gray-400" />
+            <ChevronUp className="h-4 w-4 text-vx-text-muted" />
           ) : (
-            <ChevronDown className="h-4 w-4 text-gray-400" />
+            <ChevronDown className="h-4 w-4 text-vx-text-muted" />
           )}
         </button>
 
         {/* Details Content */}
         {expandedSections.details && (
-          <div className="px-6 py-3 space-y-4 bg-gray-50">
+          <div className="px-6 py-3 space-y-4 bg-vx-surface-elevated">
             {/* WhatsApp Session Info */}
             {conversation.whatsapp_session && (
               <div className="space-y-2 pb-2 border-b">
-                <p className="text-[10px] font-semibold text-gray-700 mb-2">WhatsApp Session</p>
+                <p className="text-[10px] font-semibold text-vx-text-secondary mb-2">WhatsApp Session</p>
                 <div className="flex items-center justify-between text-xs">
-                  <span className="text-gray-600 flex items-center gap-1">
+                  <span className="text-vx-text-secondary flex items-center gap-1">
                     <Phone className="h-3 w-3" />
                     Nomor WhatsApp
                   </span>
-                  <span className="font-medium text-gray-900">
+                  <span className="font-medium text-vx-text">
                     {conversation.whatsapp_session.phone_number || 'Connecting...'}
                   </span>
                 </div>
                 {conversation.whatsapp_session.session_name && (
                   <div className="flex items-center justify-between text-xs">
-                    <span className="text-gray-600 flex items-center gap-1">
+                    <span className="text-vx-text-secondary flex items-center gap-1">
                       <MessageSquare className="h-3 w-3" />
                       Device Name
                     </span>
-                    <span className="font-medium text-gray-900">
+                    <span className="font-medium text-vx-text">
                       {conversation.whatsapp_session.session_name}
                     </span>
                   </div>
                 )}
                 <div className="flex items-center justify-between text-xs">
-                  <span className="text-gray-600 flex items-center gap-1">
+                  <span className="text-vx-text-secondary flex items-center gap-1">
                     <AlertCircle className="h-3 w-3" />
                     Status
                   </span>
@@ -438,15 +438,15 @@ export function RightSidebar({
             
             {/* Timeline - Waktu Penting */}
             <div className="space-y-2">
-              <p className="text-[10px] font-semibold text-gray-700 mb-2">Timeline</p>
+              <p className="text-[10px] font-semibold text-vx-text-secondary mb-2">Timeline</p>
               
               {/* Customer First Message */}
               <div className="flex items-start justify-between text-xs">
-                <span className="text-gray-600 flex items-center gap-1">
+                <span className="text-vx-text-secondary flex items-center gap-1">
                   <Clock className="h-3 w-3" />
                   Customer kirim pesan
                 </span>
-                <span className="font-medium text-gray-900">
+                <span className="font-medium text-vx-text">
                   {new Date(conversation.created_at).toLocaleString('id-ID', {
                     day: '2-digit',
                     month: 'short',
@@ -459,11 +459,11 @@ export function RightSidebar({
               {/* Agent First Response */}
               {conversation.first_response_at ? (
                 <div className="flex items-start justify-between text-xs">
-                  <span className="text-gray-600 flex items-center gap-1">
+                  <span className="text-vx-text-secondary flex items-center gap-1">
                     <Clock className="h-3 w-3" />
                     Agent respon
                   </span>
-                  <span className="font-medium text-green-600">
+                  <span className="font-medium text-vx-teal">
                     {new Date(conversation.first_response_at).toLocaleString('id-ID', {
                       day: '2-digit',
                       month: 'short',
@@ -474,11 +474,11 @@ export function RightSidebar({
                 </div>
               ) : (
                 <div className="flex items-start justify-between text-xs">
-                  <span className="text-gray-600 flex items-center gap-1">
+                  <span className="text-vx-text-secondary flex items-center gap-1">
                     <Clock className="h-3 w-3" />
                     Agent respon
                   </span>
-                  <span className="font-medium text-orange-600">
+                  <span className="font-medium text-orange-600 dark:text-orange-400">
                     Belum dibalas
                   </span>
                 </div>
@@ -487,11 +487,11 @@ export function RightSidebar({
               {/* Conversation Closed */}
               {conversation.closed_at ? (
                 <div className="flex items-start justify-between text-xs">
-                  <span className="text-gray-600 flex items-center gap-1">
+                  <span className="text-vx-text-secondary flex items-center gap-1">
                     <Clock className="h-3 w-3" />
                     Chat selesai
                   </span>
-                  <span className="font-medium text-blue-600">
+                  <span className="font-medium text-vx-purple">
                     {new Date(conversation.closed_at).toLocaleString('id-ID', {
                       day: '2-digit',
                       month: 'short',
@@ -502,11 +502,11 @@ export function RightSidebar({
                 </div>
               ) : (
                 <div className="flex items-start justify-between text-xs">
-                  <span className="text-gray-600 flex items-center gap-1">
+                  <span className="text-vx-text-secondary flex items-center gap-1">
                     <Clock className="h-3 w-3" />
                     Chat selesai
                   </span>
-                  <span className="font-medium text-gray-400">
+                  <span className="font-medium text-vx-text-muted">
                     Belum selesai
                   </span>
                 </div>
@@ -514,11 +514,11 @@ export function RightSidebar({
             </div>
 
             {/* SLA Metrics - Durasi */}
-            <div className="space-y-2 pt-2 border-t">
-              <p className="text-[10px] font-semibold text-gray-700 mb-2">SLA Metrics</p>
+            <div className="space-y-2 pt-2 border-t border-vx-border">
+              <p className="text-[10px] font-semibold text-vx-text-secondary mb-2">SLA Metrics</p>
               
               <div className="flex items-center justify-between text-xs">
-                <span className="text-gray-600 flex items-center gap-1">
+                <span className="text-vx-text-secondary flex items-center gap-1">
                   <Clock className="h-3 w-3" />
                   Response Time
                 </span>
@@ -531,7 +531,7 @@ export function RightSidebar({
                 </span>
               </div>
               <div className="flex items-center justify-between text-xs">
-                <span className="text-gray-600 flex items-center gap-1">
+                <span className="text-vx-text-secondary flex items-center gap-1">
                   <Clock className="h-3 w-3" />
                   Resolution Time
                 </span>
@@ -547,7 +547,7 @@ export function RightSidebar({
 
             {/* Workflow Status */}
             {canChangeStatus && (
-              <div className="pt-2 border-t">
+              <div className="pt-2 border-t border-vx-border">
                 <WorkflowStatus
                   conversationId={conversation?.id}
                   currentStatus={conversation?.workflow_status || 'incoming'}
@@ -564,24 +564,24 @@ export function RightSidebar({
         {/* Assign Agent */}
         <button
           onClick={() => toggleSection('agents')}
-          className="w-full px-6 py-3 flex items-center gap-3 hover:bg-gray-50 transition-colors text-left group"
+          className="w-full px-6 py-3 flex items-center gap-3 hover:bg-vx-surface-hover transition-colors text-left group"
         >
-          <div className="w-8 h-8 rounded-lg bg-purple-50 flex items-center justify-center group-hover:bg-purple-100 transition-colors">
-            <Users className="h-4 w-4 text-purple-600" />
+          <div className="w-8 h-8 rounded-lg bg-vx-purple/10 flex items-center justify-center group-hover:bg-vx-purple/20 transition-colors">
+            <Users className="h-4 w-4 text-vx-purple" />
           </div>
           <div className="flex-1">
-            <p className="text-sm font-medium text-gray-900">Assign Agent</p>
+            <p className="text-sm font-medium text-vx-text">Assign Agent</p>
           </div>
           {expandedSections.agents ? (
-            <ChevronUp className="h-4 w-4 text-gray-400" />
+            <ChevronUp className="h-4 w-4 text-vx-text-muted" />
           ) : (
-            <ChevronDown className="h-4 w-4 text-gray-400" />
+            <ChevronDown className="h-4 w-4 text-vx-text-muted" />
           )}
         </button>
 
         {/* Agent Assignment Content */}
         {expandedSections.agents && (
-          <div className="px-6 py-3 bg-gray-50">
+          <div className="px-6 py-3 bg-vx-surface-elevated">
             <AgentAssignment
               conversationId={conversation?.id}
               currentAgentId={conversation?.assigned_to}
@@ -600,24 +600,24 @@ export function RightSidebar({
         {/* Handover History */}
         <button
           onClick={() => toggleSection('handovers')}
-          className="w-full px-6 py-3 flex items-center gap-3 hover:bg-gray-50 transition-colors text-left group"
+          className="w-full px-6 py-3 flex items-center gap-3 hover:bg-vx-surface-hover transition-colors text-left group"
         >
-          <div className="w-8 h-8 rounded-lg bg-cyan-50 flex items-center justify-center group-hover:bg-cyan-100 transition-colors">
-            <Users className="h-4 w-4 text-cyan-600" />
+          <div className="w-8 h-8 rounded-lg bg-vx-cyan/10 flex items-center justify-center group-hover:bg-vx-cyan/20 transition-colors">
+            <Users className="h-4 w-4 text-vx-cyan" />
           </div>
           <div className="flex-1">
-            <p className="text-sm font-medium text-gray-900">Handover History</p>
+            <p className="text-sm font-medium text-vx-text">Handover History</p>
           </div>
           {expandedSections.handovers ? (
-            <ChevronUp className="h-4 w-4 text-gray-400" />
+            <ChevronUp className="h-4 w-4 text-vx-text-muted" />
           ) : (
-            <ChevronDown className="h-4 w-4 text-gray-400" />
+            <ChevronDown className="h-4 w-4 text-vx-text-muted" />
           )}
         </button>
 
         {/* Handover History Content */}
         {expandedSections.handovers && (
-          <div className="px-6 py-3 bg-gray-50">
+          <div className="px-6 py-3 bg-vx-surface-elevated">
             <HandoverHistory conversationId={conversation?.id} />
           </div>
         )}
@@ -625,24 +625,24 @@ export function RightSidebar({
         {/* Conversation History */}
         <button
           onClick={() => toggleSection('history')}
-          className="w-full px-6 py-3 flex items-center gap-3 hover:bg-gray-50 transition-colors text-left group"
+          className="w-full px-6 py-3 flex items-center gap-3 hover:bg-vx-surface-hover transition-colors text-left group"
         >
-          <div className="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center group-hover:bg-indigo-100 transition-colors">
-            <MessageSquare className="h-4 w-4 text-indigo-600" />
+          <div className="w-8 h-8 rounded-lg bg-vx-purple/10 flex items-center justify-center group-hover:bg-vx-purple/20 transition-colors">
+            <MessageSquare className="h-4 w-4 text-vx-purple" />
           </div>
           <div className="flex-1">
-            <p className="text-sm font-medium text-gray-900">Conversation History</p>
+            <p className="text-sm font-medium text-vx-text">Conversation History</p>
           </div>
           {expandedSections.history ? (
-            <ChevronUp className="h-4 w-4 text-gray-400" />
+            <ChevronUp className="h-4 w-4 text-vx-text-muted" />
           ) : (
-            <ChevronDown className="h-4 w-4 text-gray-400" />
+            <ChevronDown className="h-4 w-4 text-vx-text-muted" />
           )}
         </button>
 
         {/* Conversation History Content */}
         {expandedSections.history && (
-          <div className="px-6 py-3 bg-gray-50">
+          <div className="px-6 py-3 bg-vx-surface-elevated">
             <ConversationHistory
               contactId={conversation?.contact?.id}
               currentConversationId={conversation?.id}
@@ -658,28 +658,28 @@ export function RightSidebar({
           <>
             <button
               onClick={() => toggleSection('labels')}
-              className="w-full px-6 py-3 flex items-center gap-3 hover:bg-gray-50 transition-colors text-left group"
+              className="w-full px-6 py-3 flex items-center gap-3 hover:bg-vx-surface-hover transition-colors text-left group"
             >
-              <div className="w-8 h-8 rounded-lg bg-orange-50 flex items-center justify-center group-hover:bg-orange-100 transition-colors">
-                <Tag className="h-4 w-4 text-orange-600" />
+              <div className="w-8 h-8 rounded-lg bg-orange-50 dark:bg-orange-500/10 flex items-center justify-center group-hover:bg-orange-100 dark:group-hover:bg-orange-500/20 transition-colors">
+                <Tag className="h-4 w-4 text-orange-600 dark:text-orange-400" />
               </div>
               <div className="flex-1">
-                <p className="text-sm font-medium text-gray-900">Chat Labels</p>
+                <p className="text-sm font-medium text-vx-text">Chat Labels</p>
               </div>
               {appliedLabels.length > 0 && (
-                <span className="bg-orange-100 text-orange-700 text-xs px-2 py-0.5 rounded-full font-medium">
+                <span className="bg-orange-100 dark:bg-orange-500/10 text-orange-700 dark:text-orange-400 text-xs px-2 py-0.5 rounded-full font-medium">
                   {appliedLabels.length}
                 </span>
               )}
               {expandedSections.labels ? (
-                <ChevronUp className="h-4 w-4 text-gray-400" />
+                <ChevronUp className="h-4 w-4 text-vx-text-muted" />
               ) : (
-                <ChevronDown className="h-4 w-4 text-gray-400" />
+                <ChevronDown className="h-4 w-4 text-vx-text-muted" />
               )}
             </button>
 
             {expandedSections.labels && (
-              <div className="px-6 py-3 bg-gray-50">
+              <div className="px-6 py-3 bg-vx-surface-elevated">
                 <ChatLabels
                   appliedLabels={appliedLabels}
                   availableLabels={availableLabels}
@@ -697,20 +697,20 @@ export function RightSidebar({
             {/* Internal Notes Section */}
             <button
               onClick={() => toggleSection('notes')}
-              className="w-full px-6 py-3 flex items-center gap-3 hover:bg-gray-50 transition-colors text-left group"
+              className="w-full px-6 py-3 flex items-center gap-3 hover:bg-vx-surface-hover transition-colors text-left group"
             >
-              <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center group-hover:bg-blue-100 transition-colors">
-                <FileText className="h-4 w-4 text-blue-600" />
+              <div className="w-8 h-8 rounded-lg bg-vx-purple/10 flex items-center justify-center group-hover:bg-vx-purple/20 transition-colors">
+                <FileText className="h-4 w-4 text-vx-purple" />
               </div>
               <div className="flex-1">
-                <p className="text-sm font-medium text-gray-900">Internal Notes</p>
-                <p className="text-xs text-gray-500">Catatan untuk agent</p>
+                <p className="text-sm font-medium text-vx-text">Internal Notes</p>
+                <p className="text-xs text-vx-text-muted">Catatan untuk agent</p>
               </div>
               {notes.filter(n => 
                 n.note_type === 'internal' || 
                 (!n.note_type && !n.rating)
               ).length > 0 && (
-                <span className="bg-blue-100 text-blue-700 text-xs px-2 py-0.5 rounded-full font-medium">
+                <span className="bg-vx-purple/10 text-vx-purple text-xs px-2 py-0.5 rounded-full font-medium">
                   {notes.filter(n => 
                     n.note_type === 'internal' || 
                     (!n.note_type && !n.rating)
@@ -718,14 +718,14 @@ export function RightSidebar({
                 </span>
               )}
               {expandedSections.notes ? (
-                <ChevronUp className="h-4 w-4 text-gray-400" />
+                <ChevronUp className="h-4 w-4 text-vx-text-muted" />
               ) : (
-                <ChevronDown className="h-4 w-4 text-gray-400" />
+                <ChevronDown className="h-4 w-4 text-vx-text-muted" />
               )}
             </button>
 
             {expandedSections.notes && (
-              <div className="px-6 py-3 space-y-3 bg-gray-50">
+              <div className="px-6 py-3 space-y-3 bg-vx-surface-elevated">
                 {/* Add Internal Note Form */}
                 <InternalNoteForm onSave={(content) => onSaveNote(content, 0, 'internal')} />
                 
@@ -734,7 +734,7 @@ export function RightSidebar({
                   n.note_type === 'internal' || 
                   (!n.note_type && !n.rating)
                 ).length > 0 && (
-                  <div className="space-y-2 pt-2 border-t">
+                  <div className="space-y-2 pt-2 border-t border-vx-border">
                     {notes
                       .filter(n => 
                         n.note_type === 'internal' || 
@@ -751,20 +751,20 @@ export function RightSidebar({
             {/* Rating & Review Section */}
             <button
               onClick={() => toggleSection('reviews')}
-              className="w-full px-6 py-3 flex items-center gap-3 hover:bg-gray-50 transition-colors text-left group"
+              className="w-full px-6 py-3 flex items-center gap-3 hover:bg-vx-surface-hover transition-colors text-left group"
             >
-              <div className="w-8 h-8 rounded-lg bg-yellow-50 flex items-center justify-center group-hover:bg-yellow-100 transition-colors">
-                <Star className="h-4 w-4 text-yellow-600" />
+              <div className="w-8 h-8 rounded-lg bg-yellow-50 dark:bg-yellow-500/10 flex items-center justify-center group-hover:bg-yellow-100 dark:group-hover:bg-yellow-500/20 transition-colors">
+                <Star className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
               </div>
               <div className="flex-1">
-                <p className="text-sm font-medium text-gray-900">Rating & Review</p>
-                <p className="text-xs text-gray-500">Feedback customer</p>
+                <p className="text-sm font-medium text-vx-text">Rating & Review</p>
+                <p className="text-xs text-vx-text-muted">Feedback customer</p>
               </div>
               {notes.filter(n => 
                 n.note_type === 'review' || 
                 (!n.note_type && n.rating && n.rating > 0)
               ).length > 0 && (
-                <span className="bg-yellow-100 text-yellow-700 text-xs px-2 py-0.5 rounded-full font-medium">
+                <span className="bg-yellow-100 dark:bg-yellow-500/10 text-yellow-700 dark:text-yellow-400 text-xs px-2 py-0.5 rounded-full font-medium">
                   {notes.filter(n => 
                     n.note_type === 'review' || 
                     (!n.note_type && n.rating && n.rating > 0)
@@ -772,14 +772,14 @@ export function RightSidebar({
                 </span>
               )}
               {expandedSections.reviews ? (
-                <ChevronUp className="h-4 w-4 text-gray-400" />
+                <ChevronUp className="h-4 w-4 text-vx-text-muted" />
               ) : (
-                <ChevronDown className="h-4 w-4 text-gray-400" />
+                <ChevronDown className="h-4 w-4 text-vx-text-muted" />
               )}
             </button>
 
             {expandedSections.reviews && (
-              <div className="px-6 py-3 space-y-3 bg-gray-50">
+              <div className="px-6 py-3 space-y-3 bg-vx-surface-elevated">
                 {/* Add Review Form */}
                 <ReviewForm onSave={(content, rating) => onSaveNote(content, rating, 'review')} />
                 
@@ -788,7 +788,7 @@ export function RightSidebar({
                   n.note_type === 'review' || 
                   (!n.note_type && n.rating && n.rating > 0)
                 ).length > 0 && (
-                  <div className="space-y-2 pt-2 border-t">
+                  <div className="space-y-2 pt-2 border-t border-vx-border">
                     {notes
                       .filter(n => 
                         n.note_type === 'review' || 

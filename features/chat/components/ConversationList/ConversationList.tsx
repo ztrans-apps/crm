@@ -194,35 +194,37 @@ export function ConversationList({
   }
 
   return (
-    <div className="w-80 border-r bg-white flex flex-col h-full">
+    <div className="w-80 border-r border-vx-border bg-vx-surface flex flex-col h-full">
       {/* Header with search and filter tabs */}
-      <div className="p-3 border-b bg-white">
-        <h3 className="text-sm font-semibold mb-2.5">Obrolan</h3>
+      <div className="p-3 border-b border-vx-border bg-vx-surface">
+        <h3 className="text-sm font-semibold mb-2.5 text-vx-text">Obrolan</h3>
         
         {/* Search */}
         <div className="relative mb-3">
-          <Search className="absolute left-2.5 top-1/2 transform -translate-y-1/2 h-3.5 w-3.5 text-gray-400" />
+          <Search className="absolute left-2.5 top-1/2 transform -translate-y-1/2 h-3.5 w-3.5 text-vx-text-muted" />
           <Input
             placeholder="Cari obrolan..."
             value={searchQuery}
             onChange={(e) => onSearchChange(e.target.value)}
-            className="pl-8 h-8 text-sm"
+            className="pl-8 h-8 text-sm bg-vx-surface-elevated border-vx-border text-vx-text placeholder:text-vx-text-muted focus:ring-vx-purple/30 focus:border-vx-purple/50 rounded-full"
           />
         </div>
 
         {/* Filter Tabs */}
-        <div className="flex space-x-1 bg-gray-100 rounded p-0.5 mb-3">
+        <div className="flex space-x-1 bg-vx-surface-elevated rounded-lg p-0.5 mb-3">
           <button
             onClick={() => setActiveFilter('inbox')}
-            className={`flex-1 px-2 py-1.5 text-xs font-medium rounded transition-colors flex items-center justify-center gap-1 ${
+            className={`flex-1 px-2 py-1.5 text-xs font-medium rounded-md transition-all duration-200 flex items-center justify-center gap-1 ${
               activeFilter === 'inbox'
-                ? 'bg-white text-blue-600 shadow-sm ring-1 ring-gray-200'
-                : 'text-gray-600 hover:text-gray-900'
+                ? 'bg-vx-purple text-white shadow-sm'
+                : 'text-vx-text-secondary hover:text-vx-text hover:bg-vx-surface-hover'
             }`}
           >
             <span>Masuk</span>
             {counts.inbox > 0 && (
-              <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] bg-blue-600 text-white text-[10px] px-1.5 rounded-full font-semibold leading-none">
+              <span className={`inline-flex items-center justify-center min-w-[18px] h-[18px] text-[10px] px-1.5 rounded-full font-semibold leading-none ${
+                activeFilter === 'inbox' ? 'bg-white/20 text-white' : 'bg-vx-teal text-white'
+              }`}>
                 {counts.inbox}
               </span>
             )}
@@ -230,15 +232,17 @@ export function ConversationList({
 
           <button
             onClick={() => setActiveFilter('assigned')}
-            className={`flex-1 px-2 py-1.5 text-xs font-medium rounded transition-colors flex items-center justify-center gap-1 ${
+            className={`flex-1 px-2 py-1.5 text-xs font-medium rounded-md transition-all duration-200 flex items-center justify-center gap-1 ${
               activeFilter === 'assigned'
-                ? 'bg-white text-blue-600 shadow-sm ring-1 ring-gray-200'
-                : 'text-gray-600 hover:text-gray-900'
+                ? 'bg-vx-purple text-white shadow-sm'
+                : 'text-vx-text-secondary hover:text-vx-text hover:bg-vx-surface-hover'
             }`}
           >
             <span>Saya</span>
             {counts.assigned > 0 && (
-              <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] bg-gray-600 text-white text-[10px] px-1.5 rounded-full font-semibold leading-none">
+              <span className={`inline-flex items-center justify-center min-w-[18px] h-[18px] text-[10px] px-1.5 rounded-full font-semibold leading-none ${
+                activeFilter === 'assigned' ? 'bg-white/20 text-white' : 'bg-vx-text-muted text-white'
+              }`}>
                 {counts.assigned}
               </span>
             )}
@@ -246,15 +250,17 @@ export function ConversationList({
 
           <button
             onClick={() => setActiveFilter('resolved')}
-            className={`flex-1 px-2 py-1.5 text-xs font-medium rounded transition-colors flex items-center justify-center gap-1 ${
+            className={`flex-1 px-2 py-1.5 text-xs font-medium rounded-md transition-all duration-200 flex items-center justify-center gap-1 ${
               activeFilter === 'resolved'
-                ? 'bg-white text-blue-600 shadow-sm ring-1 ring-gray-200'
-                : 'text-gray-600 hover:text-gray-900'
+                ? 'bg-vx-purple text-white shadow-sm'
+                : 'text-vx-text-secondary hover:text-vx-text hover:bg-vx-surface-hover'
             }`}
           >
             <span>Selesai</span>
             {counts.resolved > 0 && (
-              <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] bg-gray-400 text-white text-[10px] px-1.5 rounded-full font-semibold leading-none">
+              <span className={`inline-flex items-center justify-center min-w-[18px] h-[18px] text-[10px] px-1.5 rounded-full font-semibold leading-none ${
+                activeFilter === 'resolved' ? 'bg-white/20 text-white' : 'bg-vx-text-muted/50 text-vx-text-secondary'
+              }`}>
                 {counts.resolved}
               </span>
             )}
@@ -266,32 +272,32 @@ export function ConversationList({
           {/* Sort Dropdown */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="flex-1 h-8 text-xs">
+              <Button variant="outline" size="sm" className="flex-1 h-8 text-xs border-vx-border text-vx-text-secondary hover:bg-vx-surface-hover hover:text-vx-text">
                 <ArrowUpDown className="h-3.5 w-3.5 mr-1.5" />
                 {sortBy === 'newest' && 'Terbaru'}
                 {sortBy === 'oldest' && 'Terlama'}
                 {sortBy === 'unread' && 'Belum Dibaca'}
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="w-48">
-              <DropdownMenuLabel>Urutkan</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => setSortBy('newest')}>
+            <DropdownMenuContent align="start" className="w-48 bg-vx-surface border-vx-border vx-shadow-md">
+              <DropdownMenuLabel className="text-vx-text">Urutkan</DropdownMenuLabel>
+              <DropdownMenuSeparator className="bg-vx-border" />
+              <DropdownMenuItem onClick={() => setSortBy('newest')} className="text-vx-text-secondary hover:text-vx-text hover:bg-vx-surface-hover">
                 <div className="flex items-center justify-between w-full">
                   <span>Terbaru</span>
-                  {sortBy === 'newest' && <span className="text-blue-600">✓</span>}
+                  {sortBy === 'newest' && <span className="text-vx-purple">✓</span>}
                 </div>
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setSortBy('oldest')}>
+              <DropdownMenuItem onClick={() => setSortBy('oldest')} className="text-vx-text-secondary hover:text-vx-text hover:bg-vx-surface-hover">
                 <div className="flex items-center justify-between w-full">
                   <span>Terlama</span>
-                  {sortBy === 'oldest' && <span className="text-blue-600">✓</span>}
+                  {sortBy === 'oldest' && <span className="text-vx-purple">✓</span>}
                 </div>
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setSortBy('unread')}>
+              <DropdownMenuItem onClick={() => setSortBy('unread')} className="text-vx-text-secondary hover:text-vx-text hover:bg-vx-surface-hover">
                 <div className="flex items-center justify-between w-full">
                   <span>Belum Dibaca</span>
-                  {sortBy === 'unread' && <span className="text-blue-600">✓</span>}
+                  {sortBy === 'unread' && <span className="text-vx-purple">✓</span>}
                 </div>
               </DropdownMenuItem>
             </DropdownMenuContent>
@@ -300,30 +306,30 @@ export function ConversationList({
           {/* Advanced Filter Dropdown */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="h-8 px-3 relative text-xs">
+              <Button variant="outline" size="sm" className="h-8 px-3 relative text-xs border-vx-border text-vx-text-secondary hover:bg-vx-surface-hover hover:text-vx-text">
                 Filter
                 {activeFilterCount > 0 && (
-                  <span className="absolute -top-1 -right-1 min-w-[16px] h-[16px] bg-blue-600 text-white text-[9px] rounded-full flex items-center justify-center font-semibold">
+                  <span className="absolute -top-1 -right-1 min-w-[16px] h-[16px] bg-vx-purple text-white text-[9px] rounded-full flex items-center justify-center font-semibold">
                     {activeFilterCount}
                   </span>
                 )}
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-64">
+            <DropdownMenuContent align="end" className="w-64 bg-vx-surface border-vx-border vx-shadow-md">
               <div className="flex items-center justify-between px-2 py-2">
-                <DropdownMenuLabel className="p-0">Filter</DropdownMenuLabel>
+                <DropdownMenuLabel className="p-0 text-vx-text">Filter</DropdownMenuLabel>
                 {activeFilterCount > 0 && (
                   <Button
                     variant="ghost"
                     size="sm"
                     onClick={resetFilters}
-                    className="h-6 px-2 text-xs text-blue-600 hover:text-blue-700"
+                    className="h-6 px-2 text-xs text-vx-purple hover:text-vx-purple-dark"
                   >
                     Reset filter
                   </Button>
                 )}
               </div>
-              <DropdownMenuSeparator />
+              <DropdownMenuSeparator className="bg-vx-border" />
               
               {/* Unresponded Chat */}
               <div className="px-2 py-2">
@@ -337,11 +343,11 @@ export function ConversationList({
                 </DropdownMenuCheckboxItem>
               </div>
 
-              <DropdownMenuSeparator />
+              <DropdownMenuSeparator className="bg-vx-border" />
               
               {/* Workflow Status */}
               <div className="px-2 py-1">
-                <div className="text-xs font-semibold text-gray-700 mb-1.5">Status Workflow</div>
+                <div className="text-xs font-semibold text-vx-text-secondary mb-1.5">Status Workflow</div>
                 <div className="space-y-1">
                   <DropdownMenuCheckboxItem
                     checked={advancedFilters.workflowStatuses.includes('incoming')}
@@ -398,11 +404,11 @@ export function ConversationList({
                 </div>
               </div>
 
-              <DropdownMenuSeparator />
+              <DropdownMenuSeparator className="bg-vx-border" />
 
               {/* Assigned Agent */}
               <div className="px-2 py-2">
-                <div className="text-xs font-semibold text-gray-700 mb-1.5">Agent</div>
+                <div className="text-xs font-semibold text-vx-text-secondary mb-1.5">Agent</div>
                 <div className="max-h-32 overflow-y-auto space-y-1">
                   {availableAgents.length > 0 ? (
                     availableAgents.map((agent) => (
@@ -422,16 +428,16 @@ export function ConversationList({
                       </DropdownMenuCheckboxItem>
                     ))
                   ) : (
-                    <div className="text-xs text-gray-500 py-2">No agents assigned</div>
+                    <div className="text-xs text-vx-text-muted py-2">No agents assigned</div>
                   )}
                 </div>
               </div>
 
-              <DropdownMenuSeparator />
+              <DropdownMenuSeparator className="bg-vx-border" />
 
               {/* Tags */}
               <div className="px-2 py-2">
-                <div className="text-xs font-semibold text-gray-700 mb-1.5">Label</div>
+                <div className="text-xs font-semibold text-vx-text-secondary mb-1.5">Label</div>
                 <div className="max-h-32 overflow-y-auto space-y-1">
                   {availableLabels.length > 0 ? (
                     availableLabels.map((label) => (
@@ -459,7 +465,7 @@ export function ConversationList({
                       </DropdownMenuCheckboxItem>
                     ))
                   ) : (
-                    <div className="text-xs text-gray-500 py-2">Tidak ada label</div>
+                    <div className="text-xs text-vx-text-muted py-2">Tidak ada label</div>
                   )}
                 </div>
                 <DropdownMenuCheckboxItem
@@ -478,13 +484,13 @@ export function ConversationList({
       </div>
 
       {/* Conversations */}
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto vx-scrollbar">
         {loading ? (
           <div className="flex items-center justify-center h-32">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-vx-purple"></div>
           </div>
         ) : sortedConversations.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-32 text-gray-500">
+          <div className="flex flex-col items-center justify-center h-32 text-vx-text-muted">
             <MessageSquare className="h-12 w-12 mb-2 opacity-50" />
             <p className="text-sm">Tidak ada obrolan</p>
           </div>

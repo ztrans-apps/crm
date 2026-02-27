@@ -26,7 +26,7 @@ export default async function AppLayout({
     .single()
 
   return (
-    <div className="flex h-screen bg-gray-50">
+    <div className="flex h-screen bg-background">
       {/* Agent Status Manager - only for agents */}
       {(profile as any)?.role === 'agent' && (
         <AgentStatusManager userId={user.id} role={(profile as any)?.role} />
@@ -35,9 +35,9 @@ export default async function AppLayout({
       {/* Dynamic Sidebar based on permissions */}
       <DynamicSidebar userRole={(profile as any)?.role} />
       
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="flex-1 flex flex-col overflow-hidden min-w-0">
         <Header user={{ ...user, ...(profile || {}) }} />
-        <main className="flex-1 overflow-y-auto">
+        <main className="flex-1 overflow-y-auto bg-vx-surface-elevated">
           {children}
         </main>
       </div>

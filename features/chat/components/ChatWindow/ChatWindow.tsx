@@ -151,8 +151,8 @@ export function ChatWindow({
 
   if (!conversation) {
     return (
-      <div className="flex-1 flex items-center justify-center bg-gray-50">
-        <div className="text-center text-gray-500">
+      <div className="flex-1 flex items-center justify-center bg-vx-surface-elevated">
+        <div className="text-center text-vx-text-muted">
           <MessageSquare className="h-16 w-16 mx-auto mb-4 opacity-30" />
           <p className="text-lg">Select a conversation to start chatting</p>
         </div>
@@ -162,7 +162,7 @@ export function ChatWindow({
 
   return (
     <div 
-      className="flex-1 flex flex-col bg-gray-50 relative"
+      className="flex-1 flex flex-col bg-vx-surface-elevated relative"
       onClick={onChatWindowClick}
       onDragEnter={handleDragEnter}
       onDragLeave={handleDragLeave}
@@ -171,33 +171,33 @@ export function ChatWindow({
     >
       {/* Drag and Drop Overlay */}
       {isDragging && (
-        <div className="absolute inset-0 z-50 bg-blue-500/10 backdrop-blur-sm flex items-center justify-center border-4 border-dashed border-blue-500">
-          <div className="bg-white rounded-lg shadow-xl p-8 text-center">
-            <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-blue-100 flex items-center justify-center">
-              <svg className="w-10 h-10 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div className="absolute inset-0 z-50 bg-vx-purple/10 backdrop-blur-sm flex items-center justify-center border-4 border-dashed border-vx-teal rounded-2xl m-2">
+          <div className="bg-vx-surface rounded-2xl vx-shadow-lg p-8 text-center">
+            <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-vx-teal/10 flex items-center justify-center">
+              <svg className="w-10 h-10 text-vx-teal" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
               </svg>
             </div>
-            <h3 className="text-xl font-semibold text-gray-900 mb-2">Drop file here</h3>
-            <p className="text-sm text-gray-500">Release to send the file</p>
+            <h3 className="text-xl font-semibold text-vx-text mb-2">Drop file here</h3>
+            <p className="text-sm text-vx-text-muted">Release to send the file</p>
           </div>
         </div>
       )}
       {/* Chat Header */}
-      <div className="bg-white p-3 border-b">
+      <div className="bg-vx-surface p-3 border-b border-vx-border">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 rounded-full bg-green-500 flex items-center justify-center text-white text-sm font-semibold">
+            <div className="w-10 h-10 rounded-full vx-gradient flex items-center justify-center text-white text-sm font-semibold ring-2 ring-vx-purple/20">
               {getAvatarInitial(conversation.contact)}
             </div>
             <div>
-              <h3 className="font-semibold text-base">{getDisplayName(conversation.contact)}</h3>
-              <div className="flex items-center space-x-2 text-xs text-gray-500">
+              <h3 className="font-semibold text-base text-vx-text">{getDisplayName(conversation.contact)}</h3>
+              <div className="flex items-center space-x-2 text-xs text-vx-text-muted">
                 <span>{conversation.contact?.phone_number}</span>
                 {conversation.assigned_to && (
                   <>
                     <span>•</span>
-                    <span className="text-blue-600">
+                    <span className="text-vx-purple">
                       Assigned
                     </span>
                   </>
@@ -214,18 +214,18 @@ export function ChatWindow({
                 size="sm"
                 onClick={onRefresh}
                 disabled={loading}
-                className="text-gray-600 hover:text-gray-900"
+                className="text-vx-text-muted hover:text-vx-purple hover:bg-vx-surface-hover"
               >
                 <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
               </Button>
             )}
             {conversation.read_status === 'unread' && (
-              <span className="px-2 py-1 bg-green-100 text-green-700 text-xs rounded-full">
+              <span className="px-2 py-1 bg-vx-teal/10 text-vx-teal text-xs rounded-full font-medium">
                 Unread
               </span>
             )}
             {conversation.status === 'closed' && (
-              <span className="px-2 py-1 bg-gray-100 text-gray-700 text-xs rounded-full">
+              <span className="px-2 py-1 bg-vx-surface-hover text-vx-text-muted text-xs rounded-full">
                 Selesai
               </span>
             )}
@@ -235,8 +235,8 @@ export function ChatWindow({
 
       {/* Closed conversation notice */}
       {conversation.status === 'closed' && (
-        <div className="bg-yellow-50 border-b border-yellow-200 px-3 py-2">
-          <p className="text-xs text-yellow-800 text-center">
+        <div className="bg-amber-50 dark:bg-amber-500/10 border-b border-amber-200 dark:border-amber-500/20 px-3 py-2">
+          <p className="text-xs text-amber-800 dark:text-amber-400 text-center">
             ⚠️ Chat sudah berakhir. Tidak bisa membalas lagi.
           </p>
         </div>
@@ -251,13 +251,13 @@ export function ChatWindow({
         >
           {loading ? (
             <div className="flex items-center justify-center h-full">
-              <div className="text-center text-gray-500">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-500 mx-auto mb-2"></div>
+              <div className="text-center text-vx-text-muted">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-vx-purple mx-auto mb-2"></div>
                 <p className="text-sm">Loading messages...</p>
               </div>
             </div>
           ) : messages.length === 0 ? (
-            <div className="flex items-center justify-center h-full text-gray-500">
+            <div className="flex items-center justify-center h-full text-vx-text-muted">
               <p>No messages yet</p>
             </div>
           ) : (
@@ -305,7 +305,7 @@ export function ChatWindow({
       </div>
 
       {/* Input Area */}
-      <div className="bg-white border-t">
+      <div className="bg-vx-surface border-t border-vx-border">
         <InputBar
           value={messageInput}
           onChange={onMessageInputChange}
