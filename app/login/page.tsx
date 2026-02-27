@@ -87,8 +87,6 @@ export default function LoginPage() {
                 disabled={loading}
                 className="bg-vx-surface-elevated border-vx-border focus:ring-vx-purple/30 focus:border-vx-purple"
               />
-                disabled={loading}
-              />
             </div>
             {error && (
               <div className="text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-500/10 p-3 rounded-md border border-red-200 dark:border-red-500/20">
