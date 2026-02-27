@@ -16,7 +16,7 @@ function BackToBottomButton({ show, newMessageCount, onClick }: BackToBottomButt
   return (
     <button
       onClick={onClick}
-      className="absolute right-6 bottom-6 z-10 flex items-center justify-center w-10 h-10 bg-gray-700 hover:bg-gray-800 text-white rounded-full shadow-lg transition-all duration-200 hover:scale-105 animate-in fade-in slide-in-from-bottom-2"
+      className="absolute right-6 bottom-6 z-10 flex items-center justify-center w-10 h-10 bg-vx-purple hover:bg-vx-purple/90 text-white rounded-full shadow-lg transition-all duration-200 hover:scale-105 animate-in fade-in slide-in-from-bottom-2"
       title="Scroll to bottom"
       aria-label="Scroll to bottom"
     >

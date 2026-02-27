@@ -106,7 +106,7 @@ export function MessageBubble({
         {/* Sender name for incoming messages - only show for first message in group */}
         {!message.is_from_me && showSender && (
           <div className="px-2 mb-1">
-            <span className="text-[11px] text-gray-600 font-medium">
+            <span className="text-[11px] text-vx-text-secondary font-medium">
               {message.contact?.name || message.contact?.phone_number || 'Customer'}
             </span>
           </div>
@@ -115,7 +115,7 @@ export function MessageBubble({
         {/* Agent/Bot name for outgoing messages - only show for first message in group */}
         {message.is_from_me && showSender && (
           <div className="px-2 mb-1">
-            <span className={`text-[11px] font-medium ${message.sender_type === 'bot' ? 'text-purple-600' : 'text-blue-600'}`}>
+            <span className={`text-[11px] font-medium ${message.sender_type === 'bot' ? 'text-vx-purple' : 'text-vx-teal'}`}>
               {message.sender_type === 'bot' 
                 ? `🤖 ${message.metadata?.chatbot_name || 'Bot'}`
                 : (message.sent_by_user?.full_name || 'Agent')
@@ -130,9 +130,9 @@ export function MessageBubble({
             className={`rounded-lg px-2 py-1 shadow-sm relative ${
               message.is_from_me
                 ? message.sender_type === 'bot'
-                  ? 'bg-purple-100 text-gray-900'
-                  : 'bg-[#d9fdd3] text-gray-900'
-                : 'bg-white text-gray-900'
+                  ? 'bg-vx-purple/15 text-vx-text dark:bg-vx-purple/20'
+                  : 'bg-vx-bubble-outgoing text-vx-text'
+                : 'bg-vx-bubble-incoming text-vx-text'
             }`}
             style={{ maxWidth: '450px', minWidth: '60px' }}
           >
@@ -140,16 +140,16 @@ export function MessageBubble({
             {message.quoted_message && (
               <div className={`mb-2 p-2 rounded border-l-4 ${
                 message.is_from_me 
-                  ? 'bg-white/50 border-green-600' 
-                  : 'bg-gray-50 border-gray-400'
+                  ? 'bg-vx-surface/50 border-vx-teal' 
+                  : 'bg-vx-surface-elevated border-vx-border'
               }`}>
-                <div className="text-[11px] font-semibold mb-0.5 text-gray-700">
+                <div className="text-[11px] font-semibold mb-0.5 text-vx-text-secondary">
                   {message.quoted_message.is_from_me 
                     ? (message.quoted_message.sent_by_user?.full_name || 'Agent')
                     : (message.quoted_message.contact?.name || message.quoted_message.contact?.phone_number || 'Customer')
                   }
                 </div>
-                <div className="text-[12px] text-gray-600 line-clamp-2">
+                <div className="text-[12px] text-vx-text-muted line-clamp-2">
                   {message.quoted_message.content?.replace(/\\n/g, '\n') || '[Media]'}
                 </div>
               </div>
@@ -207,7 +207,7 @@ export function MessageBubble({
                     href={message.media_url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex items-center gap-2 p-2 bg-gray-100 rounded hover:bg-gray-200 transition-colors"
+                    className="flex items-center gap-2 p-2 bg-vx-surface-hover rounded hover:bg-vx-surface-elevated transition-colors"
                   >
                     <span className="text-2xl">📄</span>
                     <div className="flex-1 min-w-0">
@@ -215,12 +215,12 @@ export function MessageBubble({
                         {message.media_filename || 'Document'}
                       </p>
                       {message.media_size && (
-                        <p className="text-[10px] text-gray-500">
+                        <p className="text-[10px] text-vx-text-muted">
                           {(message.media_size / 1024).toFixed(1)} KB
                         </p>
                       )}
                     </div>
-                    <span className="text-xs text-blue-600">↓</span>
+                    <span className="text-xs text-vx-purple">↓</span>
                   </a>
                 )}
                 
@@ -276,11 +276,11 @@ export function MessageBubble({
 
             {/* Time and status in bottom right corner */}
             <div className="absolute bottom-1 right-2 flex items-center gap-1">
-              <span className="text-[10px] text-gray-500">
+              <span className="text-[10px] text-vx-text-muted">
                 {formatTime(message.created_at)}
               </span>
               {message.is_from_me && message.status && (
-                <span className="text-gray-500 flex items-center">
+                <span className="text-vx-text-muted flex items-center">
                   {getStatusIcon(message.status)}
                 </span>
               )}
@@ -288,8 +288,8 @@ export function MessageBubble({
 
             {/* Translation */}
             {showTranslation && translation && (
-              <div className="mt-2 pt-2 border-t border-gray-200">
-                <p className="text-xs text-gray-500 mb-1">Terjemahan:</p>
+              <div className="mt-2 pt-2 border-t border-vx-border">
+                <p className="text-xs text-vx-text-muted mb-1">Terjemahan:</p>
                 <p className="text-[13px] leading-[1.4] break-words whitespace-pre-wrap">
                   {translation}
                 </p>
@@ -304,9 +304,9 @@ export function MessageBubble({
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="h-6 w-6 p-0 rounded-full hover:bg-gray-100"
+                  className="h-6 w-6 p-0 rounded-full hover:bg-vx-surface-hover"
                 >
-                  <MoreVertical className="h-3.5 w-3.5 text-gray-500" />
+                  <MoreVertical className="h-3.5 w-3.5 text-vx-text-muted" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align={message.is_from_me ? 'end' : 'start'} className="w-48">

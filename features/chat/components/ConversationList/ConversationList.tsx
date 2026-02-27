@@ -194,7 +194,7 @@ export function ConversationList({
   }
 
   return (
-    <div className="w-80 border-r border-vx-border bg-vx-surface flex flex-col h-full">
+    <div className="w-full border-r border-vx-border bg-vx-surface flex flex-col h-full">
       {/* Header with search and filter tabs */}
       <div className="p-3 border-b border-vx-border bg-vx-surface">
         <h3 className="text-sm font-semibold mb-2.5 text-vx-text">Obrolan</h3>

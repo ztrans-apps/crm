@@ -55,12 +55,12 @@ export function ConversationItem({
 
   return (
     <div
-      className={`p-3 border-b transition-colors cursor-pointer ${
+      className={`p-3 border-b border-vx-border transition-colors cursor-pointer ${
         isSelected
-          ? 'bg-blue-100 border-l-4 border-l-blue-600'
+          ? 'bg-vx-purple/10 border-l-4 border-l-vx-purple'
           : isUnread
-          ? 'bg-blue-50/40 hover:bg-blue-50/60'
-          : 'hover:bg-gray-50'
+          ? 'bg-vx-purple/5 hover:bg-vx-purple/10'
+          : 'hover:bg-vx-surface-hover'
       }`}
       onClick={onSelect}
     >
@@ -68,7 +68,7 @@ export function ConversationItem({
         {/* Avatar */}
         <div className="relative shrink-0">
           <div className={`w-10 h-10 rounded-full flex items-center justify-center text-white font-semibold text-sm ${
-            isUnread ? 'bg-green-600' : 'bg-green-500'
+            isUnread ? 'vx-gradient' : 'bg-vx-purple/80'
           }`}>
             {getInitial(conversation.contact?.name, conversation.contact?.phone_number)}
           </div>
@@ -86,19 +86,19 @@ export function ConversationItem({
           <div className="flex items-center justify-between mb-1">
             <div className="flex items-center gap-1.5 flex-1 min-w-0">
               <h3 className={`text-sm truncate ${
-                isUnread ? 'font-bold text-gray-900' : 'font-medium text-gray-700'
+                isUnread ? 'font-bold text-vx-text' : 'font-medium text-vx-text-secondary'
               }`}>
                 {getDisplayName()}
               </h3>
               {!isContactSaved && (
                 <span 
-                  className="shrink-0 w-2 h-2 rounded-full bg-orange-500" 
+                  className="shrink-0 w-2 h-2 rounded-full bg-orange-500 dark:bg-orange-400" 
                   title="Kontak belum disimpan"
                 />
               )}
             </div>
             <span className={`text-xs shrink-0 ml-2 ${
-              isUnread ? 'text-blue-600 font-medium' : 'text-gray-500'
+              isUnread ? 'text-vx-purple font-medium' : 'text-vx-text-muted'
             }`}>
               {formatTime(conversation.last_message_at)}
             </span>
@@ -106,13 +106,13 @@ export function ConversationItem({
 
           {/* Agent info if assigned */}
           {conversation.assigned_to_user && (
-            <div className="text-[10px] text-blue-600 mb-0.5 truncate">
+            <div className="text-[10px] text-vx-purple mb-0.5 truncate">
               Agent: {conversation.assigned_to_user.full_name || conversation.assigned_to_user.email}
             </div>
           )}
 
           <p className={`text-xs truncate ${
-            isUnread ? 'text-gray-900 font-medium' : 'text-gray-600'
+            isUnread ? 'text-vx-text font-medium' : 'text-vx-text-muted'
           }`}>
             {conversation.last_message || 'No messages'}
           </p>
@@ -132,14 +132,14 @@ export function ConversationItem({
                     }}
                   >
                     {/* Tooltip on hover */}
-                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 bg-gray-900 text-white text-[10px] rounded whitespace-nowrap opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-opacity z-10">
+                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 px-2 py-1 bg-vx-surface text-vx-text text-[10px] rounded whitespace-nowrap opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-opacity z-10 vx-shadow-md border border-vx-border">
                       {label.name}
                     </div>
                   </div>
                 )
               })}
               {conversation.labels.length > 3 && (
-                <span className="text-[9px] text-gray-400 ml-0.5">
+                <span className="text-[9px] text-vx-text-muted ml-0.5">
                   +{conversation.labels.length - 3}
                 </span>
               )}
@@ -154,7 +154,7 @@ export function ConversationItem({
                 e.stopPropagation()
                 onPick()
               }}
-              className="mt-2 w-full h-7 bg-green-600 hover:bg-green-700 text-white text-xs"
+              className="mt-2 w-full h-7 vx-gradient text-white text-xs hover:opacity-90"
             >
               <UserPlus className="h-3 w-3 mr-1" />
               Ambil obrolan

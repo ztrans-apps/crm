@@ -264,7 +264,7 @@ function UnifiedChatsContent() {
     <div className="h-full flex relative overflow-hidden">
       {/* Left Sidebar - Conversation List */}
       <div className={`
-        w-full md:w-80 lg:w-96 shrink-0 border-r border-vx-border
+        w-full md:w-80 lg:w-96 shrink-0
         ${mobileView !== 'list' ? 'hidden md:block' : 'block'}
       `}>
         <ConversationList

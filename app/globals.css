@@ -63,6 +63,8 @@
   --color-vx-border: var(--vx-border);
   --color-vx-bubble-in: var(--vx-bubble-in);
   --color-vx-bubble-in-border: var(--vx-bubble-in-border);
+  --color-vx-bubble-incoming: var(--vx-bubble-incoming);
+  --color-vx-bubble-outgoing: var(--vx-bubble-outgoing);
 }
 
 :root {
@@ -115,6 +117,8 @@
   --vx-border: #E8E0F0;
   --vx-bubble-in: #FFFFFF;
   --vx-bubble-in-border: #E8E0F0;
+  --vx-bubble-incoming: #FFFFFF;
+  --vx-bubble-outgoing: #E8F5E1;
 }
 
 .dark {
@@ -166,6 +170,8 @@
   --vx-border: #2E2244;
   --vx-bubble-in: #241A36;
   --vx-bubble-in-border: #2E2244;
+  --vx-bubble-incoming: #241A36;
+  --vx-bubble-outgoing: #1A2E1A;
 }
 
 @layer base {

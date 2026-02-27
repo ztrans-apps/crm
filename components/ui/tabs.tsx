@@ -38,7 +38,7 @@ const Tabs = ({ defaultValue, value: controlledValue, onValueChange, children, c
 
 const TabsList = ({ children, className }: { children: React.ReactNode; className?: string }) => {
   return (
-    <div className={`inline-flex h-10 items-center justify-center rounded-md bg-gray-100 p-1 ${className}`}>
+    <div className={`inline-flex h-10 items-center justify-center rounded-md bg-vx-surface-elevated p-1 ${className}`}>
       {children}
     </div>
   )
@@ -60,10 +60,10 @@ const TabsTrigger = ({ value, children, className }: TabsTriggerProps) => {
     <button
       type="button"
       onClick={() => context.onValueChange(value)}
-      className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-green-500 disabled:pointer-events-none disabled:opacity-50 ${
+      className={`inline-flex items-center justify-center whitespace-nowrap rounded-sm px-3 py-1.5 text-sm font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-vx-purple/30 disabled:pointer-events-none disabled:opacity-50 ${
         isActive
-          ? 'bg-white text-gray-900 shadow-sm'
-          : 'text-gray-600 hover:text-gray-900'
+          ? 'bg-vx-surface text-vx-text shadow-sm'
+          : 'text-vx-text-secondary hover:text-vx-text'
       } ${className}`}
     >
       {children}
