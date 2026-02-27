@@ -110,29 +110,64 @@ async function handleIncomingMessage(
     const messageId = message.id
     const timestamp = message.timestamp
 
+    // Default tenant ID - TODO: Get from phone_number_id mapping
+    const DEFAULT_TENANT_ID = '00000000-0000-0000-0000-000000000001'
+
+    // Get or create contact first
+    let { data: contact } = await supabase
+      .from('contacts')
+      .select('id, tenant_id')
+      .eq('phone_number', from)
+      .single()
+
+    if (!contact) {
+      // Create new contact
+      const { data: newContact, error: contactError } = await supabase
+        .from('contacts')
+        .insert({
+          phone_number: from,
+          name: from, // Use phone number as name initially
+          user_id: null, // Will be set when user is created
+          tenant_id: DEFAULT_TENANT_ID,
+        })
+        .select('id, tenant_id')
+        .single()
+
+      if (contactError) {
+        console.error('[Webhook] Error creating contact:', contactError)
+        return
+      }
+
+      contact = newContact
+    }
+
     // Get or create conversation
     const { data: conversation } = await supabase
       .from('conversations')
       .select('id, tenant_id')
-      .eq('phone_number', from)
-      .eq('phone_number_id', phoneNumberId)
+      .eq('contact_id', contact.id)
       .single()
 
     let conversationId = conversation?.id
-    let tenantId = conversation?.tenant_id
+    let tenantId = conversation?.tenant_id || contact?.tenant_id || DEFAULT_TENANT_ID
 
     if (!conversation) {
       // Create new conversation
-      const { data: newConversation } = await supabase
+      const { data: newConversation, error: convError } = await supabase
         .from('conversations')
         .insert({
-          phone_number: from,
-          phone_number_id: phoneNumberId,
+          contact_id: contact.id,
+          tenant_id: tenantId,
           status: 'open',
           last_message_at: new Date(parseInt(timestamp) * 1000).toISOString(),
         })
         .select('id, tenant_id')
         .single()
+
+      if (convError) {
+        console.error('[Webhook] Error creating conversation:', convError)
+        return
+      }
 
       conversationId = newConversation?.id
       tenantId = newConversation?.tenant_id
@@ -177,25 +212,32 @@ async function handleIncomingMessage(
     }
 
     // Save message to database
-    await supabase.from('messages').insert({
+    const { error: messageError } = await supabase.from('messages').insert({
       tenant_id: tenantId,
       conversation_id: conversationId,
-      message_id: messageId,
-      phone_number: from,
-      direction: 'incoming',
+      whatsapp_message_id: messageId,
+      sender_type: 'customer',
+      sender_id: null, // NULL for customer messages (not linked to profiles)
       message_type: message.type,
       content,
-      media_id: mediaId,
-      status: 'received',
-      received_at: new Date(parseInt(timestamp) * 1000).toISOString(),
+      media_url: mediaId, // Store media ID in media_url for now
+      status: 'sent', // Message status
+      is_from_me: false,
+      delivery_status: 'sent', // Use 'sent' instead of 'received'
+      delivered_at: new Date(parseInt(timestamp) * 1000).toISOString(),
     })
+
+    if (messageError) {
+      console.error('[Webhook] Error saving message:', messageError)
+      return
+    }
 
     // Update conversation last message
     await supabase
       .from('conversations')
       .update({
         last_message_at: new Date(parseInt(timestamp) * 1000).toISOString(),
-        last_message_content: content,
+        last_message: content,
       })
       .eq('id', conversationId)
 
@@ -219,10 +261,10 @@ async function handleStatusUpdate(status: WebhookStatus, supabase: any) {
     await supabase
       .from('messages')
       .update({
-        status: status.status,
+        delivery_status: status.status,
         updated_at: new Date(parseInt(status.timestamp) * 1000).toISOString(),
       })
-      .eq('message_id', status.id)
+      .eq('whatsapp_message_id', status.id)
 
     // If failed, log error
     if (status.status === 'failed' && status.errors) {
@@ -231,10 +273,10 @@ async function handleStatusUpdate(status: WebhookStatus, supabase: any) {
       await supabase
         .from('messages')
         .update({
-          error_code: status.errors[0]?.code,
-          error_message: status.errors[0]?.message,
+          failed_reason: status.errors[0]?.message,
+          failed_at: new Date(parseInt(status.timestamp) * 1000).toISOString(),
         })
-        .eq('message_id', status.id)
+        .eq('whatsapp_message_id', status.id)
     }
 
     console.log('[Webhook] Status updated successfully:', status.id)
