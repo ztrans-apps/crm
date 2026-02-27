@@ -75,22 +75,22 @@ export function QuickReplyDropdownSimple({ show, searchQuery, onSelect, conversa
 
   return (
     <div 
-      className="absolute bottom-full left-0 right-0 mb-2 bg-white rounded-lg shadow-xl border-2 border-blue-500 overflow-hidden max-w-xl"
+      className="absolute bottom-full left-0 right-0 mb-2 bg-vx-surface rounded-lg shadow-xl border-2 border-vx-purple overflow-hidden max-w-xl"
       style={{ zIndex: 1000 }}
     >
-      <div className="p-2 bg-blue-50 border-b flex items-center gap-2">
-        <Zap className="h-4 w-4 text-blue-600" />
+      <div className="p-2 bg-vx-purple/5 border-b flex items-center gap-2">
+        <Zap className="h-4 w-4 text-vx-purple" />
         <span className="text-sm font-medium">Quick Replies</span>
         {searchQuery && (
-          <span className="text-xs text-gray-500">({filtered.length} results)</span>
+          <span className="text-xs text-vx-text-muted">({filtered.length} results)</span>
         )}
       </div>
 
       <div className="max-h-64 overflow-y-auto">
         {loading ? (
-          <div className="p-4 text-center text-sm text-gray-500">Loading...</div>
+          <div className="p-4 text-center text-sm text-vx-text-muted">Loading...</div>
         ) : filtered.length === 0 ? (
-          <div className="p-4 text-center text-sm text-gray-500">
+          <div className="p-4 text-center text-sm text-vx-text-muted">
             {searchQuery ? 'No results found' : 'No quick replies yet'}
           </div>
         ) : (
@@ -104,23 +104,23 @@ export function QuickReplyDropdownSimple({ show, searchQuery, onSelect, conversa
                 const contentWithVariables = replaceVariables(qr.content)
                 onSelect(contentWithVariables)
               }}
-              className="p-3 border-b last:border-b-0 hover:bg-blue-50 cursor-pointer transition-colors"
+              className="p-3 border-b last:border-b-0 hover:bg-vx-purple/5 cursor-pointer transition-colors"
             >
               <div className="flex items-center gap-2 mb-1">
-                <span className="text-sm font-medium text-gray-900">{qr.title}</span>
+                <span className="text-sm font-medium text-vx-text">{qr.title}</span>
                 {qr.category && (
-                  <span className="text-xs px-2 py-0.5 bg-gray-100 text-gray-600 rounded">
+                  <span className="text-xs px-2 py-0.5 bg-vx-surface-hover text-vx-text-secondary rounded">
                     {qr.category}
                   </span>
                 )}
               </div>
-              <p className="text-xs text-gray-600 line-clamp-2">{qr.content}</p>
+              <p className="text-xs text-vx-text-secondary line-clamp-2">{qr.content}</p>
             </div>
           ))
         )}
       </div>
 
-      <div className="p-2 bg-gray-50 border-t text-center text-xs text-gray-500">
+      <div className="p-2 bg-vx-surface-elevated border-t text-center text-xs text-vx-text-muted">
         Click to select • Type to search
       </div>
     </div>

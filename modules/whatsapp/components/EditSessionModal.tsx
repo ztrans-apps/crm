@@ -91,9 +91,9 @@ export function EditNumberModal({ open, onOpenChange, sessionId, onSuccess }: Ed
                 id="phone"
                 value={phoneNumber}
                 disabled
-                className="bg-gray-50"
+                className="bg-vx-surface-elevated"
               />
-              <p className="text-xs text-gray-500">Phone number cannot be changed</p>
+              <p className="text-xs text-vx-text-muted">Phone number cannot be changed</p>
             </div>
             <div className="space-y-2">
               <Label htmlFor="name">Label</Label>
@@ -113,12 +113,12 @@ export function EditNumberModal({ open, onOpenChange, sessionId, onSuccess }: Ed
                 onChange={(e) => setMetaPhoneNumberId(e.target.value)}
                 placeholder="e.g., 123456789012345"
               />
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-vx-text-muted">
                 From Meta Developer Console → WhatsApp → API Setup
               </p>
             </div>
             {error && (
-              <p className="text-sm text-red-600">{error}</p>
+              <p className="text-sm text-red-600 dark:text-red-400">{error}</p>
             )}
           </div>
           <DialogFooter>
@@ -130,7 +130,7 @@ export function EditNumberModal({ open, onOpenChange, sessionId, onSuccess }: Ed
             >
               Cancel
             </Button>
-            <Button type="submit" disabled={loading} className="bg-green-600 hover:bg-green-700">
+            <Button type="submit" disabled={loading} className="bg-vx-teal hover:bg-vx-teal/90">
               {loading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
               Save Changes
             </Button>

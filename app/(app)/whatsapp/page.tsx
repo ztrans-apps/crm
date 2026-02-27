@@ -98,10 +98,10 @@ export default function WhatsAppPage() {
 
   const getQualityColor = (rating?: string) => {
     switch (rating?.toUpperCase()) {
-      case 'GREEN': return 'text-green-600 bg-green-100';
-      case 'YELLOW': return 'text-yellow-600 bg-yellow-100';
-      case 'RED': return 'text-red-600 bg-red-100';
-      default: return 'text-gray-600 bg-gray-100';
+      case 'GREEN': return 'text-vx-teal bg-vx-teal/10';
+      case 'YELLOW': return 'text-yellow-600 dark:text-yellow-400 bg-yellow-100 dark:bg-yellow-500/10';
+      case 'RED': return 'text-red-600 dark:text-red-400 bg-red-100';
+      default: return 'text-vx-text-secondary bg-vx-surface-hover';
     }
   };
 
@@ -110,14 +110,14 @@ export default function WhatsAppPage() {
       {/* Header */}
       <div className="mb-8 flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">WhatsApp Connections</h1>
-          <p className="text-gray-600 mt-1">Manage your WhatsApp Business numbers via Meta Cloud API</p>
+          <h1 className="text-3xl font-bold text-vx-text">WhatsApp Connections</h1>
+          <p className="text-vx-text-secondary mt-1">Manage your WhatsApp Business numbers via Meta Cloud API</p>
         </div>
         {canAddSession && (
           <Button
             onClick={handleAddNumber}
             size="lg"
-            className="bg-green-600 hover:bg-green-700 font-medium flex items-center gap-2"
+            className="bg-vx-teal hover:bg-vx-teal/90 font-medium flex items-center gap-2"
           >
             <Plus className="h-5 w-5" />
             Add WhatsApp Number
@@ -127,8 +127,8 @@ export default function WhatsAppPage() {
 
       {/* Error Alert */}
       {error && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3 mb-6">
-          <AlertCircle className="h-5 w-5 text-red-600 mt-0.5" />
+        <div className="bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 rounded-lg p-4 flex items-start gap-3 mb-6">
+          <AlertCircle className="h-5 w-5 text-red-600 dark:text-red-400 mt-0.5" />
           <div className="flex-1">
             <h3 className="font-medium text-red-900">Error</h3>
             <p className="text-sm text-red-700 mt-1">{error}</p>
@@ -141,39 +141,39 @@ export default function WhatsAppPage() {
 
       {/* Meta Cloud API Status Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-        <div className="bg-white rounded-lg border p-6">
+        <div className="bg-vx-surface rounded-lg border p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600 mb-1">API Status</p>
-              <p className={`text-lg font-bold ${apiStatus.configured ? 'text-green-600' : 'text-red-600'}`}>
+              <p className="text-sm text-vx-text-secondary mb-1">API Status</p>
+              <p className={`text-lg font-bold ${apiStatus.configured ? 'text-vx-teal' : 'text-red-600 dark:text-red-400'}`}>
                 {loadingStatus ? '...' : apiStatus.configured ? 'Connected' : 'Not Configured'}
               </p>
             </div>
-            <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${apiStatus.configured ? 'bg-green-100' : 'bg-red-100'}`}>
-              <Signal className={`w-6 h-6 ${apiStatus.configured ? 'text-green-600' : 'text-red-600'}`} />
+            <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${apiStatus.configured ? 'bg-vx-teal/10' : 'bg-red-100'}`}>
+              <Signal className={`w-6 h-6 ${apiStatus.configured ? 'text-vx-teal' : 'text-red-600 dark:text-red-400'}`} />
             </div>
           </div>
         </div>
 
-        <div className="bg-white rounded-lg border p-6">
+        <div className="bg-vx-surface rounded-lg border p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600 mb-1">Verified Name</p>
-              <p className="text-lg font-bold text-gray-900 truncate">
+              <p className="text-sm text-vx-text-secondary mb-1">Verified Name</p>
+              <p className="text-lg font-bold text-vx-text truncate">
                 {loadingStatus ? '...' : apiStatus.verifiedName || '-'}
               </p>
             </div>
-            <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-              <CheckCircle2 className="w-6 h-6 text-blue-600" />
+            <div className="w-12 h-12 bg-vx-purple/10 rounded-lg flex items-center justify-center">
+              <CheckCircle2 className="w-6 h-6 text-vx-purple" />
             </div>
           </div>
         </div>
 
-        <div className="bg-white rounded-lg border p-6">
+        <div className="bg-vx-surface rounded-lg border p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600 mb-1">Quality Rating</p>
-              <p className={`text-lg font-bold ${apiStatus.qualityRating === 'GREEN' ? 'text-green-600' : apiStatus.qualityRating === 'YELLOW' ? 'text-yellow-600' : apiStatus.qualityRating === 'RED' ? 'text-red-600' : 'text-gray-600'}`}>
+              <p className="text-sm text-vx-text-secondary mb-1">Quality Rating</p>
+              <p className={`text-lg font-bold ${apiStatus.qualityRating === 'GREEN' ? 'text-vx-teal' : apiStatus.qualityRating === 'YELLOW' ? 'text-yellow-600 dark:text-yellow-400' : apiStatus.qualityRating === 'RED' ? 'text-red-600 dark:text-red-400' : 'text-vx-text-secondary'}`}>
                 {loadingStatus ? '...' : apiStatus.qualityRating || '-'}
               </p>
             </div>
@@ -183,16 +183,16 @@ export default function WhatsAppPage() {
           </div>
         </div>
 
-        <div className="bg-white rounded-lg border p-6">
+        <div className="bg-vx-surface rounded-lg border p-6">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm text-gray-600 mb-1">Messaging Limit</p>
-              <p className="text-lg font-bold text-gray-900">
+              <p className="text-sm text-vx-text-secondary mb-1">Messaging Limit</p>
+              <p className="text-lg font-bold text-vx-text">
                 {loadingStatus ? '...' : apiStatus.messagingLimit || '-'}
               </p>
             </div>
-            <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
-              <MessageSquare className="w-6 h-6 text-purple-600" />
+            <div className="w-12 h-12 bg-vx-purple/10 rounded-lg flex items-center justify-center">
+              <MessageSquare className="w-6 h-6 text-vx-purple" />
             </div>
           </div>
         </div>

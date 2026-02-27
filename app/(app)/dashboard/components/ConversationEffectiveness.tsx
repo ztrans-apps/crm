@@ -65,7 +65,7 @@ export function ConversationEffectiveness({ dateRange, customDates }: Conversati
           <CardTitle>Efektivitas Percakapan</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="h-96 animate-pulse bg-gray-200 dark:bg-gray-800 rounded" />
+          <div className="h-96 animate-pulse bg-vx-surface-hover rounded" />
         </CardContent>
       </Card>
     )
@@ -120,10 +120,10 @@ export function ConversationEffectiveness({ dateRange, customDates }: Conversati
             <h3 className="mb-4 text-sm font-medium">Kepatuhan SLA</h3>
             <div className="flex items-center justify-center">
               <div className="text-center">
-                <div className="text-4xl font-bold text-green-600">
+                <div className="text-4xl font-bold text-vx-teal">
                   {data.slaCompliance.percentage}%
                 </div>
-                <p className="mt-2 text-sm text-gray-600">
+                <p className="mt-2 text-sm text-vx-text-secondary">
                   {data.slaCompliance.compliant} dari {data.slaCompliance.compliant + data.slaCompliance.nonCompliant} percakapan
                 </p>
               </div>

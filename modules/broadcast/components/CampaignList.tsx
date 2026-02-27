@@ -48,28 +48,28 @@ export function CampaignList({ onAddCampaign, onSelectCampaign }: CampaignListPr
     switch (status) {
       case 'completed':
         return (
-          <Badge className="bg-green-100 text-green-700">
+          <Badge className="bg-vx-teal/10 text-vx-teal">
             <CheckCircle className="h-3 w-3 mr-1" />
             Completed
           </Badge>
         );
       case 'sending':
         return (
-          <Badge className="bg-blue-100 text-blue-700">
+          <Badge className="bg-vx-purple/10 text-vx-purple">
             <Loader2 className="h-3 w-3 mr-1 animate-spin" />
             Sending
           </Badge>
         );
       case 'scheduled':
         return (
-          <Badge className="bg-purple-100 text-purple-700">
+          <Badge className="bg-vx-purple/10 text-vx-purple">
             <Clock className="h-3 w-3 mr-1" />
             Scheduled
           </Badge>
         );
       case 'failed':
         return (
-          <Badge className="bg-red-100 text-red-700">
+          <Badge className="bg-red-100 dark:bg-red-500/10 text-red-600 dark:text-red-400">
             <XCircle className="h-3 w-3 mr-1" />
             Failed
           </Badge>
@@ -88,8 +88,8 @@ export function CampaignList({ onAddCampaign, onSelectCampaign }: CampaignListPr
       <Card>
         <CardContent className="flex items-center justify-center py-16">
           <div className="text-center">
-            <Loader2 className="h-12 w-12 text-gray-400 animate-spin mx-auto mb-3" />
-            <p className="text-gray-600">Loading campaigns...</p>
+            <Loader2 className="h-12 w-12 text-vx-text-muted animate-spin mx-auto mb-3" />
+            <p className="text-vx-text-secondary">Loading campaigns...</p>
           </div>
         </CardContent>
       </Card>
@@ -100,15 +100,15 @@ export function CampaignList({ onAddCampaign, onSelectCampaign }: CampaignListPr
     return (
       <Card className="border-2 border-dashed">
         <CardContent className="flex flex-col items-center justify-center py-16">
-          <div className="w-20 h-20 bg-purple-100 rounded-full flex items-center justify-center mb-4">
-            <Send className="h-10 w-10 text-purple-600" />
+          <div className="w-20 h-20 bg-vx-purple/10 rounded-full flex items-center justify-center mb-4">
+            <Send className="h-10 w-10 text-vx-purple" />
           </div>
-          <h3 className="text-xl font-semibold text-gray-900 mb-2">No Campaigns Yet</h3>
-          <p className="text-gray-600 mb-6 text-center max-w-md">
+          <h3 className="text-xl font-semibold text-vx-text mb-2">No Campaigns Yet</h3>
+          <p className="text-vx-text-secondary mb-6 text-center max-w-md">
             Create your first broadcast campaign to send messages to multiple contacts
           </p>
           {onAddCampaign && (
-            <Button onClick={onAddCampaign} size="lg" className="bg-purple-600 hover:bg-purple-700">
+            <Button onClick={onAddCampaign} size="lg" className="bg-vx-purple hover:bg-vx-purple/90">
               <Plus className="h-4 w-4 mr-2" />
               Create Your First Campaign
             </Button>
@@ -130,13 +130,13 @@ export function CampaignList({ onAddCampaign, onSelectCampaign }: CampaignListPr
             <div className="flex items-start justify-between">
               <div className="flex-1">
                 <div className="flex items-center gap-3 mb-2">
-                  <h3 className="text-lg font-semibold text-gray-900">{campaign.name}</h3>
+                  <h3 className="text-lg font-semibold text-vx-text">{campaign.name}</h3>
                   {getStatusBadge(campaign.status)}
                 </div>
                 
-                <p className="text-gray-600 mb-4 line-clamp-2">{campaign.message_template}</p>
+                <p className="text-vx-text-secondary mb-4 line-clamp-2">{campaign.message_template}</p>
                 
-                <div className="flex items-center gap-6 text-sm text-gray-600">
+                <div className="flex items-center gap-6 text-sm text-vx-text-secondary">
                   <div className="flex items-center gap-1">
                     <Users className="h-4 w-4" />
                     <span>
@@ -164,10 +164,10 @@ export function CampaignList({ onAddCampaign, onSelectCampaign }: CampaignListPr
               
               <div className="ml-4">
                 <div className="text-right">
-                  <div className="text-2xl font-bold text-gray-900">
+                  <div className="text-2xl font-bold text-vx-text">
                     {Math.round((campaign.sent_count / campaign.total_recipients) * 100)}%
                   </div>
-                  <div className="text-sm text-gray-500">Complete</div>
+                  <div className="text-sm text-vx-text-muted">Complete</div>
                 </div>
               </div>
             </div>

@@ -95,7 +95,7 @@ export default function AdminSettingsPage() {
     return (
       <div className="p-8">
         <div className="flex items-center justify-center">
-          <RefreshCw className="h-8 w-8 animate-spin text-gray-400" />
+          <RefreshCw className="h-8 w-8 animate-spin text-vx-text-muted" />
         </div>
       </div>
     )
@@ -107,7 +107,7 @@ export default function AdminSettingsPage() {
       mode="any"
       fallback={
         <div className="p-8">
-          <div className="text-center text-red-600">
+          <div className="text-center text-red-600 dark:text-red-400">
             You don't have permission to access settings
           </div>
         </div>
@@ -119,7 +119,7 @@ export default function AdminSettingsPage() {
             <Settings className="h-8 w-8" />
             System Settings
           </h1>
-          <p className="text-gray-600 mt-2">
+          <p className="text-vx-text-secondary mt-2">
             Configure auto-assignment and other system-wide settings
           </p>
         </div>
@@ -128,26 +128,26 @@ export default function AdminSettingsPage() {
         {message && (
           <div className={`mb-6 p-4 rounded-lg ${
             message.type === 'success' 
-              ? 'bg-green-50 text-green-800 border border-green-200' 
-              : 'bg-red-50 text-red-800 border border-red-200'
+              ? 'bg-vx-teal/5 text-vx-teal border border-vx-teal/20' 
+              : 'bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-500/20'
           }`}>
             {message.text}
           </div>
         )}
 
         {/* Auto Assignment Settings */}
-        <div className="bg-white rounded-lg shadow p-6 mb-6">
+        <div className="bg-vx-surface rounded-lg shadow p-6 mb-6">
           <div className="flex items-center gap-3 mb-6">
-            <Users className="h-6 w-6 text-blue-600" />
+            <Users className="h-6 w-6 text-vx-purple" />
             <h2 className="text-xl font-semibold">Auto Assignment</h2>
           </div>
 
           <div className="space-y-6">
             {/* Enable/Disable */}
-            <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+            <div className="flex items-center justify-between p-4 bg-vx-surface-elevated rounded-lg">
               <div>
                 <h3 className="font-medium">Enable Auto Assignment</h3>
-                <p className="text-sm text-gray-600">
+                <p className="text-sm text-vx-text-secondary">
                   Automatically assign incoming conversations to agents
                 </p>
               </div>
@@ -158,7 +158,7 @@ export default function AdminSettingsPage() {
                   onChange={(e) => setSettings({ ...settings, enabled: e.target.checked })}
                   className="sr-only peer"
                 />
-                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                <div className="w-11 h-6 bg-vx-surface-hover peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-vx-purple/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-vx-border after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-vx-purple"></div>
               </label>
             </div>
 
@@ -173,14 +173,14 @@ export default function AdminSettingsPage() {
                   ...settings, 
                   strategy: e.target.value as 'round_robin' | 'least_busy' | 'random' 
                 })}
-                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-vx-purple/30"
                 disabled={!settings.enabled}
               >
                 <option value="round_robin">Round Robin (Bergiliran)</option>
                 <option value="least_busy">Least Busy (Paling Sedikit Chat)</option>
                 <option value="random">Random (Acak)</option>
               </select>
-              <p className="text-xs text-gray-500 mt-1">
+              <p className="text-xs text-vx-text-muted mt-1">
                 {settings.strategy === 'round_robin' && 'Assign conversations to agents in rotation'}
                 {settings.strategy === 'least_busy' && 'Assign to agent with fewest active conversations'}
                 {settings.strategy === 'random' && 'Assign to random available agent'}
@@ -218,7 +218,7 @@ export default function AdminSettingsPage() {
                   </label>
                 ))}
               </div>
-              <p className="text-xs text-gray-500 mt-1">
+              <p className="text-xs text-vx-text-muted mt-1">
                 Select which roles can receive auto-assigned conversations
               </p>
             </div>
@@ -253,11 +253,11 @@ export default function AdminSettingsPage() {
                   max_conversations_per_agent: e.target.value ? parseInt(e.target.value) : null 
                 })}
                 placeholder="No limit"
-                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-vx-purple/30"
                 disabled={!settings.enabled}
                 min="1"
               />
-              <p className="text-xs text-gray-500 mt-1">
+              <p className="text-xs text-vx-text-muted mt-1">
                 Maximum number of active conversations per agent (leave empty for no limit)
               </p>
             </div>
@@ -265,13 +265,13 @@ export default function AdminSettingsPage() {
         </div>
 
         {/* Business Hours (Coming Soon) */}
-        <div className="bg-white rounded-lg shadow p-6 mb-6 opacity-50">
+        <div className="bg-vx-surface rounded-lg shadow p-6 mb-6 opacity-50">
           <div className="flex items-center gap-3 mb-4">
-            <Clock className="h-6 w-6 text-gray-400" />
-            <h2 className="text-xl font-semibold text-gray-400">Business Hours</h2>
-            <span className="text-xs bg-gray-200 text-gray-600 px-2 py-1 rounded">Coming Soon</span>
+            <Clock className="h-6 w-6 text-vx-text-muted" />
+            <h2 className="text-xl font-semibold text-vx-text-muted">Business Hours</h2>
+            <span className="text-xs bg-vx-surface-hover text-vx-text-secondary px-2 py-1 rounded">Coming Soon</span>
           </div>
-          <p className="text-sm text-gray-500">
+          <p className="text-sm text-vx-text-muted">
             Configure business hours for auto-assignment and auto-replies
           </p>
         </div>
@@ -280,14 +280,14 @@ export default function AdminSettingsPage() {
         <div className="flex justify-end gap-3">
           <button
             onClick={loadSettings}
-            className="px-6 py-2 border rounded-lg hover:bg-gray-50"
+            className="px-6 py-2 border rounded-lg hover:bg-vx-surface-hover"
             disabled={saving}
           >
             Reset
           </button>
           <button
             onClick={handleSave}
-            className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center gap-2"
+            className="px-6 py-2 bg-vx-purple text-white rounded-lg hover:bg-vx-purple/90 disabled:opacity-50 flex items-center gap-2"
             disabled={saving}
           >
             {saving ? (

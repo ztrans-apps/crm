@@ -36,10 +36,10 @@ export function ReviewForm({ onSave }: ReviewFormProps) {
       {/* Rating Stars */}
       <div>
         <div className="flex items-center justify-between mb-2">
-          <span className="text-xs font-medium text-gray-700">
+          <span className="text-xs font-medium text-vx-text-secondary">
             Rating Customer:
           </span>
-          <span className="text-base font-semibold text-teal-600">
+          <span className="text-base font-semibold text-vx-teal">
             {rating}/10
           </span>
         </div>
@@ -58,7 +58,7 @@ export function ReviewForm({ onSave }: ReviewFormProps) {
                 className={`h-5 w-5 ${
                   star <= (hoveredRating || rating)
                     ? 'fill-yellow-400 text-yellow-400'
-                    : 'text-gray-300'
+                    : 'text-vx-text-muted'
                 }`}
               />
             </button>
@@ -71,7 +71,7 @@ export function ReviewForm({ onSave }: ReviewFormProps) {
         value={content}
         onChange={(e) => setContent(e.target.value)}
         placeholder="Tulis review atau feedback dari customer..."
-        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 resize-none"
+        className="w-full px-3 py-2 text-sm border border-vx-border rounded-lg focus:outline-none focus:ring-2 focus:ring-vx-teal/30 resize-none"
         rows={3}
         disabled={saving}
       />
@@ -80,7 +80,7 @@ export function ReviewForm({ onSave }: ReviewFormProps) {
         onClick={handleSave}
         disabled={!content.trim() || rating === 0 || saving}
         size="sm"
-        className="w-full bg-teal-600 hover:bg-teal-700"
+        className="w-full bg-vx-teal hover:bg-vx-teal/90"
       >
         <Save className="h-3 w-3 mr-2" />
         {saving ? 'Menyimpan...' : 'Simpan Review'}

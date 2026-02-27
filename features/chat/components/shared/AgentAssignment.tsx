@@ -138,19 +138,19 @@ export function AgentAssignment({
       {/* Current Agent Display */}
       {currentAgentId ? (
         <div className="relative">
-          <label className="text-xs font-medium text-gray-600 mb-1 block">
+          <label className="text-xs font-medium text-vx-text-secondary mb-1 block">
             Agent Saat Ini
           </label>
-          <div className="flex items-center gap-2 p-2 bg-gray-50 rounded-lg border border-gray-200">
-            <div className="w-6 h-6 rounded-full bg-green-500 flex items-center justify-center text-white text-[10px] font-semibold">
+          <div className="flex items-center gap-2 p-2 bg-vx-surface-elevated rounded-lg border border-vx-border">
+            <div className="w-6 h-6 rounded-full vx-gradient flex items-center justify-center text-white text-[10px] font-semibold">
               {currentAgentName?.charAt(0).toUpperCase() || 'A'}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-xs font-medium text-gray-900 truncate">
+              <p className="text-xs font-medium text-vx-text truncate">
                 {currentAgentName || 'Unknown Agent'}
               </p>
               {currentAgentEmail && (
-                <p className="text-[10px] text-gray-500 truncate">
+                <p className="text-[10px] text-vx-text-muted truncate">
                   {currentAgentEmail}
                 </p>
               )}
@@ -158,17 +158,17 @@ export function AgentAssignment({
             {canHandover && userRole === 'owner' && (
               <button
                 onClick={handleRemoveAgent}
-                className="p-1 hover:bg-gray-200 rounded transition-colors"
+                className="p-1 hover:bg-vx-surface-hover rounded transition-colors"
                 title="Unassign agent"
               >
-                <X className="h-3.5 w-3.5 text-gray-500" />
+                <X className="h-3.5 w-3.5 text-vx-text-muted" />
               </button>
             )}
           </div>
         </div>
       ) : (
-        <div className="p-3 bg-yellow-50 rounded-lg border border-yellow-200">
-          <p className="text-xs text-yellow-700 flex items-center gap-2">
+        <div className="p-3 bg-yellow-50 dark:bg-yellow-500/10 rounded-lg border border-yellow-200 dark:border-yellow-500/20">
+          <p className="text-xs text-yellow-700 dark:text-yellow-400 flex items-center gap-2">
             <UserCircle className="h-4 w-4" />
             Belum ada agent yang ditugaskan
           </p>
@@ -178,7 +178,7 @@ export function AgentAssignment({
       {/* Agents Section - Add/Handover */}
       {(canHandover || canAssign) && (
         <div className="space-y-2">
-          <label className="text-xs font-medium text-green-600 flex items-center gap-1">
+          <label className="text-xs font-medium text-vx-teal flex items-center gap-1">
             <UserCircle className="h-3.5 w-3.5" />
             {currentAgentId ? 'Handover ke Agent Lain' : 'Pilih Agent'}
           </label>
@@ -187,7 +187,7 @@ export function AgentAssignment({
           {!currentAgentId && userRole === 'owner' && onAutoAssign && (
             <Button
               onClick={handleAutoAssign}
-              className="w-full h-9 bg-purple-600 hover:bg-purple-700 text-white flex items-center justify-center gap-2"
+              className="w-full h-9 bg-vx-purple hover:bg-vx-purple/90 text-white flex items-center justify-center gap-2"
             >
               <Zap className="h-4 w-4" />
               Auto-Assign (Round-Robin)
@@ -198,10 +198,10 @@ export function AgentAssignment({
           {!currentAgentId && userRole === 'owner' && onAutoAssign && (
             <div className="relative">
               <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-gray-200"></div>
+                <div className="w-full border-t border-vx-border"></div>
               </div>
               <div className="relative flex justify-center text-xs">
-                <span className="bg-gray-50 px-2 text-gray-500">atau pilih manual</span>
+                <span className="bg-vx-surface-elevated px-2 text-vx-text-muted">atau pilih manual</span>
               </div>
             </div>
           )}
@@ -210,28 +210,28 @@ export function AgentAssignment({
           <div className="relative">
             <button
               onClick={() => setShowDropdown(!showDropdown)}
-              className="w-full p-3 text-left border-2 border-green-500 rounded-lg hover:bg-green-50 transition-colors flex items-center justify-between"
+              className="w-full p-3 text-left border-2 border-vx-teal rounded-lg hover:bg-vx-teal/5 transition-colors flex items-center justify-between"
             >
-              <span className="text-sm font-medium text-gray-700">
+              <span className="text-sm font-medium text-vx-text-secondary">
                 {selectedAgent 
                   ? availableAgents.find(a => a.id === selectedAgent)?.full_name 
                   : 'Pilih agent...'
                 }
               </span>
-              <ChevronDown className={`h-4 w-4 text-gray-400 transition-transform ${
+              <ChevronDown className={`h-4 w-4 text-vx-text-muted transition-transform ${
                 showDropdown ? 'rotate-180' : ''
               }`} />
             </button>
 
             {/* Dropdown List */}
             {showDropdown && (
-              <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+              <div className="absolute z-10 w-full mt-1 bg-vx-surface border border-vx-border rounded-lg shadow-lg max-h-48 overflow-y-auto">
                 {loading ? (
                   <div className="p-3 text-center">
-                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-green-500 mx-auto"></div>
+                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-vx-teal mx-auto"></div>
                   </div>
                 ) : availableAgents.length === 0 ? (
-                  <div className="p-3 text-center text-xs text-gray-500">
+                  <div className="p-3 text-center text-xs text-vx-text-muted">
                     Tidak ada agent online saat ini
                   </div>
                 ) : (
@@ -242,25 +242,25 @@ export function AgentAssignment({
                         setSelectedAgent(agent.id)
                         setShowDropdown(false)
                       }}
-                      className="w-full p-3 text-left hover:bg-gray-50 transition-colors border-b last:border-b-0"
+                      className="w-full p-3 text-left hover:bg-vx-surface-hover transition-colors border-b last:border-b-0"
                     >
                       <div className="flex items-center gap-2">
-                        <div className="w-6 h-6 rounded-full bg-blue-500 flex items-center justify-center text-white text-xs font-semibold">
+                        <div className="w-6 h-6 rounded-full bg-vx-purple flex items-center justify-center text-white text-xs font-semibold">
                           {agent.full_name.charAt(0).toUpperCase()}
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-gray-900 truncate">
+                          <p className="text-sm font-medium text-vx-text truncate">
                             {agent.full_name}
                           </p>
-                          <p className="text-xs text-gray-500 truncate">
+                          <p className="text-xs text-vx-text-muted truncate">
                             {agent.email}
                           </p>
                         </div>
                         {agent.agent_status && (
                           <span className={`text-xs px-2 py-0.5 rounded-full ${
                             agent.agent_status === 'available' 
-                              ? 'bg-green-100 text-green-700'
-                              : 'bg-yellow-100 text-yellow-700'
+                              ? 'bg-vx-teal/10 text-vx-teal'
+                              : 'bg-yellow-100 dark:bg-yellow-500/10 text-yellow-700 dark:text-yellow-400'
                           }`}>
                             {agent.agent_status}
                           </span>
@@ -277,7 +277,7 @@ export function AgentAssignment({
           {selectedAgent && (
             <Button
               onClick={handleAssignOrHandover}
-              className="w-full h-9 bg-green-600 hover:bg-green-700 text-white"
+              className="w-full h-9 vx-gradient hover:opacity-90 text-white"
             >
               {currentAgentId ? 'Handover' : 'Assign Agent'}
             </Button>

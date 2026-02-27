@@ -116,7 +116,7 @@ export function ContactForm({ open, onOpenChange, onSuccess, contact }: ContactF
               onChange={(e) => setFormData({ ...formData, phone_number: e.target.value })}
               disabled={loading}
             />
-            <p className="text-sm text-gray-500">
+            <p className="text-sm text-vx-text-muted">
               Include country code (e.g., +62 for Indonesia)
             </p>
           </div>
@@ -158,7 +158,7 @@ export function ContactForm({ open, onOpenChange, onSuccess, contact }: ContactF
           <Button
             onClick={handleSubmit}
             disabled={loading}
-            className="bg-blue-600 hover:bg-blue-700"
+            className="bg-vx-purple hover:bg-vx-purple/90"
           >
             {loading ? (
               <>

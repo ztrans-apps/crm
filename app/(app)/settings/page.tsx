@@ -9,7 +9,7 @@ export default function SettingsPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold">Settings</h1>
-        <p className="text-gray-600">Manage your account and preferences</p>
+        <p className="text-vx-text-secondary">Manage your account and preferences</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -24,7 +24,7 @@ export default function SettingsPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <p className="text-sm text-gray-600">
+            <p className="text-sm text-vx-text-secondary">
               Manage your profile, name, email, and avatar
             </p>
           </CardContent>
@@ -41,7 +41,7 @@ export default function SettingsPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <p className="text-sm text-gray-600">
+            <p className="text-sm text-vx-text-secondary">
               Choose how you want to be notified
             </p>
           </CardContent>
@@ -58,7 +58,7 @@ export default function SettingsPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <p className="text-sm text-gray-600">
+            <p className="text-sm text-vx-text-secondary">
               Change password and manage security options
             </p>
           </CardContent>
@@ -75,7 +75,7 @@ export default function SettingsPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <p className="text-sm text-gray-600">
+            <p className="text-sm text-vx-text-secondary">
               Language, timezone, and display settings
             </p>
           </CardContent>

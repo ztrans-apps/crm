@@ -62,7 +62,7 @@ export function BusinessImpact() {
           <CardTitle>Dampak Bisnis</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="h-96 animate-pulse bg-gray-200 dark:bg-gray-800 rounded" />
+          <div className="h-96 animate-pulse bg-vx-surface-hover rounded" />
         </CardContent>
       </Card>
     )
@@ -73,8 +73,8 @@ export function BusinessImpact() {
   const TrendIcon = data.leadsGenerated.trend === 'up' ? TrendingUp : 
                     data.leadsGenerated.trend === 'down' ? TrendingDown : Minus
 
-  const trendColor = data.leadsGenerated.trend === 'up' ? 'text-green-600' : 
-                     data.leadsGenerated.trend === 'down' ? 'text-red-600' : 'text-gray-600'
+  const trendColor = data.leadsGenerated.trend === 'up' ? 'text-vx-teal' : 
+                     data.leadsGenerated.trend === 'down' ? 'text-red-600 dark:text-red-400' : 'text-vx-text-secondary'
 
   return (
     <Card>
@@ -85,10 +85,10 @@ export function BusinessImpact() {
         {/* Leads Generated */}
         <div>
           <h3 className="mb-4 text-sm font-medium">Lead yang Dihasilkan</h3>
-          <div className="rounded-lg bg-blue-50 p-4 dark:bg-blue-950">
+          <div className="rounded-lg bg-vx-purple/10 p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-2xl font-bold text-blue-600">{data.leadsGenerated.total}</p>
+                <p className="text-2xl font-bold text-vx-purple">{data.leadsGenerated.total}</p>
                 <div className={cn('flex items-center gap-1 text-sm', trendColor)}>
                   <TrendIcon className="h-4 w-4" />
                   <span>{data.leadsGenerated.change}% dari bulan lalu</span>
@@ -103,16 +103,16 @@ export function BusinessImpact() {
         <div>
           <h3 className="mb-4 text-sm font-medium">Tiket Terselesaikan</h3>
           <div className="grid grid-cols-3 gap-4">
-            <div className="rounded-lg bg-gray-50 p-3 dark:bg-gray-900">
-              <p className="text-sm text-gray-600 dark:text-gray-400">Hari Ini</p>
+            <div className="rounded-lg bg-vx-surface-elevated p-3">
+              <p className="text-sm text-vx-text-secondary">Hari Ini</p>
               <p className="text-xl font-bold">{data.ticketsResolved.today}</p>
             </div>
-            <div className="rounded-lg bg-gray-50 p-3 dark:bg-gray-900">
-              <p className="text-sm text-gray-600 dark:text-gray-400">Minggu Ini</p>
+            <div className="rounded-lg bg-vx-surface-elevated p-3">
+              <p className="text-sm text-vx-text-secondary">Minggu Ini</p>
               <p className="text-xl font-bold">{data.ticketsResolved.week}</p>
             </div>
-            <div className="rounded-lg bg-gray-50 p-3 dark:bg-gray-900">
-              <p className="text-sm text-gray-600 dark:text-gray-400">Bulan Ini</p>
+            <div className="rounded-lg bg-vx-surface-elevated p-3">
+              <p className="text-sm text-vx-text-secondary">Bulan Ini</p>
               <p className="text-xl font-bold">{data.ticketsResolved.month}</p>
             </div>
           </div>
@@ -121,11 +121,11 @@ export function BusinessImpact() {
         {/* Cost Per Conversation */}
         <div>
           <h3 className="mb-4 text-sm font-medium">Biaya per Percakapan</h3>
-          <div className="rounded-lg bg-green-50 p-4 dark:bg-green-950">
+          <div className="rounded-lg bg-vx-teal/10 p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-2xl font-bold text-green-600">${data.costPerConversation.amount}</p>
-                <p className="text-sm text-gray-600 dark:text-gray-400">
+                <p className="text-2xl font-bold text-vx-teal">${data.costPerConversation.amount}</p>
+                <p className="text-sm text-vx-text-secondary">
                   Penghematan: ${data.costPerConversation.savings}
                 </p>
               </div>
@@ -137,11 +137,11 @@ export function BusinessImpact() {
         {/* Repeat Customer Rate */}
         <div>
           <h3 className="mb-4 text-sm font-medium">Tingkat Pelanggan Kembali</h3>
-          <div className="rounded-lg bg-purple-50 p-4 dark:bg-purple-950">
+          <div className="rounded-lg bg-vx-purple/10 p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-2xl font-bold text-purple-600">{data.repeatCustomerRate.rate}%</p>
-                <p className="text-sm text-gray-600 dark:text-gray-400">
+                <p className="text-2xl font-bold text-vx-purple">{data.repeatCustomerRate.rate}%</p>
+                <p className="text-sm text-vx-text-secondary">
                   Trend: {data.repeatCustomerRate.trend === 'up' ? '↑ Naik' : 
                           data.repeatCustomerRate.trend === 'down' ? '↓ Turun' : '→ Stabil'}
                 </p>
@@ -159,9 +159,9 @@ export function BusinessImpact() {
               <div key={campaign.campaignId} className="rounded-lg border p-3">
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-medium">{campaign.campaignName}</span>
-                  <span className="text-sm font-bold text-green-600">{campaign.conversionRate}%</span>
+                  <span className="text-sm font-bold text-vx-teal">{campaign.conversionRate}%</span>
                 </div>
-                <div className="mt-2 flex gap-4 text-xs text-gray-600 dark:text-gray-400">
+                <div className="mt-2 flex gap-4 text-xs text-vx-text-secondary">
                   <span>Terkirim: {campaign.sent}</span>
                   <span>Respons: {campaign.responded}</span>
                   <span>Konversi: {campaign.converted}</span>

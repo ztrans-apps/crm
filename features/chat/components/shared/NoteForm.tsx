@@ -34,13 +34,13 @@ export function NoteForm({ onSave }: NoteFormProps) {
   const displayRating = hoveredStar !== null ? hoveredStar : (rating || 0)
 
   return (
-    <div className="bg-white rounded-lg border border-gray-200 p-3 space-y-2">
+    <div className="bg-vx-surface rounded-lg border border-vx-border p-3 space-y-2">
       <div className="flex items-center justify-end">
         <Button
           size="sm"
           onClick={handleSubmit}
           disabled={!content.trim() || saving}
-          className="h-8 px-4 bg-teal-600 hover:bg-teal-700 text-xs"
+          className="h-8 px-4 bg-vx-teal hover:bg-vx-teal/90 text-xs"
         >
           {saving ? (
             <div className="flex items-center space-x-1">
@@ -58,10 +58,10 @@ export function NoteForm({ onSave }: NoteFormProps) {
 
       <div className="space-y-1">
         <div className="flex items-center justify-between">
-          <span className="text-xs text-gray-700">
+          <span className="text-xs text-vx-text-secondary">
             Rate this chat note:
           </span>
-          <span className="text-base font-semibold text-teal-600">
+          <span className="text-base font-semibold text-vx-teal">
             {displayRating}/10
           </span>
         </div>
@@ -81,7 +81,7 @@ export function NoteForm({ onSave }: NoteFormProps) {
                 className={`h-5 w-5 ${
                   star <= displayRating
                     ? 'fill-yellow-400 text-yellow-400' 
-                    : 'text-gray-300'
+                    : 'text-vx-text-muted'
                 }`}
               />
             </button>
@@ -94,7 +94,7 @@ export function NoteForm({ onSave }: NoteFormProps) {
         value={content}
         onChange={(e) => setContent(e.target.value)}
         rows={3}
-        className="text-xs resize-none border-gray-200 focus:border-teal-500 focus:ring-teal-500"
+        className="text-xs resize-none border-vx-border focus:border-vx-teal focus:ring-vx-teal/30"
       />
     </div>
   )
@@ -131,11 +131,11 @@ export function NoteCard({ note, defaultExpanded = false }: NoteCardProps) {
   }
 
   return (
-    <div className="bg-gray-50 rounded-lg border border-gray-200 overflow-hidden">
+    <div className="bg-vx-surface-elevated rounded-lg border border-vx-border overflow-hidden">
       <div className="p-2.5">
         {/* Author Header */}
         <div className="mb-1.5">
-          <p className="text-xs font-semibold text-gray-900">
+          <p className="text-xs font-semibold text-vx-text">
             {authorName}:
           </p>
         </div>
@@ -143,7 +143,7 @@ export function NoteCard({ note, defaultExpanded = false }: NoteCardProps) {
         {/* Content - Show when expanded */}
         {isExpanded && note.content && (
           <div className="mb-2">
-            <p className="text-xs text-gray-700 leading-relaxed whitespace-pre-wrap">
+            <p className="text-xs text-vx-text-secondary leading-relaxed whitespace-pre-wrap">
               {note.content}
             </p>
           </div>
@@ -152,18 +152,18 @@ export function NoteCard({ note, defaultExpanded = false }: NoteCardProps) {
         {/* Rating - Always show when exists */}
         {note.rating && (
           <div className="flex items-center gap-1.5 mb-1.5">
-            <span className="text-[10px] text-gray-600">Rating:</span>
+            <span className="text-[10px] text-vx-text-secondary">Rating:</span>
             <div className="flex gap-0.5">
               {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((star) => (
                 <Star
                   key={star}
                   className={`h-3 w-3 ${
-                    star <= note.rating ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'
+                    star <= note.rating ? 'fill-yellow-400 text-yellow-400' : 'text-vx-text-muted'
                   }`}
                 />
               ))}
             </div>
-            <span className="text-[10px] font-semibold text-gray-700">
+            <span className="text-[10px] font-semibold text-vx-text-secondary">
               ({note.rating}/10)
             </span>
           </div>
@@ -171,17 +171,17 @@ export function NoteCard({ note, defaultExpanded = false }: NoteCardProps) {
 
         {/* Timestamp and Toggle */}
         <div className="flex items-center justify-between">
-          <p className="text-[10px] text-gray-500">
+          <p className="text-[10px] text-vx-text-muted">
             {formatTimestamp(note.created_at)}
           </p>
           
           {/* Toggle button */}
           <button
             onClick={() => setIsExpanded(!isExpanded)}
-            className="p-0.5 hover:bg-gray-200 rounded transition-colors"
+            className="p-0.5 hover:bg-vx-surface-hover rounded transition-colors"
           >
             <ChevronDown 
-              className={`h-3.5 w-3.5 text-gray-400 transition-transform ${
+              className={`h-3.5 w-3.5 text-vx-text-muted transition-transform ${
                 isExpanded ? 'rotate-180' : ''
               }`}
             />

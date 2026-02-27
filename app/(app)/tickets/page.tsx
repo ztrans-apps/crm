@@ -13,7 +13,7 @@ export default function TicketsPage() {
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-2xl font-bold">Tickets</h1>
-            <p className="text-gray-600">Manage support tickets</p>
+            <p className="text-vx-text-secondary">Manage support tickets</p>
           </div>
           <Button className="flex items-center gap-2">
             <Plus className="h-4 w-4" />
@@ -32,7 +32,7 @@ export default function TicketsPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="flex flex-col items-center justify-center py-12 text-gray-500">
+            <div className="flex flex-col items-center justify-center py-12 text-vx-text-muted">
               <Ticket className="h-12 w-12 mb-4 opacity-20" />
               <p>No tickets yet</p>
               <p className="text-sm">Create your first ticket to get started</p>

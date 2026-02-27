@@ -157,8 +157,8 @@ export default function RBACManagementPage() {
     return (
       <div className="flex items-center justify-center h-96">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading RBAC data...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-vx-text mx-auto"></div>
+          <p className="mt-4 text-vx-text-secondary">Loading RBAC data...</p>
         </div>
       </div>
     )
@@ -169,13 +169,13 @@ export default function RBACManagementPage() {
       <div className="flex items-center justify-center h-96">
         <Card className="w-96">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-red-600">
+            <CardTitle className="flex items-center gap-2 text-red-600 dark:text-red-400">
               <AlertCircle className="h-5 w-5" />
               Access Denied
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-gray-600">
+            <p className="text-vx-text-secondary">
               You don't have permission to view roles and permissions.
             </p>
           </CardContent>
@@ -191,15 +191,15 @@ export default function RBACManagementPage() {
           <Shield className="h-8 w-8" />
           RBAC Management
         </h1>
-        <p className="text-gray-600 mt-2">
+        <p className="text-vx-text-secondary mt-2">
           Manage roles, permissions, and user access control
         </p>
       </div>
 
       {error && (
-        <Card className="mb-6 border-red-200 bg-red-50">
+        <Card className="mb-6 border-red-200 dark:border-red-500/20 bg-red-50 dark:bg-red-500/10">
           <CardContent className="pt-6">
-            <div className="flex items-center gap-2 text-red-600">
+            <div className="flex items-center gap-2 text-red-600 dark:text-red-400">
               <AlertCircle className="h-5 w-5" />
               <p>{error}</p>
             </div>
@@ -228,7 +228,7 @@ export default function RBACManagementPage() {
           <div className="flex justify-between items-center">
             <div>
               <h2 className="text-xl font-semibold">Roles</h2>
-              <p className="text-sm text-gray-600">
+              <p className="text-sm text-vx-text-secondary">
                 Manage user roles and their permissions
               </p>
             </div>
@@ -259,7 +259,7 @@ export default function RBACManagementPage() {
                         {role.description || 'No description'}
                       </CardDescription>
                       <div className="mt-2">
-                        <code className="text-xs bg-gray-100 px-2 py-1 rounded">
+                        <code className="text-xs bg-vx-surface-hover px-2 py-1 rounded">
                           {role.role_key}
                         </code>
                       </div>
@@ -305,7 +305,7 @@ export default function RBACManagementPage() {
         <TabsContent value="permissions" className="space-y-4">
           <div>
             <h2 className="text-xl font-semibold">Permissions</h2>
-            <p className="text-sm text-gray-600">
+            <p className="text-sm text-vx-text-secondary">
               All available permissions in the system
             </p>
           </div>
@@ -324,22 +324,22 @@ export default function RBACManagementPage() {
                     {perms.map((perm) => (
                       <div
                         key={perm.id}
-                        className="flex items-start justify-between p-3 border rounded-lg hover:bg-gray-50"
+                        className="flex items-start justify-between p-3 border rounded-lg hover:bg-vx-surface-hover"
                       >
                         <div className="flex-1">
                           <div className="flex items-center gap-2">
-                            <code className="text-sm font-mono bg-gray-100 px-2 py-1 rounded">
+                            <code className="text-sm font-mono bg-vx-surface-hover px-2 py-1 rounded">
                               {perm.permission_key}
                             </code>
                             <Badge variant="outline" className="text-xs">
                               {perm.action}
                             </Badge>
                           </div>
-                          <p className="text-sm text-gray-600 mt-1">
+                          <p className="text-sm text-vx-text-secondary mt-1">
                             {perm.permission_name}
                           </p>
                           {perm.description && (
-                            <p className="text-xs text-gray-500 mt-1">
+                            <p className="text-xs text-vx-text-muted mt-1">
                               {perm.description}
                             </p>
                           )}
@@ -358,7 +358,7 @@ export default function RBACManagementPage() {
           <div className="flex justify-between items-center">
             <div>
               <h2 className="text-xl font-semibold">User Role Assignments</h2>
-              <p className="text-sm text-gray-600">
+              <p className="text-sm text-vx-text-secondary">
                 View and manage user role assignments
               </p>
             </div>
@@ -376,15 +376,15 @@ export default function RBACManagementPage() {
                 {userRoles.map((ur) => (
                   <div
                     key={ur.id}
-                    className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50"
+                    className="flex items-center justify-between p-3 border rounded-lg hover:bg-vx-surface-hover"
                   >
                     <div className="flex-1">
                       <p className="font-medium">{ur.user.full_name || ur.user.email}</p>
-                      <p className="text-sm text-gray-600">{ur.user.email}</p>
+                      <p className="text-sm text-vx-text-secondary">{ur.user.email}</p>
                     </div>
                     <div className="flex items-center gap-3">
                       <Badge>{ur.role.role_name}</Badge>
-                      <p className="text-xs text-gray-500">
+                      <p className="text-xs text-vx-text-muted">
                         {new Date(ur.assigned_at).toLocaleDateString()}
                       </p>
                       {canAssignRoles && (

@@ -53,7 +53,7 @@ export function ContactDetail({ contact, onEdit, onDelete, onMessage }: ContactD
                 variant="outline"
                 size="sm"
                 onClick={onDelete}
-                className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                className="text-red-600 dark:text-red-400 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-500/5"
               >
                 <Trash2 className="h-4 w-4 mr-1" />
                 Delete
@@ -66,12 +66,12 @@ export function ContactDetail({ contact, onEdit, onDelete, onMessage }: ContactD
         {/* Profile Section */}
         <div className="flex items-center gap-4">
           <Avatar className="h-20 w-20">
-            <AvatarFallback className="bg-blue-100 text-blue-700 text-2xl">
+            <AvatarFallback className="bg-vx-purple/10 text-vx-purple text-2xl">
               {getInitials(contact.name)}
             </AvatarFallback>
           </Avatar>
           <div>
-            <h2 className="text-2xl font-bold text-gray-900">
+            <h2 className="text-2xl font-bold text-vx-text">
               {contact.name || contact.phone_number}
             </h2>
             {contact.tags && contact.tags.length > 0 && (
@@ -88,28 +88,28 @@ export function ContactDetail({ contact, onEdit, onDelete, onMessage }: ContactD
 
         {/* Contact Information */}
         <div className="space-y-3">
-          <div className="flex items-center gap-3 text-gray-700">
-            <Phone className="h-5 w-5 text-gray-400" />
+          <div className="flex items-center gap-3 text-vx-text-secondary">
+            <Phone className="h-5 w-5 text-vx-text-muted" />
             <div>
-              <p className="text-sm text-gray-500">Phone</p>
+              <p className="text-sm text-vx-text-muted">Phone</p>
               <p className="font-medium">{contact.phone_number}</p>
             </div>
           </div>
           
           {contact.email && (
-            <div className="flex items-center gap-3 text-gray-700">
-              <Mail className="h-5 w-5 text-gray-400" />
+            <div className="flex items-center gap-3 text-vx-text-secondary">
+              <Mail className="h-5 w-5 text-vx-text-muted" />
               <div>
-                <p className="text-sm text-gray-500">Email</p>
+                <p className="text-sm text-vx-text-muted">Email</p>
                 <p className="font-medium">{contact.email}</p>
               </div>
             </div>
           )}
           
-          <div className="flex items-center gap-3 text-gray-700">
-            <Calendar className="h-5 w-5 text-gray-400" />
+          <div className="flex items-center gap-3 text-vx-text-secondary">
+            <Calendar className="h-5 w-5 text-vx-text-muted" />
             <div>
-              <p className="text-sm text-gray-500">Added</p>
+              <p className="text-sm text-vx-text-muted">Added</p>
               <p className="font-medium">
                 {new Date(contact.created_at).toLocaleDateString()}
               </p>
@@ -120,19 +120,19 @@ export function ContactDetail({ contact, onEdit, onDelete, onMessage }: ContactD
         {/* Notes */}
         {contact.notes && (
           <div>
-            <h3 className="font-semibold text-gray-900 mb-2">Notes</h3>
-            <p className="text-gray-700 whitespace-pre-wrap">{contact.notes}</p>
+            <h3 className="font-semibold text-vx-text mb-2">Notes</h3>
+            <p className="text-vx-text-secondary whitespace-pre-wrap">{contact.notes}</p>
           </div>
         )}
 
         {/* Last Message */}
         {contact.last_message && (
           <div>
-            <h3 className="font-semibold text-gray-900 mb-2">Last Message</h3>
-            <div className="p-3 bg-gray-50 rounded-lg">
-              <p className="text-gray-700">{contact.last_message}</p>
+            <h3 className="font-semibold text-vx-text mb-2">Last Message</h3>
+            <div className="p-3 bg-vx-surface-elevated rounded-lg">
+              <p className="text-vx-text-secondary">{contact.last_message}</p>
               {contact.last_message_at && (
-                <p className="text-sm text-gray-500 mt-1">
+                <p className="text-sm text-vx-text-muted mt-1">
                   {new Date(contact.last_message_at).toLocaleString()}
                 </p>
               )}
@@ -144,7 +144,7 @@ export function ContactDetail({ contact, onEdit, onDelete, onMessage }: ContactD
         {onMessage && (
           <Button
             onClick={onMessage}
-            className="w-full bg-green-600 hover:bg-green-700"
+            className="w-full bg-vx-teal hover:bg-vx-teal/90"
           >
             <MessageSquare className="h-4 w-4 mr-2" />
             Send Message

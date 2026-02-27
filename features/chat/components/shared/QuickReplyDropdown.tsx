@@ -147,7 +147,7 @@ export function QuickReplyDropdown({
 
   return (
     <div 
-      className="absolute bottom-full left-0 right-0 mb-2 bg-white rounded-lg shadow-2xl border-2 border-blue-500 overflow-hidden"
+      className="absolute bottom-full left-0 right-0 mb-2 bg-vx-surface rounded-lg shadow-2xl border-2 border-vx-purple overflow-hidden"
       style={{ 
         zIndex: 50,
         maxWidth: '600px',
@@ -159,12 +159,12 @@ export function QuickReplyDropdown({
       }}
     >
       {/* Header */}
-      <div className="flex items-center justify-between p-3 border-b bg-blue-50">
+      <div className="flex items-center justify-between p-3 border-b bg-vx-purple/5">
         <div className="flex items-center gap-2">
-          <Zap className="h-4 w-4 text-blue-600" />
-          <span className="text-sm font-medium text-gray-700">Quick Replies</span>
+          <Zap className="h-4 w-4 text-vx-purple" />
+          <span className="text-sm font-medium text-vx-text-secondary">Quick Replies</span>
           {searchQuery && (
-            <span className="text-xs text-gray-500">
+            <span className="text-xs text-vx-text-muted">
               ({filteredReplies.length} results)
             </span>
           )}
@@ -176,7 +176,7 @@ export function QuickReplyDropdown({
             e.stopPropagation()
             onClose()
           }}
-          className="text-gray-400 hover:text-gray-600"
+          className="text-vx-text-muted hover:text-vx-text-secondary"
         >
           <X className="h-4 w-4" />
         </button>
@@ -184,8 +184,8 @@ export function QuickReplyDropdown({
 
       {/* Search hint */}
       {!searchQuery && (
-        <div className="p-2 bg-blue-50 border-b">
-          <p className="text-xs text-blue-700 flex items-center gap-1">
+        <div className="p-2 bg-vx-purple/5 border-b">
+          <p className="text-xs text-vx-purple flex items-center gap-1">
             <Search className="h-3 w-3" />
             Type to search quick replies...
           </p>
@@ -198,15 +198,15 @@ export function QuickReplyDropdown({
         className="max-h-64 overflow-y-auto"
       >
         {loading ? (
-          <div className="p-4 text-center text-sm text-gray-500">
+          <div className="p-4 text-center text-sm text-vx-text-muted">
             Loading quick replies...
           </div>
         ) : filteredReplies.length === 0 ? (
           <div className="p-4 text-center">
-            <p className="text-sm text-gray-500 mb-2">
+            <p className="text-sm text-vx-text-muted mb-2">
               {searchQuery ? 'No quick replies found' : 'No quick replies yet'}
             </p>
-            <p className="text-xs text-gray-400">
+            <p className="text-xs text-vx-text-muted">
               {searchQuery ? 'Try a different search term' : 'Create quick replies in settings'}
             </p>
           </div>
@@ -221,28 +221,28 @@ export function QuickReplyDropdown({
               }}
               className={`w-full text-left p-3 border-b last:border-b-0 transition-colors ${
                 index === selectedIndex
-                  ? 'bg-blue-50 border-l-4 border-l-blue-500'
-                  : 'hover:bg-gray-50'
+                  ? 'bg-vx-purple/5 border-l-4 border-l-vx-purple'
+                  : 'hover:bg-vx-surface-hover'
               }`}
             >
               <div className="flex items-start justify-between gap-2">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
-                    <h4 className="text-sm font-medium text-gray-900 truncate">
+                    <h4 className="text-sm font-medium text-vx-text truncate">
                       {qr.title}
                     </h4>
                     {qr.category && (
-                      <span className="text-xs px-2 py-0.5 bg-gray-100 text-gray-600 rounded">
+                      <span className="text-xs px-2 py-0.5 bg-vx-surface-hover text-vx-text-secondary rounded">
                         {qr.category}
                       </span>
                     )}
                   </div>
-                  <p className="text-xs text-gray-600 line-clamp-2 whitespace-pre-wrap">
+                  <p className="text-xs text-vx-text-secondary line-clamp-2 whitespace-pre-wrap">
                     {qr.content.replace(/\\n/g, '\n')}
                   </p>
                 </div>
                 {index === selectedIndex && (
-                  <div className="text-xs text-blue-600 font-medium">
+                  <div className="text-xs text-vx-purple font-medium">
                     ↵
                   </div>
                 )}
@@ -253,8 +253,8 @@ export function QuickReplyDropdown({
       </div>
 
       {/* Footer hint */}
-      <div className="p-2 bg-gray-50 border-t">
-        <p className="text-xs text-gray-500 text-center">
+      <div className="p-2 bg-vx-surface-elevated border-t">
+        <p className="text-xs text-vx-text-muted text-center">
           Use ↑↓ to navigate • Enter to select • Esc to close
         </p>
       </div>

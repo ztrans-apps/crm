@@ -47,13 +47,13 @@ export default function AgentListTab() {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'available':
-        return 'bg-green-100 text-green-700'
+        return 'bg-vx-teal/10 text-vx-teal'
       case 'busy':
-        return 'bg-yellow-100 text-yellow-700'
+        return 'bg-yellow-100 dark:bg-yellow-500/10 text-yellow-700 dark:text-yellow-400'
       case 'offline':
-        return 'bg-gray-100 text-gray-700'
+        return 'bg-vx-surface-hover text-vx-text-secondary'
       default:
-        return 'bg-gray-100 text-gray-700'
+        return 'bg-vx-surface-hover text-vx-text-secondary'
     }
   }
 
@@ -83,7 +83,7 @@ export default function AgentListTab() {
           {agents.map((agent) => (
             <div
               key={agent.id}
-              className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 transition-colors"
+              className="flex items-center justify-between p-4 border rounded-lg hover:bg-vx-surface-hover transition-colors"
             >
               <div className="flex items-center gap-4 flex-1">
                 <div className="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center text-white font-semibold">
@@ -91,27 +91,27 @@ export default function AgentListTab() {
                 </div>
                 <div className="flex-1">
                   <div className="flex items-center gap-2">
-                    <p className="font-medium text-gray-900">{agent.full_name}</p>
+                    <p className="font-medium text-vx-text">{agent.full_name}</p>
                     <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${getStatusColor(agent.agent_status)}`}>
                       {agent.agent_status || 'offline'}
                     </span>
                   </div>
-                  <p className="text-sm text-gray-500 flex items-center gap-1">
+                  <p className="text-sm text-vx-text-muted flex items-center gap-1">
                     <Mail className="h-3 w-3" />
                     {agent.email}
                   </p>
                 </div>
               </div>
               <div className="text-right">
-                <p className="text-sm font-medium text-gray-900">
+                <p className="text-sm font-medium text-vx-text">
                   {agent.active_chats_count || 0} / {agent.max_concurrent_chats || 5}
                 </p>
-                <p className="text-xs text-gray-500">Active Chats</p>
+                <p className="text-xs text-vx-text-muted">Active Chats</p>
               </div>
             </div>
           ))}
           {agents.length === 0 && !loading && (
-            <p className="text-center text-gray-500 py-8">No agents found</p>
+            <p className="text-center text-vx-text-muted py-8">No agents found</p>
           )}
         </div>
       </CardContent>

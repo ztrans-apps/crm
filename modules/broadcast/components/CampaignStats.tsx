@@ -20,36 +20,36 @@ export function CampaignStats({ stats }: CampaignStatsProps) {
       title: 'Total Campaigns',
       value: stats.total_campaigns,
       icon: Send,
-      color: 'text-purple-600',
-      bgColor: 'bg-purple-100',
+      color: 'text-vx-purple',
+      bgColor: 'bg-vx-purple/10',
     },
     {
       title: 'Messages Sent',
       value: stats.total_sent,
       icon: Users,
-      color: 'text-blue-600',
-      bgColor: 'bg-blue-100',
+      color: 'text-vx-purple',
+      bgColor: 'bg-vx-purple/10',
     },
     {
       title: 'Delivered',
       value: stats.total_delivered,
       icon: CheckCircle,
-      color: 'text-green-600',
-      bgColor: 'bg-green-100',
+      color: 'text-vx-teal',
+      bgColor: 'bg-vx-teal/10',
     },
     {
       title: 'Failed',
       value: stats.total_failed,
       icon: XCircle,
-      color: 'text-red-600',
-      bgColor: 'bg-red-100',
+      color: 'text-red-600 dark:text-red-400',
+      bgColor: 'bg-red-100 dark:bg-red-500/10',
     },
     {
       title: 'Pending',
       value: stats.pending,
       icon: Clock,
-      color: 'text-yellow-600',
-      bgColor: 'bg-yellow-100',
+      color: 'text-yellow-600 dark:text-yellow-400',
+      bgColor: 'bg-yellow-100 dark:bg-yellow-500/10',
     },
     {
       title: 'Success Rate',
@@ -65,7 +65,7 @@ export function CampaignStats({ stats }: CampaignStatsProps) {
       {statCards.map((stat, index) => (
         <Card key={index}>
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600">
+            <CardTitle className="text-sm font-medium text-vx-text-secondary">
               {stat.title}
             </CardTitle>
             <div className={`p-2 rounded-lg ${stat.bgColor}`}>
@@ -73,7 +73,7 @@ export function CampaignStats({ stats }: CampaignStatsProps) {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-gray-900">{stat.value}</div>
+            <div className="text-2xl font-bold text-vx-text">{stat.value}</div>
           </CardContent>
         </Card>
       ))}

@@ -297,13 +297,13 @@ export default function CreateRolePage() {
       <div className="container mx-auto py-8 px-4">
         <Card className="max-w-2xl mx-auto">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-red-600">
+            <CardTitle className="flex items-center gap-2 text-red-600 dark:text-red-400">
               <AlertCircle className="h-5 w-5" />
               Access Denied
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-gray-600">
+            <p className="text-vx-text-secondary">
               You don't have permission to create roles.
             </p>
             <Button 
@@ -336,15 +336,15 @@ export default function CreateRolePage() {
           <Shield className="h-8 w-8" />
           Create New Role
         </h1>
-        <p className="text-gray-600 mt-2">
+        <p className="text-vx-text-secondary mt-2">
           Create a custom role with specific permissions
         </p>
       </div>
 
       {success && (
-        <Card className="mb-6 border-green-200 bg-green-50">
+        <Card className="mb-6 border-vx-teal/20 bg-vx-teal/5">
           <CardContent className="pt-6">
-            <div className="flex items-center gap-2 text-green-600">
+            <div className="flex items-center gap-2 text-vx-teal">
               <Check className="h-5 w-5" />
               <p>Role created successfully! Redirecting...</p>
             </div>
@@ -353,9 +353,9 @@ export default function CreateRolePage() {
       )}
 
       {error && (
-        <Card className="mb-6 border-red-200 bg-red-50">
+        <Card className="mb-6 border-red-200 dark:border-red-500/20 bg-red-50 dark:bg-red-500/10">
           <CardContent className="pt-6">
-            <div className="flex items-center gap-2 text-red-600">
+            <div className="flex items-center gap-2 text-red-600 dark:text-red-400">
               <AlertCircle className="h-5 w-5" />
               <p>{error}</p>
             </div>
@@ -394,7 +394,7 @@ export default function CreateRolePage() {
                   placeholder="e.g., customer_support_agent"
                   disabled={loading}
                 />
-                <p className="text-xs text-gray-500 mt-1">
+                <p className="text-xs text-vx-text-muted mt-1">
                   Unique identifier (auto-generated from name)
                 </p>
               </div>
@@ -441,14 +441,14 @@ export default function CreateRolePage() {
                 <button
                   key={template.name}
                   onClick={() => applyTemplate(template)}
-                  className={`w-full text-left p-3 border rounded-lg hover:bg-gray-50 transition-colors ${
-                    selectedTemplate === template.name ? 'border-blue-500 bg-blue-50' : ''
+                  className={`w-full text-left p-3 border rounded-lg hover:bg-vx-surface-hover transition-colors ${
+                    selectedTemplate === template.name ? 'border-vx-purple bg-vx-purple/5' : ''
                   }`}
                   disabled={loading}
                 >
                   <p className="font-medium text-sm">{template.name}</p>
-                  <p className="text-xs text-gray-600 mt-1">{template.description}</p>
-                  <p className="text-xs text-gray-500 mt-1">
+                  <p className="text-xs text-vx-text-secondary mt-1">{template.description}</p>
+                  <p className="text-xs text-vx-text-muted mt-1">
                     {template.permissions.length} permissions
                   </p>
                 </button>
@@ -467,7 +467,7 @@ export default function CreateRolePage() {
               </CardDescription>
               <div className="mt-4">
                 <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-vx-text-muted" />
                   <Input
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
@@ -503,7 +503,7 @@ export default function CreateRolePage() {
                         {perms.map((perm) => (
                           <div
                             key={perm.id}
-                            className="flex items-start gap-3 p-2 hover:bg-gray-50 rounded"
+                            className="flex items-start gap-3 p-2 hover:bg-vx-surface-hover rounded"
                           >
                             <Checkbox
                               checked={selectedPermissions.has(perm.permission_key)}
@@ -511,18 +511,18 @@ export default function CreateRolePage() {
                             />
                             <div className="flex-1">
                               <div className="flex items-center gap-2">
-                                <code className="text-xs bg-gray-100 px-2 py-1 rounded">
+                                <code className="text-xs bg-vx-surface-hover px-2 py-1 rounded">
                                   {perm.permission_key}
                                 </code>
                                 <Badge variant="outline" className="text-xs">
                                   {perm.action}
                                 </Badge>
                               </div>
-                              <p className="text-sm text-gray-700 mt-1">
+                              <p className="text-sm text-vx-text-secondary mt-1">
                                 {perm.permission_name}
                               </p>
                               {perm.description && (
-                                <p className="text-xs text-gray-500 mt-1">
+                                <p className="text-xs text-vx-text-muted mt-1">
                                   {perm.description}
                                 </p>
                               )}

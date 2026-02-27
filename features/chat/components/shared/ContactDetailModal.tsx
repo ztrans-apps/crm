@@ -155,49 +155,49 @@ export function ContactDetailModal({
             // View Mode
             <div className="space-y-4">
               <div>
-                <label className="text-sm text-gray-600 mb-1 block">Salutation</label>
-                <p className="text-base text-gray-900">{formData.salutation || '-'}</p>
+                <label className="text-sm text-vx-text-secondary mb-1 block">Salutation</label>
+                <p className="text-base text-vx-text">{formData.salutation || '-'}</p>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="text-sm text-gray-600 mb-1 block">First Name</label>
-                  <p className="text-base text-gray-900">{formData.first_name || '-'}</p>
+                  <label className="text-sm text-vx-text-secondary mb-1 block">First Name</label>
+                  <p className="text-base text-vx-text">{formData.first_name || '-'}</p>
                 </div>
                 <div>
-                  <label className="text-sm text-gray-600 mb-1 block">Last Name</label>
-                  <p className="text-base text-gray-900">{formData.last_name || '-'}</p>
+                  <label className="text-sm text-vx-text-secondary mb-1 block">Last Name</label>
+                  <p className="text-base text-vx-text">{formData.last_name || '-'}</p>
                 </div>
               </div>
 
               <div>
-                <label className="text-sm text-gray-600 mb-1 block">Email</label>
-                <p className="text-base text-gray-900">{formData.email || '-'}</p>
+                <label className="text-sm text-vx-text-secondary mb-1 block">Email</label>
+                <p className="text-base text-vx-text">{formData.email || '-'}</p>
               </div>
 
               <div>
-                <label className="text-sm text-gray-600 mb-1 block">Phone Number</label>
-                <p className="text-base text-gray-900">{formData.phone_number || '-'}</p>
+                <label className="text-sm text-vx-text-secondary mb-1 block">Phone Number</label>
+                <p className="text-base text-vx-text">{formData.phone_number || '-'}</p>
               </div>
 
               <div>
-                <label className="text-sm text-gray-600 mb-1 block">Organization</label>
-                <p className="text-base text-gray-900">{formData.organization || '-'}</p>
+                <label className="text-sm text-vx-text-secondary mb-1 block">Organization</label>
+                <p className="text-base text-vx-text">{formData.organization || '-'}</p>
               </div>
 
               <div>
-                <label className="text-sm text-gray-600 mb-1 block">Address</label>
-                <p className="text-base text-gray-900">{formData.address || '-'}</p>
+                <label className="text-sm text-vx-text-secondary mb-1 block">Address</label>
+                <p className="text-base text-vx-text">{formData.address || '-'}</p>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="text-sm text-gray-600 mb-1 block">City</label>
-                  <p className="text-base text-gray-900">{formData.city || '-'}</p>
+                  <label className="text-sm text-vx-text-secondary mb-1 block">City</label>
+                  <p className="text-base text-vx-text">{formData.city || '-'}</p>
                 </div>
                 <div>
-                  <label className="text-sm text-gray-600 mb-1 block">Country</label>
-                  <p className="text-base text-gray-900">{formData.country || '-'}</p>
+                  <label className="text-sm text-vx-text-secondary mb-1 block">Country</label>
+                  <p className="text-base text-vx-text">{formData.country || '-'}</p>
                 </div>
               </div>
 
@@ -205,7 +205,7 @@ export function ContactDetailModal({
                 <div className="pt-4">
                   <Button
                     onClick={() => setEditing(true)}
-                    className="w-full h-11 bg-blue-600 hover:bg-blue-700"
+                    className="w-full h-11 bg-vx-purple hover:bg-vx-purple/90"
                   >
                     Edit Contact
                   </Button>
@@ -217,7 +217,7 @@ export function ContactDetailModal({
             <div className="space-y-4">
               {/* Salutation Dropdown */}
               <div>
-                <label className="text-sm text-gray-700 mb-2 block">Salutation</label>
+                <label className="text-sm text-vx-text-secondary mb-2 block">Salutation</label>
                 <Select
                   value={formData.salutation}
                   onValueChange={(value) => setFormData({ ...formData, salutation: value })}
@@ -238,8 +238,8 @@ export function ContactDetailModal({
               {/* First Name & Last Name */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="text-sm text-gray-700 mb-2 block">
-                    First Name <span className="text-red-500">*</span>
+                  <label className="text-sm text-vx-text-secondary mb-2 block">
+                    First Name <span className="text-red-500 dark:text-red-400">*</span>
                   </label>
                   <Input
                     value={formData.first_name}
@@ -250,15 +250,15 @@ export function ContactDetailModal({
                       }
                     }}
                     placeholder="John"
-                    className={`h-11 ${errors.first_name ? 'border-red-500' : ''}`}
+                    className={`h-11 ${errors.first_name ? 'border-red-500 dark:border-red-400' : ''}`}
                     required
                   />
                   {errors.first_name && (
-                    <p className="text-xs text-red-500 mt-1">{errors.first_name}</p>
+                    <p className="text-xs text-red-500 dark:text-red-400 mt-1">{errors.first_name}</p>
                   )}
                 </div>
                 <div>
-                  <label className="text-sm text-gray-700 mb-2 block">Last Name</label>
+                  <label className="text-sm text-vx-text-secondary mb-2 block">Last Name</label>
                   <Input
                     value={formData.last_name}
                     onChange={(e) => setFormData({ ...formData, last_name: e.target.value })}
@@ -270,7 +270,7 @@ export function ContactDetailModal({
 
               {/* Email */}
               <div>
-                <label className="text-sm text-gray-700 mb-2 block">Email</label>
+                <label className="text-sm text-vx-text-secondary mb-2 block">Email</label>
                 <Input
                   type="email"
                   value={formData.email}
@@ -282,7 +282,7 @@ export function ContactDetailModal({
 
               {/* Phone Number */}
               <div>
-                <label className="text-sm text-gray-700 mb-2 block">Phone Number</label>
+                <label className="text-sm text-vx-text-secondary mb-2 block">Phone Number</label>
                 <Input
                   value={formData.phone_number}
                   onChange={(e) => setFormData({ ...formData, phone_number: e.target.value })}
@@ -294,7 +294,7 @@ export function ContactDetailModal({
 
               {/* Organization */}
               <div>
-                <label className="text-sm text-gray-700 mb-2 block">Organization</label>
+                <label className="text-sm text-vx-text-secondary mb-2 block">Organization</label>
                 <Input
                   value={formData.organization}
                   onChange={(e) => setFormData({ ...formData, organization: e.target.value })}
@@ -305,7 +305,7 @@ export function ContactDetailModal({
 
               {/* Address */}
               <div>
-                <label className="text-sm text-gray-700 mb-2 block">Address</label>
+                <label className="text-sm text-vx-text-secondary mb-2 block">Address</label>
                 <Input
                   value={formData.address}
                   onChange={(e) => setFormData({ ...formData, address: e.target.value })}
@@ -317,7 +317,7 @@ export function ContactDetailModal({
               {/* City & Country */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="text-sm text-gray-700 mb-2 block">City</label>
+                  <label className="text-sm text-vx-text-secondary mb-2 block">City</label>
                   <Input
                     value={formData.city}
                     onChange={(e) => setFormData({ ...formData, city: e.target.value })}
@@ -326,7 +326,7 @@ export function ContactDetailModal({
                   />
                 </div>
                 <div>
-                  <label className="text-sm text-gray-700 mb-2 block">Country</label>
+                  <label className="text-sm text-vx-text-secondary mb-2 block">Country</label>
                   <Input
                     value={formData.country}
                     onChange={(e) => setFormData({ ...formData, country: e.target.value })}
@@ -341,7 +341,7 @@ export function ContactDetailModal({
                 <Button
                   onClick={handleSave}
                   disabled={saving}
-                  className="flex-1 h-11 bg-green-600 hover:bg-green-700 text-white font-medium"
+                  className="flex-1 h-11 vx-gradient hover:opacity-90 text-white font-medium"
                 >
                   {saving ? 'Saving...' : 'Save Contact'}
                 </Button>

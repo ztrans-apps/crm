@@ -56,35 +56,35 @@ export function CampaignHistory() {
     switch (status) {
       case 'completed':
         return (
-          <Badge className="bg-green-100 text-green-700 border-green-200">
+          <Badge className="bg-vx-teal/10 text-vx-teal border-green-200">
             <CheckCircle className="h-3 w-3 mr-1" />
             Selesai
           </Badge>
         );
       case 'sending':
         return (
-          <Badge className="bg-blue-100 text-blue-700 border-blue-200">
+          <Badge className="bg-vx-purple/10 text-vx-purple border-blue-200">
             <Loader2 className="h-3 w-3 mr-1 animate-spin" />
             Mengirim
           </Badge>
         );
       case 'scheduled':
         return (
-          <Badge className="bg-purple-100 text-purple-700 border-purple-200">
+          <Badge className="bg-vx-purple/10 text-vx-purple border-purple-200">
             <Clock className="h-3 w-3 mr-1" />
             Terjadwal
           </Badge>
         );
       case 'failed':
         return (
-          <Badge className="bg-red-100 text-red-700 border-red-200">
+          <Badge className="bg-red-100 dark:bg-red-500/10 text-red-600 dark:text-red-400 border-red-200">
             <XCircle className="h-3 w-3 mr-1" />
             Gagal
           </Badge>
         );
       case 'cancelled':
         return (
-          <Badge className="bg-gray-100 text-gray-700 border-gray-200">
+          <Badge className="bg-vx-surface-hover text-vx-text-secondary border-vx-border">
             Dibatalkan
           </Badge>
         );
@@ -118,8 +118,8 @@ export function CampaignHistory() {
       <Card>
         <CardContent className="flex items-center justify-center py-16">
           <div className="text-center">
-            <Loader2 className="h-12 w-12 text-gray-400 animate-spin mx-auto mb-3" />
-            <p className="text-gray-600">Memuat riwayat campaign...</p>
+            <Loader2 className="h-12 w-12 text-vx-text-muted animate-spin mx-auto mb-3" />
+            <p className="text-vx-text-secondary">Memuat riwayat campaign...</p>
           </div>
         </CardContent>
       </Card>
@@ -133,7 +133,7 @@ export function CampaignHistory() {
         <CardContent className="p-4">
           <div className="flex gap-4">
             <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-vx-text-muted" />
               <Input
                 placeholder="Cari campaign..."
                 value={searchQuery}
@@ -144,7 +144,7 @@ export function CampaignHistory() {
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="px-4 py-2 border rounded-lg bg-white"
+              className="px-4 py-2 border rounded-lg bg-vx-surface"
             >
               <option value="all">Semua Status</option>
               <option value="draft">Draft</option>
@@ -162,13 +162,13 @@ export function CampaignHistory() {
       {filteredCampaigns.length === 0 ? (
         <Card className="border-2 border-dashed">
           <CardContent className="flex flex-col items-center justify-center py-16">
-            <div className="w-20 h-20 bg-purple-100 rounded-full flex items-center justify-center mb-4">
-              <Send className="h-10 w-10 text-purple-600" />
+            <div className="w-20 h-20 bg-vx-purple/10 rounded-full flex items-center justify-center mb-4">
+              <Send className="h-10 w-10 text-vx-purple" />
             </div>
-            <h3 className="text-xl font-semibold text-gray-900 mb-2">
+            <h3 className="text-xl font-semibold text-vx-text mb-2">
               {searchQuery || statusFilter !== 'all' ? 'Tidak Ada Hasil' : 'Belum Ada Campaign'}
             </h3>
-            <p className="text-gray-600 text-center max-w-md">
+            <p className="text-vx-text-secondary text-center max-w-md">
               {searchQuery || statusFilter !== 'all' 
                 ? 'Coba ubah filter atau kata kunci pencarian'
                 : 'Buat campaign pertama Anda di tab "Buat Campaign"'
@@ -181,42 +181,42 @@ export function CampaignHistory() {
           <CardContent className="p-0">
             <div className="overflow-x-auto">
               <table className="w-full">
-                <thead className="bg-gray-50 border-b">
+                <thead className="bg-vx-surface-elevated border-b">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-vx-text-muted uppercase tracking-wider">
                       Campaign
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-vx-text-muted uppercase tracking-wider">
                       Status
                     </th>
-                    <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-center text-xs font-medium text-vx-text-muted uppercase tracking-wider">
                       Penerima
                     </th>
-                    <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-center text-xs font-medium text-vx-text-muted uppercase tracking-wider">
                       Progress
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-vx-text-muted uppercase tracking-wider">
                       Tanggal
                     </th>
-                    <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-center text-xs font-medium text-vx-text-muted uppercase tracking-wider">
                       Aksi
                     </th>
                   </tr>
                 </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
+                <tbody className="bg-vx-surface divide-y divide-vx-border">
                   {filteredCampaigns.map((campaign) => {
                     const progress = Math.round((campaign.sent_count / campaign.total_recipients) * 100);
                     
                     return (
                       <tr 
                         key={campaign.id} 
-                        className="hover:bg-gray-50 cursor-pointer"
+                        className="hover:bg-vx-surface-hover cursor-pointer"
                         onClick={() => setSelectedCampaign(campaign)}
                       >
                         <td className="px-6 py-4">
                           <div>
-                            <div className="font-medium text-gray-900">{campaign.name}</div>
-                            <div className="text-sm text-gray-500 line-clamp-1">
+                            <div className="font-medium text-vx-text">{campaign.name}</div>
+                            <div className="text-sm text-vx-text-muted line-clamp-1">
                               {campaign.message_template}
                             </div>
                           </div>
@@ -226,36 +226,36 @@ export function CampaignHistory() {
                         </td>
                         <td className="px-6 py-4 text-center">
                           <div className="flex items-center justify-center gap-1">
-                            <Users className="h-4 w-4 text-gray-400" />
+                            <Users className="h-4 w-4 text-vx-text-muted" />
                             <span className="font-medium">{campaign.total_recipients}</span>
                           </div>
                         </td>
                         <td className="px-6 py-4">
                           <div className="flex items-center justify-center gap-3">
-                            <div className="flex-1 bg-gray-200 rounded-full h-2 max-w-[100px]">
+                            <div className="flex-1 bg-vx-surface-hover rounded-full h-2 max-w-[100px]">
                               <div 
                                 className={`h-2 rounded-full ${
                                   progress === 100 ? 'bg-green-500' : 
                                   progress > 0 ? 'bg-blue-500' : 
-                                  'bg-gray-300'
+                                  'bg-vx-surface-hover'
                                 }`}
                                 style={{ width: `${progress}%` }}
                               />
                             </div>
-                            <span className="text-sm font-medium text-gray-700 min-w-[45px]">
+                            <span className="text-sm font-medium text-vx-text-secondary min-w-[45px]">
                               {progress}%
                             </span>
                           </div>
                         </td>
                         <td className="px-6 py-4">
-                          <div className="text-sm text-gray-900">
+                          <div className="text-sm text-vx-text">
                             {new Date(campaign.created_at).toLocaleDateString('id-ID', {
                               day: '2-digit',
                               month: '2-digit',
                               year: 'numeric'
                             })}
                           </div>
-                          <div className="text-xs text-gray-500">
+                          <div className="text-xs text-vx-text-muted">
                             {new Date(campaign.created_at).toLocaleTimeString('id-ID', {
                               hour: '2-digit',
                               minute: '2-digit'

@@ -126,7 +126,7 @@ export function AudioPlayer({ src, isFromMe = false }: AudioPlayerProps) {
   if (hasError) {
     return (
       <div className="flex items-center gap-2 py-1 min-w-[250px] max-w-[350px]">
-        <div className="text-xs text-red-500">Unable to play audio</div>
+        <div className="text-xs text-red-500 dark:text-red-400">Unable to play audio</div>
       </div>
     )
   }
@@ -143,12 +143,12 @@ export function AudioPlayer({ src, isFromMe = false }: AudioPlayerProps) {
         size="sm"
         className={`h-10 w-10 rounded-full p-0 shrink-0 ${
           isFromMe 
-            ? 'bg-white/80 hover:bg-white text-green-600' 
-            : 'bg-gray-100 hover:bg-gray-200 text-green-600'
+            ? 'bg-white/80 hover:bg-white text-vx-teal' 
+            : 'bg-vx-surface-hover hover:bg-vx-surface-hover text-vx-teal'
         }`}
       >
         {isLoading ? (
-          <div className="h-4 w-4 border-2 border-green-600 border-t-transparent rounded-full animate-spin" />
+          <div className="h-4 w-4 border-2 border-vx-teal border-t-transparent rounded-full animate-spin" />
         ) : isPlaying ? (
           <Pause className="h-5 w-5 fill-current" />
         ) : (
@@ -160,7 +160,7 @@ export function AudioPlayer({ src, isFromMe = false }: AudioPlayerProps) {
       <div className="flex-1 flex flex-col gap-1">
         {/* Progress bar */}
         <div
-          className="h-1 bg-gray-300 rounded-full cursor-pointer relative overflow-hidden"
+          className="h-1 bg-vx-surface-hover rounded-full cursor-pointer relative overflow-hidden"
           onClick={handleSeek}
         >
           <div
@@ -173,10 +173,10 @@ export function AudioPlayer({ src, isFromMe = false }: AudioPlayerProps) {
 
         {/* Time display */}
         <div className="flex justify-between items-center">
-          <span className="text-[10px] text-gray-600">
+          <span className="text-[10px] text-vx-text-secondary">
             {formatTime(currentTime)}
           </span>
-          <span className="text-[10px] text-gray-500">
+          <span className="text-[10px] text-vx-text-muted">
             {formatTime(duration)}
           </span>
         </div>

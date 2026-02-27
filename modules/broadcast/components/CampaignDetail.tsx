@@ -247,11 +247,11 @@ export function CampaignDetail({ campaign, onBack, onRefresh }: CampaignDetailPr
     switch (status) {
       case 'sent':
       case 'delivered':
-        return <Badge className="bg-green-100 text-green-700">Terkirim</Badge>;
+        return <Badge className="bg-vx-teal/10 text-vx-teal">Terkirim</Badge>;
       case 'read':
-        return <Badge className="bg-blue-100 text-blue-700">Dibaca</Badge>;
+        return <Badge className="bg-vx-purple/10 text-vx-purple">Dibaca</Badge>;
       case 'failed':
-        return <Badge className="bg-red-100 text-red-700">Gagal</Badge>;
+        return <Badge className="bg-red-100 dark:bg-red-500/10 text-red-600 dark:text-red-400">Gagal</Badge>;
       default:
         return <Badge variant="secondary">Pending</Badge>;
     }
@@ -324,25 +324,25 @@ export function CampaignDetail({ campaign, onBack, onRefresh }: CampaignDetailPr
 
           {/* Stats Grid */}
           <div className="grid grid-cols-4 gap-4">
-            <div className="text-center p-4 bg-gray-50 rounded-lg">
-              <Users className="h-6 w-6 mx-auto mb-2 text-gray-600" />
-              <div className="text-2xl font-bold text-gray-900">{campaign.total_recipients}</div>
-              <div className="text-sm text-gray-600">Total Penerima</div>
+            <div className="text-center p-4 bg-vx-surface-elevated rounded-lg">
+              <Users className="h-6 w-6 mx-auto mb-2 text-vx-text-secondary" />
+              <div className="text-2xl font-bold text-vx-text">{campaign.total_recipients}</div>
+              <div className="text-sm text-vx-text-secondary">Total Penerima</div>
             </div>
             <div className="text-center p-4 bg-blue-50 rounded-lg">
-              <CheckCircle className="h-6 w-6 mx-auto mb-2 text-blue-600" />
-              <div className="text-2xl font-bold text-blue-600">{stats.sent + stats.delivered + stats.read}</div>
-              <div className="text-sm text-gray-600">Terkirim</div>
+              <CheckCircle className="h-6 w-6 mx-auto mb-2 text-vx-purple" />
+              <div className="text-2xl font-bold text-vx-purple">{stats.sent + stats.delivered + stats.read}</div>
+              <div className="text-sm text-vx-text-secondary">Terkirim</div>
             </div>
             <div className="text-center p-4 bg-green-50 rounded-lg">
-              <Eye className="h-6 w-6 mx-auto mb-2 text-green-600" />
-              <div className="text-2xl font-bold text-green-600">{stats.read}</div>
-              <div className="text-sm text-gray-600">Dibaca</div>
+              <Eye className="h-6 w-6 mx-auto mb-2 text-vx-teal" />
+              <div className="text-2xl font-bold text-vx-teal">{stats.read}</div>
+              <div className="text-sm text-vx-text-secondary">Dibaca</div>
             </div>
             <div className="text-center p-4 bg-red-50 rounded-lg">
-              <XCircle className="h-6 w-6 mx-auto mb-2 text-red-600" />
-              <div className="text-2xl font-bold text-red-600">{stats.failed}</div>
-              <div className="text-sm text-gray-600">Gagal</div>
+              <XCircle className="h-6 w-6 mx-auto mb-2 text-red-600 dark:text-red-400" />
+              <div className="text-2xl font-bold text-red-600 dark:text-red-400">{stats.failed}</div>
+              <div className="text-sm text-vx-text-secondary">Gagal</div>
             </div>
           </div>
         </CardContent>
@@ -357,7 +357,7 @@ export function CampaignDetail({ campaign, onBack, onRefresh }: CampaignDetailPr
           {/* Filters */}
           <div className="flex gap-4">
             <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-vx-text-muted" />
               <Input
                 placeholder="Cari nama atau nomor..."
                 value={searchQuery}
@@ -368,7 +368,7 @@ export function CampaignDetail({ campaign, onBack, onRefresh }: CampaignDetailPr
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="px-4 py-2 border rounded-lg bg-white"
+              className="px-4 py-2 border rounded-lg bg-vx-surface"
             >
               <option value="all">Semua Status</option>
               <option value="pending">Pending</option>
@@ -382,32 +382,32 @@ export function CampaignDetail({ campaign, onBack, onRefresh }: CampaignDetailPr
           {/* Table */}
           {loading ? (
             <div className="flex items-center justify-center py-8">
-              <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+              <Loader2 className="h-8 w-8 animate-spin text-vx-text-muted" />
             </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full">
-                <thead className="bg-gray-50">
+                <thead className="bg-vx-surface-elevated">
                   <tr>
-                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Nama</th>
-                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Nomor</th>
-                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Status</th>
-                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Waktu</th>
+                    <th className="px-4 py-3 text-left text-sm font-medium text-vx-text-secondary">Nama</th>
+                    <th className="px-4 py-3 text-left text-sm font-medium text-vx-text-secondary">Nomor</th>
+                    <th className="px-4 py-3 text-left text-sm font-medium text-vx-text-secondary">Status</th>
+                    <th className="px-4 py-3 text-left text-sm font-medium text-vx-text-secondary">Waktu</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y">
                   {filteredRecipients.map((recipient) => (
-                    <tr key={recipient.id} className="hover:bg-gray-50">
-                      <td className="px-4 py-3 text-sm text-gray-900">
+                    <tr key={recipient.id} className="hover:bg-vx-surface-hover">
+                      <td className="px-4 py-3 text-sm text-vx-text">
                         {recipient.contact?.name || '-'}
                       </td>
-                      <td className="px-4 py-3 text-sm text-gray-900">
+                      <td className="px-4 py-3 text-sm text-vx-text">
                         {recipient.phone_number}
                       </td>
                       <td className="px-4 py-3 text-sm">
                         {getStatusBadge(recipient.status)}
                       </td>
-                      <td className="px-4 py-3 text-sm text-gray-600">
+                      <td className="px-4 py-3 text-sm text-vx-text-secondary">
                         {recipient.sent_at 
                           ? new Date(recipient.sent_at).toLocaleString('id-ID')
                           : '-'
@@ -419,7 +419,7 @@ export function CampaignDetail({ campaign, onBack, onRefresh }: CampaignDetailPr
               </table>
               
               {filteredRecipients.length === 0 && (
-                <div className="text-center py-8 text-gray-500">
+                <div className="text-center py-8 text-vx-text-muted">
                   Tidak ada data penerima
                 </div>
               )}

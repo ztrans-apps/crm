@@ -68,7 +68,7 @@ export function ChatLabels({
               <span>{cl.label.name}</span>
               <button
                 onClick={() => handleRemoveLabel(cl.label_id)}
-                className="ml-1 hover:bg-gray-100 rounded-full p-0.5"
+                className="ml-1 hover:bg-vx-surface-hover rounded-full p-0.5"
                 disabled={loading}
               >
                 <X className="h-2.5 w-2.5" />
@@ -77,7 +77,7 @@ export function ChatLabels({
           ))}
         </div>
       ) : (
-        <p className="text-[10px] text-gray-500">No labels applied</p>
+        <p className="text-[10px] text-vx-text-muted">No labels applied</p>
       )}
 
       {/* Add label button */}
@@ -99,7 +99,7 @@ export function ChatLabels({
           </DialogHeader>
           <div className="space-y-2 max-h-96 overflow-y-auto">
             {unappliedLabels.length === 0 ? (
-              <p className="text-sm text-gray-500 text-center py-4">
+              <p className="text-sm text-vx-text-muted text-center py-4">
                 All labels have been applied
               </p>
             ) : (
@@ -108,7 +108,7 @@ export function ChatLabels({
                   key={label.id}
                   onClick={() => handleApplyLabel(label.id)}
                   disabled={applying !== null}
-                  className="w-full p-3 border rounded-lg hover:bg-gray-50 transition-colors text-left flex items-center justify-between"
+                  className="w-full p-3 border rounded-lg hover:bg-vx-surface-hover transition-colors text-left flex items-center justify-between"
                 >
                   <div className="flex items-center space-x-3">
                     <div
@@ -118,7 +118,7 @@ export function ChatLabels({
                     <span className="font-medium">{label.name}</span>
                   </div>
                   {applying === label.id && (
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-green-500"></div>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-vx-teal"></div>
                   )}
                 </button>
               ))

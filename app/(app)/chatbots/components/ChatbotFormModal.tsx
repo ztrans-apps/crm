@@ -111,15 +111,15 @@ export function ChatbotFormModal({ isOpen, onClose, onSuccess, chatbot }: Chatbo
 
   return (
     <div className="fixed inset-0 bg-black/30 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+      <div className="bg-vx-surface rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b">
-          <h2 className="text-xl font-semibold text-gray-900">
+          <h2 className="text-xl font-semibold text-vx-text">
             {chatbot ? 'Edit Chatbot' : 'Create Chatbot'}
           </h2>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 transition-colors"
+            className="text-vx-text-muted hover:text-vx-text-secondary transition-colors"
           >
             <X className="h-5 w-5" />
           </button>
@@ -128,7 +128,7 @@ export function ChatbotFormModal({ isOpen, onClose, onSuccess, chatbot }: Chatbo
         {/* Form */}
         <form onSubmit={handleSubmit} className="p-6">
           {error && (
-            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+            <div className="mb-4 p-3 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 rounded-lg text-red-600 dark:text-red-400 text-sm">
               {error}
             </div>
           )}
@@ -136,14 +136,14 @@ export function ChatbotFormModal({ isOpen, onClose, onSuccess, chatbot }: Chatbo
           <div className="space-y-5">
             {/* Name */}
             <div className="space-y-2">
-              <label className="block text-sm font-medium text-gray-700">
+              <label className="block text-sm font-medium text-vx-text-secondary">
                 Chatbot Name <span className="text-red-500">*</span>
               </label>
               <input
                 type="text"
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-3 py-2 border border-vx-border rounded-lg focus:ring-2 focus:ring-vx-purple/30 focus:border-transparent"
                 placeholder="e.g., Welcome Bot"
                 required
               />
@@ -151,13 +151,13 @@ export function ChatbotFormModal({ isOpen, onClose, onSuccess, chatbot }: Chatbo
 
             {/* Description */}
             <div className="space-y-2">
-              <label className="block text-sm font-medium text-gray-700">
+              <label className="block text-sm font-medium text-vx-text-secondary">
                 Description
               </label>
               <textarea
                 value={formData.description}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-3 py-2 border border-vx-border rounded-lg focus:ring-2 focus:ring-vx-purple/30 focus:border-transparent"
                 placeholder="What does this chatbot do?"
                 rows={3}
               />
@@ -165,13 +165,13 @@ export function ChatbotFormModal({ isOpen, onClose, onSuccess, chatbot }: Chatbo
 
             {/* Trigger Type */}
             <div className="space-y-2">
-              <label className="block text-sm font-medium text-gray-700">
+              <label className="block text-sm font-medium text-vx-text-secondary">
                 Trigger Type <span className="text-red-500">*</span>
               </label>
               <select
                 value={formData.trigger_type}
                 onChange={(e) => setFormData({ ...formData, trigger_type: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-3 py-2 border border-vx-border rounded-lg focus:ring-2 focus:ring-vx-purple/30 focus:border-transparent"
                 required
               >
                 <option value="keyword">Keyword</option>
@@ -180,7 +180,7 @@ export function ChatbotFormModal({ isOpen, onClose, onSuccess, chatbot }: Chatbo
                 <option value="schedule">Schedule</option>
                 <option value="intent">Intent</option>
               </select>
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-vx-text-muted">
                 {formData.trigger_type === 'keyword' && 'Triggered by specific keywords'}
                 {formData.trigger_type === 'greeting' && 'Triggered when customer first messages'}
                 {formData.trigger_type === 'always' && 'Always active for all messages'}
@@ -192,18 +192,18 @@ export function ChatbotFormModal({ isOpen, onClose, onSuccess, chatbot }: Chatbo
             {/* Keywords (only for keyword trigger) */}
             {formData.trigger_type === 'keyword' && (
               <div className="space-y-2">
-                <label className="block text-sm font-medium text-gray-700">
-                  Keywords <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  value={formData.keywords}
-                  onChange={(e) => setFormData({ ...formData, keywords: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              <label className="block text-sm font-medium text-vx-text-secondary">
+                Keywords <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                value={formData.keywords}
+                onChange={(e) => setFormData({ ...formData, keywords: e.target.value })}
+                className="w-full px-3 py-2 border border-vx-border rounded-lg focus:ring-2 focus:ring-vx-purple/30 focus:border-transparent"
                   placeholder="e.g., hello, hi, hey (comma separated)"
                   required={formData.trigger_type === 'keyword'}
                 />
-                <p className="text-xs text-gray-500">
+                <p className="text-xs text-vx-text-muted">
                   Separate multiple keywords with commas
                 </p>
               </div>
@@ -211,19 +211,19 @@ export function ChatbotFormModal({ isOpen, onClose, onSuccess, chatbot }: Chatbo
 
             {/* Priority */}
             <div className="space-y-2">
-              <label className="block text-sm font-medium text-gray-700">
+              <label className="block text-sm font-medium text-vx-text-secondary">
                 Priority <span className="text-red-500">*</span>
               </label>
               <input
                 type="number"
                 value={formData.priority}
                 onChange={(e) => setFormData({ ...formData, priority: parseInt(e.target.value) })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-3 py-2 border border-vx-border rounded-lg focus:ring-2 focus:ring-vx-purple/30 focus:border-transparent"
                 min="0"
                 max="100"
                 required
               />
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-vx-text-muted">
                 Higher priority bots run first (0-100)
               </p>
             </div>
@@ -235,27 +235,27 @@ export function ChatbotFormModal({ isOpen, onClose, onSuccess, chatbot }: Chatbo
                 id="is_active"
                 checked={formData.is_active}
                 onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
-                className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                className="w-4 h-4 text-vx-purple border-vx-border rounded focus:ring-vx-purple/30"
               />
-              <label htmlFor="is_active" className="text-sm font-medium text-gray-700">
+              <label htmlFor="is_active" className="text-sm font-medium text-vx-text-secondary">
                 Active (chatbot will respond to triggers)
               </label>
             </div>
 
             {/* Flow Message */}
             <div className="space-y-2 pt-4 border-t">
-              <label className="block text-sm font-medium text-gray-700">
+              <label className="block text-sm font-medium text-vx-text-secondary">
                 Response Message <span className="text-red-500">*</span>
               </label>
               <textarea
                 value={formData.flow_message}
                 onChange={(e) => setFormData({ ...formData, flow_message: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-3 py-2 border border-vx-border rounded-lg focus:ring-2 focus:ring-vx-purple/30 focus:border-transparent"
                 placeholder="What should the chatbot say when triggered?"
                 rows={4}
                 required
               />
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-vx-text-muted">
                 This message will be sent automatically when the chatbot is triggered
               </p>
             </div>
@@ -274,7 +274,7 @@ export function ChatbotFormModal({ isOpen, onClose, onSuccess, chatbot }: Chatbo
             <Button
               type="submit"
               disabled={loading}
-              className="bg-blue-600 hover:bg-blue-700"
+              className="bg-vx-purple hover:bg-vx-purple/90"
             >
               {loading ? 'Saving...' : chatbot ? 'Update Chatbot' : 'Create Chatbot'}
             </Button>

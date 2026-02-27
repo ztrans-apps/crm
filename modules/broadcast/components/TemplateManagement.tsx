@@ -91,7 +91,7 @@ export function TemplateManagement() {
     return (
       <Card>
         <CardContent className="flex items-center justify-center py-16">
-          <Loader2 className="h-12 w-12 text-gray-400 animate-spin" />
+          <Loader2 className="h-12 w-12 text-vx-text-muted animate-spin" />
         </CardContent>
       </Card>
     );
@@ -104,7 +104,7 @@ export function TemplateManagement() {
         <CardContent className="p-4">
           <div className="flex gap-4 items-center">
             <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-vx-text-muted" />
               <Input
                 placeholder="Cari template..."
                 value={searchQuery}
@@ -115,7 +115,7 @@ export function TemplateManagement() {
             <select
               value={categoryFilter}
               onChange={(e) => setCategoryFilter(e.target.value)}
-              className="px-4 py-2 border rounded-lg bg-white"
+              className="px-4 py-2 border rounded-lg bg-vx-surface"
             >
               <option value="all">Semua Kategori</option>
               <option value="MARKETING">Marketing</option>
@@ -127,7 +127,7 @@ export function TemplateManagement() {
               Buat Template
             </Button>
           </div>
-          <p className="text-xs text-gray-500 mt-2">
+          <p className="text-xs text-vx-text-muted mt-2">
             ℹ️ Templates cannot be edited after creation (WhatsApp Business API guideline)
           </p>
         </CardContent>
@@ -137,9 +137,9 @@ export function TemplateManagement() {
       {filteredTemplates.length === 0 ? (
         <Card className="border-2 border-dashed">
           <CardContent className="flex flex-col items-center justify-center py-16">
-            <FileText className="h-16 w-16 text-gray-400 mb-4" />
-            <h3 className="text-xl font-semibold text-gray-900 mb-2">Belum Ada Template</h3>
-            <p className="text-gray-600 mb-6">Buat template pesan untuk mempercepat broadcast</p>
+            <FileText className="h-16 w-16 text-vx-text-muted mb-4" />
+            <h3 className="text-xl font-semibold text-vx-text mb-2">Belum Ada Template</h3>
+            <p className="text-vx-text-secondary mb-6">Buat template pesan untuk mempercepat broadcast</p>
             <Button onClick={() => setShowWizard(true)} className="bg-purple-600 hover:bg-purple-700">
               <Plus className="h-4 w-4 mr-2" />
               Buat Template Pertama
@@ -153,7 +153,7 @@ export function TemplateManagement() {
               <CardContent className="p-4">
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex-1">
-                    <h3 className="font-semibold text-gray-900 mb-1">{template.name}</h3>
+                    <h3 className="font-semibold text-vx-text mb-1">{template.name}</h3>
                     {template.category && getCategoryBadge(template.category)}
                   </div>
                   <div className="flex gap-1">
@@ -175,11 +175,11 @@ export function TemplateManagement() {
                   </div>
                 </div>
                 
-                <p className="text-sm text-gray-600 line-clamp-3 mb-3">
+                <p className="text-sm text-vx-text-secondary line-clamp-3 mb-3">
                   {template.content}
                 </p>
                 
-                <div className="text-xs text-gray-500">
+                <div className="text-xs text-vx-text-muted">
                   Digunakan {template.usage_count} kali
                 </div>
               </CardContent>

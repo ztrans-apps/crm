@@ -103,27 +103,27 @@ export function LocationPicker({
       {/* Map Container */}
       <div 
         ref={containerRef}
-        className="w-full h-[300px] rounded-lg overflow-hidden border-2 border-gray-200 relative"
+        className="w-full h-[300px] rounded-lg overflow-hidden border-2 border-vx-border relative"
         style={{ background: '#f0f0f0' }}
       />
       
       {/* Coordinates Display */}
-      <div className="mt-3 flex items-center gap-2 p-2.5 bg-gray-50 rounded-lg border">
-        <MapPin className="h-4 w-4 text-red-500 shrink-0" />
+      <div className="mt-3 flex items-center gap-2 p-2.5 bg-vx-surface-elevated rounded-lg border">
+        <MapPin className="h-4 w-4 text-red-500 dark:text-red-400 shrink-0" />
         <div className="flex-1 text-xs">
           <div className="flex items-center justify-between">
-            <span className="text-gray-600 font-medium">Latitude:</span>
-            <span className="text-gray-900 font-mono">{currentCoords.lat.toFixed(6)}</span>
+            <span className="text-vx-text-secondary font-medium">Latitude:</span>
+            <span className="text-vx-text font-mono">{currentCoords.lat.toFixed(6)}</span>
           </div>
           <div className="flex items-center justify-between mt-1">
-            <span className="text-gray-600 font-medium">Longitude:</span>
-            <span className="text-gray-900 font-mono">{currentCoords.lng.toFixed(6)}</span>
+            <span className="text-vx-text-secondary font-medium">Longitude:</span>
+            <span className="text-vx-text font-mono">{currentCoords.lng.toFixed(6)}</span>
           </div>
         </div>
       </div>
 
       {/* Instructions */}
-      <div className="mt-2 text-xs text-center text-gray-500">
+      <div className="mt-2 text-xs text-center text-vx-text-muted">
         Drag the map or marker to adjust location
       </div>
     </div>

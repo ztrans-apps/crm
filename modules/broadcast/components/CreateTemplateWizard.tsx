@@ -272,21 +272,21 @@ export function CreateTemplateWizard({ open, onClose, onSuccess, editTemplate }:
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 bg-white overflow-hidden flex flex-col">
+    <div className="fixed inset-0 z-50 bg-vx-surface overflow-hidden flex flex-col">
       {/* Header */}
-      <div className="border-b bg-white px-6 py-4">
+      <div className="border-b bg-vx-surface px-6 py-4">
         <div className="flex items-center justify-between mb-1">
-          <h1 className="text-xl font-bold text-gray-900">
+          <h1 className="text-xl font-bold text-vx-text">
             {editTemplate ? 'Edit WhatsApp Template' : 'Create WhatsApp Template'}
           </h1>
           <button
             onClick={onClose}
-            className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors"
+            className="p-1.5 hover:bg-vx-surface-hover rounded-lg transition-colors"
           >
-            <X className="h-5 w-5 text-gray-600" />
+            <X className="h-5 w-5 text-vx-text-secondary" />
           </button>
         </div>
-        <p className="text-sm text-gray-600">
+        <p className="text-sm text-vx-text-secondary">
           {editTemplate 
             ? 'Update your message template for WhatsApp Business account.'
             : 'Create a new message template for your WhatsApp Business account. Templates must be approved before use.'
@@ -295,7 +295,7 @@ export function CreateTemplateWizard({ open, onClose, onSuccess, editTemplate }:
       </div>
 
       {/* Progress Steps */}
-      <div className="border-b bg-gray-50 px-6 py-4">
+      <div className="border-b bg-vx-surface-elevated px-6 py-4">
         <div className="max-w-4xl mx-auto flex items-center justify-between">
           {steps.map((step, index) => (
             <div key={step.number} className="flex items-center">
@@ -306,7 +306,7 @@ export function CreateTemplateWizard({ open, onClose, onSuccess, editTemplate }:
                       ? 'bg-teal-600 border-teal-600 text-white'
                       : currentStep > step.number
                       ? 'bg-teal-100 border-teal-600 text-teal-600'
-                      : 'bg-gray-100 border-gray-300 text-gray-400'
+                      : 'bg-vx-surface-hover border-vx-border text-vx-text-muted'
                   }`}
                 >
                   {currentStep > step.number ? (
@@ -321,7 +321,7 @@ export function CreateTemplateWizard({ open, onClose, onSuccess, editTemplate }:
                       ? 'text-teal-600 font-semibold'
                       : currentStep > step.number
                       ? 'text-teal-600'
-                      : 'text-gray-400'
+                      : 'text-vx-text-muted'
                   }`}
                 >
                   {step.title}
@@ -330,7 +330,7 @@ export function CreateTemplateWizard({ open, onClose, onSuccess, editTemplate }:
               {index < steps.length - 1 && (
                 <div
                   className={`w-16 h-0.5 mx-3 mb-8 ${
-                    currentStep > step.number ? 'bg-teal-600' : 'bg-gray-300'
+                    currentStep > step.number ? 'bg-teal-600' : 'bg-vx-border'
                   }`}
                 />
               )}
@@ -354,13 +354,13 @@ export function CreateTemplateWizard({ open, onClose, onSuccess, editTemplate }:
         </div>
 
         {/* Right Side - WhatsApp Preview (Always Visible) */}
-        <div className="w-[380px] border-l bg-gray-50 overflow-y-auto">
+        <div className="w-[380px] border-l bg-vx-surface-elevated overflow-y-auto">
           <WhatsAppPreview data={templateData} mediaPreviewUrl={mediaPreviewUrl} />
         </div>
       </div>
 
       {/* Navigation Footer */}
-      <div className="border-t bg-white px-8 py-4">
+      <div className="border-t bg-vx-surface px-8 py-4">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <Button
             variant="outline"
@@ -372,7 +372,7 @@ export function CreateTemplateWizard({ open, onClose, onSuccess, editTemplate }:
             Back
           </Button>
 
-          <div className="text-sm text-gray-600 font-medium">
+          <div className="text-sm text-vx-text-secondary font-medium">
             Step {currentStep} of {steps.length}
           </div>
 
@@ -419,8 +419,8 @@ function WhatsAppPreview({ data, mediaPreviewUrl }: { data: TemplateData; mediaP
   return (
     <div className="p-4 h-full flex flex-col">
       <div className="mb-3">
-        <h3 className="font-semibold text-gray-900 text-base mb-0.5">WhatsApp</h3>
-        <p className="text-xs text-gray-600">Preview</p>
+        <h3 className="font-semibold text-vx-text text-base mb-0.5">WhatsApp</h3>
+        <p className="text-xs text-vx-text-secondary">Preview</p>
       </div>
 
       {/* Phone Preview */}
@@ -589,7 +589,7 @@ function Step1BasicInformation({
             }}
             className="font-mono text-sm h-9"
           />
-          <p className="text-xs text-gray-500">
+          <p className="text-xs text-vx-text-muted">
             Use only letters, numbers, and underscores. Spaces will be converted to underscores.
           </p>
         </div>
@@ -626,7 +626,7 @@ function Step1BasicInformation({
             <option value="UTILITY">UTILITY - Transactional updates</option>
             <option value="AUTHENTICATION">AUTHENTICATION - Security codes</option>
           </select>
-          <div className="text-xs text-gray-600 space-y-0.5 mt-1.5 bg-gray-50 p-2 rounded-lg">
+          <div className="text-xs text-vx-text-secondary space-y-0.5 mt-1.5 bg-vx-surface-elevated p-2 rounded-lg">
             <p><strong>MARKETING:</strong> Promotional messages, offers, announcements</p>
             <p><strong>UTILITY:</strong> Account updates, order status, reminders</p>
             <p><strong>AUTHENTICATION:</strong> OTP, verification codes, security alerts</p>
@@ -694,14 +694,14 @@ function Step2HeaderConfiguration({
               className={`p-5 border-2 rounded-lg text-left transition-colors ${
                 data.headerFormat === 'NONE'
                   ? 'border-teal-600 bg-teal-50'
-                  : 'border-gray-200 hover:border-gray-300'
+                  : 'border-vx-border hover:border-vx-border'
               }`}
             >
               <div className="flex items-center gap-3 mb-2">
                 <X className="h-6 w-6" />
                 <span className="font-semibold text-base">None</span>
               </div>
-              <p className="text-sm text-gray-600">No header</p>
+              <p className="text-sm text-vx-text-secondary">No header</p>
             </button>
 
             <button
@@ -713,14 +713,14 @@ function Step2HeaderConfiguration({
               className={`p-5 border-2 rounded-lg text-left transition-colors ${
                 data.headerFormat === 'TEXT'
                   ? 'border-teal-600 bg-teal-50'
-                  : 'border-gray-200 hover:border-gray-300'
+                  : 'border-vx-border hover:border-vx-border'
               }`}
             >
               <div className="flex items-center gap-3 mb-2">
                 <FileText className="h-6 w-6" />
                 <span className="font-semibold text-base">Text</span>
               </div>
-              <p className="text-sm text-gray-600">Max 60 chars</p>
+              <p className="text-sm text-vx-text-secondary">Max 60 chars</p>
             </button>
 
             <button
@@ -732,14 +732,14 @@ function Step2HeaderConfiguration({
               className={`p-5 border-2 rounded-lg text-left transition-colors ${
                 data.headerFormat === 'IMAGE'
                   ? 'border-teal-600 bg-teal-50'
-                  : 'border-gray-200 hover:border-gray-300'
+                  : 'border-vx-border hover:border-vx-border'
               }`}
             >
               <div className="flex items-center gap-3 mb-2">
                 <ImageIcon className="h-6 w-6" />
                 <span className="font-semibold text-base">Image</span>
               </div>
-              <p className="text-sm text-gray-600">Max 5MB</p>
+              <p className="text-sm text-vx-text-secondary">Max 5MB</p>
             </button>
 
             <button
@@ -751,14 +751,14 @@ function Step2HeaderConfiguration({
               className={`p-5 border-2 rounded-lg text-left transition-colors ${
                 data.headerFormat === 'VIDEO'
                   ? 'border-teal-600 bg-teal-50'
-                  : 'border-gray-200 hover:border-gray-300'
+                  : 'border-vx-border hover:border-vx-border'
               }`}
             >
               <div className="flex items-center gap-3 mb-2">
                 <Video className="h-6 w-6" />
                 <span className="font-semibold text-base">Video</span>
               </div>
-              <p className="text-sm text-gray-600">&lt;16MB, &lt;30s</p>
+              <p className="text-sm text-vx-text-secondary">&lt;16MB, &lt;30s</p>
             </button>
 
             <button
@@ -770,14 +770,14 @@ function Step2HeaderConfiguration({
               className={`p-5 border-2 rounded-lg text-left transition-colors ${
                 data.headerFormat === 'DOCUMENT'
                   ? 'border-teal-600 bg-teal-50'
-                  : 'border-gray-200 hover:border-gray-300'
+                  : 'border-vx-border hover:border-vx-border'
               }`}
             >
               <div className="flex items-center gap-3 mb-2">
                 <FileType className="h-6 w-6" />
                 <span className="font-semibold text-base">Document</span>
               </div>
-              <p className="text-sm text-gray-600">PDF only</p>
+              <p className="text-sm text-vx-text-secondary">PDF only</p>
             </button>
           </div>
         </div>
@@ -795,7 +795,7 @@ function Step2HeaderConfiguration({
               maxLength={60}
               className="text-base h-11"
             />
-            <p className="text-sm text-gray-500">
+            <p className="text-sm text-vx-text-muted">
               {(data.headerText || '').length}/60 characters
             </p>
           </div>
@@ -809,8 +809,8 @@ function Step2HeaderConfiguration({
             
             {/* Show existing media preview if in edit mode */}
             {!data.headerMedia && mediaPreviewUrl && (
-              <div className="mb-3 p-4 bg-gray-50 border rounded-lg">
-                <p className="text-sm text-gray-600 mb-2 font-semibold">Current {data.headerFormat}:</p>
+              <div className="mb-3 p-4 bg-vx-surface-elevated border rounded-lg">
+                <p className="text-sm text-vx-text-secondary mb-2 font-semibold">Current {data.headerFormat}:</p>
                 {data.headerFormat === 'IMAGE' && (
                   <img 
                     src={mediaPreviewUrl} 
@@ -826,17 +826,17 @@ function Step2HeaderConfiguration({
                   />
                 )}
                 {data.headerFormat === 'DOCUMENT' && (
-                  <div className="flex items-center gap-2 text-gray-700">
+                  <div className="flex items-center gap-2 text-vx-text-secondary">
                     <FileType className="h-8 w-8" />
                     <span className="text-sm">Document uploaded</span>
                   </div>
                 )}
-                <p className="text-xs text-gray-500 mt-2">Upload a new file to replace this</p>
+                <p className="text-xs text-vx-text-muted mt-2">Upload a new file to replace this</p>
               </div>
             )}
             
             <div className="border-2 border-dashed rounded-lg p-8 text-center hover:border-teal-500 transition-colors">
-              <Upload className="h-12 w-12 text-gray-400 mx-auto mb-3" />
+              <Upload className="h-12 w-12 text-vx-text-muted mx-auto mb-3" />
               <input
                 id="header-media"
                 type="file"
@@ -852,10 +852,10 @@ function Step2HeaderConfiguration({
                 <span className="text-teal-600 hover:text-teal-700 font-semibold text-base">
                   Click to upload
                 </span>
-                <span className="text-gray-600"> or drag and drop</span>
+                <span className="text-vx-text-secondary"> or drag and drop</span>
               </label>
               {data.headerMedia && (
-                <p className="text-sm text-gray-600 mt-3 font-semibold">
+                <p className="text-sm text-vx-text-secondary mt-3 font-semibold">
                   ✓ New file selected: {data.headerMedia.name}
                 </p>
               )}
@@ -906,10 +906,10 @@ function Step3MessageBody({
             maxLength={1024}
             className="font-sans text-sm resize-none"
           />
-          <p className="text-xs text-gray-500">
+          <p className="text-xs text-vx-text-muted">
             {data.bodyText.length}/1024 characters
           </p>
-          <div className="bg-gray-50 border rounded-lg p-2.5 text-xs text-gray-700">
+          <div className="bg-vx-surface-elevated border rounded-lg p-2.5 text-xs text-vx-text-secondary">
             <p className="font-semibold mb-1">Variable Syntax:</p>
             <p>• {'{{1}}'} for first variable (e.g., customer name)</p>
             <p>• {'{{2}}'} for second variable (e.g., order number)</p>
@@ -927,7 +927,7 @@ function Step3MessageBody({
             maxLength={60}
             className="text-sm h-9"
           />
-          <p className="text-xs text-gray-500">
+          <p className="text-xs text-vx-text-muted">
             {(data.footerText || '').length}/60 characters
           </p>
         </div>
@@ -992,7 +992,7 @@ function Step4ButtonsActions({
               className={`p-4 border-2 rounded-lg text-center transition-colors ${
                 data.buttonType === 'NONE'
                   ? 'border-teal-600 bg-teal-50'
-                  : 'border-gray-200 hover:border-gray-300'
+                  : 'border-vx-border hover:border-vx-border'
               }`}
             >
               <X className="h-5 w-5 mx-auto mb-1" />
@@ -1005,12 +1005,12 @@ function Step4ButtonsActions({
               className={`p-4 border-2 rounded-lg text-center transition-colors ${
                 data.buttonType === 'CALL_TO_ACTION'
                   ? 'border-teal-600 bg-teal-50'
-                  : 'border-gray-200 hover:border-gray-300'
+                  : 'border-vx-border hover:border-vx-border'
               }`}
             >
               <Globe className="h-5 w-5 mx-auto mb-1" />
               <span className="font-semibold text-sm">Call to Action</span>
-              <p className="text-xs text-gray-600 mt-1">Max 2</p>
+              <p className="text-xs text-vx-text-secondary mt-1">Max 2</p>
             </button>
 
             <button
@@ -1019,12 +1019,12 @@ function Step4ButtonsActions({
               className={`p-4 border-2 rounded-lg text-center transition-colors ${
                 data.buttonType === 'QUICK_REPLY'
                   ? 'border-teal-600 bg-teal-50'
-                  : 'border-gray-200 hover:border-gray-300'
+                  : 'border-vx-border hover:border-vx-border'
               }`}
             >
               <MessageSquare className="h-5 w-5 mx-auto mb-1" />
               <span className="font-semibold text-sm">Quick Reply</span>
-              <p className="text-xs text-gray-600 mt-1">Max 3</p>
+              <p className="text-xs text-vx-text-secondary mt-1">Max 3</p>
             </button>
           </div>
         </div>
@@ -1054,7 +1054,7 @@ function Step4ButtonsActions({
                       className={`p-3 border-2 rounded-lg text-left transition-colors ${
                         button.type === 'PHONE_NUMBER'
                           ? 'border-teal-600 bg-teal-50'
-                          : 'border-gray-200'
+                          : 'border-vx-border'
                       }`}
                     >
                       <Phone className="h-4 w-4 mb-1" />
@@ -1067,7 +1067,7 @@ function Step4ButtonsActions({
                       className={`p-3 border-2 rounded-lg text-left transition-colors ${
                         button.type === 'URL'
                           ? 'border-teal-600 bg-teal-50'
-                          : 'border-gray-200'
+                          : 'border-vx-border'
                       }`}
                     >
                       <Globe className="h-4 w-4 mb-1" />
@@ -1083,7 +1083,7 @@ function Step4ButtonsActions({
                       onChange={(e) => updateButton(index, { text: e.target.value })}
                       maxLength={20}
                     />
-                    <p className="text-xs text-gray-500">{button.text.length}/20 characters</p>
+                    <p className="text-xs text-vx-text-muted">{button.text.length}/20 characters</p>
                   </div>
 
                   <div className="space-y-2">
@@ -1219,9 +1219,9 @@ function Step5VariablesExamples({
         ))}
       </div>
 
-      <div className="bg-gray-50 border rounded-lg p-4">
-        <p className="text-sm font-semibold text-gray-900 mb-2">Preview with Examples:</p>
-        <p className="text-sm text-gray-700 whitespace-pre-wrap">
+      <div className="bg-vx-surface-elevated border rounded-lg p-4">
+        <p className="text-sm font-semibold text-vx-text mb-2">Preview with Examples:</p>
+        <p className="text-sm text-vx-text-secondary whitespace-pre-wrap">
           {data.bodyText.replace(/\{\{(\d+)\}\}/g, (match, num) => {
             const varIndex = data.variables.findIndex(v => v.key === match);
             return varIndex >= 0 && data.variables[varIndex].example
@@ -1256,67 +1256,67 @@ function Step6ReviewSubmit({ data }: { data: TemplateData }) {
       <Card>
         <CardContent className="p-6 space-y-6">
           <div>
-            <h3 className="font-semibold text-gray-900 mb-4 text-lg">Template Details</h3>
+            <h3 className="font-semibold text-vx-text mb-4 text-lg">Template Details</h3>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1">
-                <span className="text-sm text-gray-600">Name:</span>
+                <span className="text-sm text-vx-text-secondary">Name:</span>
                 <p className="font-mono font-semibold text-base">{data.name || '-'}</p>
               </div>
               <div className="space-y-1">
-                <span className="text-sm text-gray-600">Language:</span>
+                <span className="text-sm text-vx-text-secondary">Language:</span>
                 <p className="font-semibold text-base">{data.language || '-'}</p>
               </div>
               <div className="space-y-1">
-                <span className="text-sm text-gray-600">Category:</span>
+                <span className="text-sm text-vx-text-secondary">Category:</span>
                 <p className="font-semibold text-base">{data.category || '-'}</p>
               </div>
               <div className="space-y-1">
-                <span className="text-sm text-gray-600">Header Format:</span>
+                <span className="text-sm text-vx-text-secondary">Header Format:</span>
                 <p className="font-semibold text-base">{data.headerFormat || 'NONE'}</p>
               </div>
             </div>
           </div>
 
           <div className="border-t pt-4">
-            <h3 className="font-semibold text-gray-900 mb-4 text-lg">Template Content</h3>
+            <h3 className="font-semibold text-vx-text mb-4 text-lg">Template Content</h3>
             
             {data.headerFormat !== 'NONE' && (
-              <div className="mb-4 p-3 bg-gray-50 rounded-lg">
-                <span className="text-xs text-gray-600 uppercase font-semibold">Header:</span>
+              <div className="mb-4 p-3 bg-vx-surface-elevated rounded-lg">
+                <span className="text-xs text-vx-text-secondary uppercase font-semibold">Header:</span>
                 {data.headerFormat === 'TEXT' && (
-                  <p className="font-semibold text-gray-900 mt-1">{data.headerText}</p>
+                  <p className="font-semibold text-vx-text mt-1">{data.headerText}</p>
                 )}
                 {['IMAGE', 'VIDEO', 'DOCUMENT'].includes(data.headerFormat) && (
-                  <p className="text-sm text-gray-700 mt-1">
+                  <p className="text-sm text-vx-text-secondary mt-1">
                     {data.headerFormat} {data.headerMedia ? `(${data.headerMedia.name})` : '(Uploaded)'}
                   </p>
                 )}
               </div>
             )}
 
-            <div className="mb-4 p-3 bg-gray-50 rounded-lg">
-              <span className="text-xs text-gray-600 uppercase font-semibold">Body:</span>
-              <p className="text-gray-900 whitespace-pre-wrap mt-1">{data.bodyText || '-'}</p>
+            <div className="mb-4 p-3 bg-vx-surface-elevated rounded-lg">
+              <span className="text-xs text-vx-text-secondary uppercase font-semibold">Body:</span>
+              <p className="text-vx-text whitespace-pre-wrap mt-1">{data.bodyText || '-'}</p>
             </div>
 
             {data.footerText && (
-              <div className="mb-4 p-3 bg-gray-50 rounded-lg">
-                <span className="text-xs text-gray-600 uppercase font-semibold">Footer:</span>
-                <p className="text-sm text-gray-600 mt-1">{data.footerText}</p>
+              <div className="mb-4 p-3 bg-vx-surface-elevated rounded-lg">
+                <span className="text-xs text-vx-text-secondary uppercase font-semibold">Footer:</span>
+                <p className="text-sm text-vx-text-secondary mt-1">{data.footerText}</p>
               </div>
             )}
 
             {data.buttons.length > 0 && (
-              <div className="p-3 bg-gray-50 rounded-lg">
-                <span className="text-xs text-gray-600 uppercase font-semibold">Buttons:</span>
+              <div className="p-3 bg-vx-surface-elevated rounded-lg">
+                <span className="text-xs text-vx-text-secondary uppercase font-semibold">Buttons:</span>
                 <div className="space-y-2 mt-2">
                   {data.buttons.map((button, index) => (
-                    <div key={index} className="flex items-center gap-2 text-sm bg-white p-2 rounded">
+                    <div key={index} className="flex items-center gap-2 text-sm bg-vx-surface p-2 rounded">
                       {button.type === 'PHONE_NUMBER' && <Phone className="h-4 w-4 text-teal-600" />}
                       {button.type === 'URL' && <Globe className="h-4 w-4 text-teal-600" />}
                       {button.type === 'QUICK_REPLY' && <MessageSquare className="h-4 w-4 text-teal-600" />}
                       <span className="font-semibold">{button.text}</span>
-                      {button.value && <span className="text-gray-600">→ {button.value}</span>}
+                      {button.value && <span className="text-vx-text-secondary">→ {button.value}</span>}
                     </div>
                   ))}
                 </div>
@@ -1326,13 +1326,13 @@ function Step6ReviewSubmit({ data }: { data: TemplateData }) {
 
           {data.variables.length > 0 && (
             <div className="border-t pt-4">
-              <h3 className="font-semibold text-gray-900 mb-4 text-lg">Variable Examples</h3>
+              <h3 className="font-semibold text-vx-text mb-4 text-lg">Variable Examples</h3>
               <div className="space-y-2">
                 {data.variables.map((variable, index) => (
-                  <div key={variable.key} className="flex items-center gap-3 text-sm p-2 bg-gray-50 rounded">
-                    <span className="font-mono text-gray-600 font-semibold">{variable.key}</span>
-                    <span className="text-gray-400">→</span>
-                    <span className="font-semibold text-gray-900">{variable.example}</span>
+                  <div key={variable.key} className="flex items-center gap-3 text-sm p-2 bg-vx-surface-elevated rounded">
+                    <span className="font-mono text-vx-text-secondary font-semibold">{variable.key}</span>
+                    <span className="text-vx-text-muted">→</span>
+                    <span className="font-semibold text-vx-text">{variable.example}</span>
                   </div>
                 ))}
               </div>

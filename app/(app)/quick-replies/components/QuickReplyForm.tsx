@@ -93,15 +93,15 @@ export default function QuickReplyForm({
 
   return (
     <div className="fixed inset-0 flex items-center justify-center z-50 bg-black bg-opacity-50">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+      <div className="bg-vx-surface rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200">
-          <h2 className="text-xl font-semibold text-gray-900">
+        <div className="flex items-center justify-between p-6 border-b border-vx-border">
+          <h2 className="text-xl font-semibold text-vx-text">
             {quickReply ? 'Edit Quick Reply' : 'New Quick Reply'}
           </h2>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 transition-colors"
+            className="text-vx-text-muted hover:text-vx-text-secondary transition-colors"
           >
             <X className="h-5 w-5" />
           </button>
@@ -121,7 +121,7 @@ export default function QuickReplyForm({
                 placeholder="/hello"
                 required
               />
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-vx-text-muted">
                 Start with / (e.g., /hello, /pricing)
               </p>
             </div>
@@ -164,7 +164,7 @@ export default function QuickReplyForm({
               required
               rows={6}
             />
-            <p className="text-xs text-gray-500">
+            <p className="text-xs text-vx-text-muted">
               {formData.content.length} characters
             </p>
           </div>
@@ -177,7 +177,7 @@ export default function QuickReplyForm({
               onChange={(e) =>
                 setFormData({ ...formData, is_active: e.target.checked })
               }
-              className="rounded border-gray-300 text-yellow-600 focus:ring-yellow-500"
+              className="rounded border-vx-border text-yellow-600 focus:ring-yellow-500 dark:ring-yellow-400/30"
             />
             <Label htmlFor="is_active" className="cursor-pointer">
               Active (available for use)
@@ -185,14 +185,14 @@ export default function QuickReplyForm({
           </div>
 
           {/* Actions */}
-          <div className="flex items-center justify-end gap-3 pt-4 border-t border-gray-200">
+          <div className="flex items-center justify-end gap-3 pt-4 border-t border-vx-border">
             <Button type="button" variant="outline" onClick={onClose} disabled={loading}>
               Cancel
             </Button>
             <Button
               type="submit"
               disabled={loading}
-              className="bg-yellow-600 hover:bg-yellow-700"
+              className="bg-yellow-600 hover:bg-yellow-700 dark:bg-yellow-500"
             >
               {loading ? 'Saving...' : quickReply ? 'Update' : 'Create'}
             </Button>

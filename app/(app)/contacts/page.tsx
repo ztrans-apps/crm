@@ -159,57 +159,57 @@ export default function ContactsPage() {
 
   return (
     <PermissionGuard permission={['contact.view']}>
-      <div className="h-full bg-gray-50 p-6">
+      <div className="h-full bg-vx-surface-elevated p-6">
         {/* Header */}
         <div className="mb-6">
-          <h1 className="text-2xl font-bold text-gray-900">Contacts</h1>
-          <p className="text-sm text-gray-600 mt-1">Kelola kontak customer Anda</p>
+          <h1 className="text-2xl font-bold text-vx-text">Contacts</h1>
+          <p className="text-sm text-vx-text-secondary mt-1">Kelola kontak customer Anda</p>
         </div>
 
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-          <div className="bg-white rounded-lg shadow-sm p-5 border border-gray-200">
+          <div className="bg-vx-surface rounded-lg shadow-sm p-5 border border-vx-border">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Total Kontak</p>
-                <p className="text-3xl font-bold text-gray-900 mt-1">{stats.total}</p>
+                <p className="text-sm font-medium text-vx-text-secondary">Total Kontak</p>
+                <p className="text-3xl font-bold text-vx-text mt-1">{stats.total}</p>
               </div>
-              <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                <Users className="h-6 w-6 text-blue-600" />
+              <div className="w-12 h-12 bg-vx-purple/10 rounded-lg flex items-center justify-center">
+                <Users className="h-6 w-6 text-vx-purple" />
               </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-lg shadow-sm p-5 border border-gray-200">
+          <div className="bg-vx-surface rounded-lg shadow-sm p-5 border border-vx-border">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Punya Percakapan</p>
-                <p className="text-3xl font-bold text-gray-900 mt-1">{stats.withConversations}</p>
+                <p className="text-sm font-medium text-vx-text-secondary">Punya Percakapan</p>
+                <p className="text-3xl font-bold text-vx-text mt-1">{stats.withConversations}</p>
               </div>
-              <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-                <MessageSquare className="h-6 w-6 text-green-600" />
+              <div className="w-12 h-12 bg-vx-teal/10 rounded-lg flex items-center justify-center">
+                <MessageSquare className="h-6 w-6 text-vx-teal" />
               </div>
             </div>
           </div>
 
-          <div className="bg-white rounded-lg shadow-sm p-5 border border-gray-200">
+          <div className="bg-vx-surface rounded-lg shadow-sm p-5 border border-vx-border">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Aktif 7 Hari</p>
-                <p className="text-3xl font-bold text-gray-900 mt-1">{stats.recentlyActive}</p>
+                <p className="text-sm font-medium text-vx-text-secondary">Aktif 7 Hari</p>
+                <p className="text-3xl font-bold text-vx-text mt-1">{stats.recentlyActive}</p>
               </div>
-              <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
-                <Calendar className="h-6 w-6 text-purple-600" />
+              <div className="w-12 h-12 bg-vx-purple/10 rounded-lg flex items-center justify-center">
+                <Calendar className="h-6 w-6 text-vx-purple" />
               </div>
             </div>
           </div>
         </div>
 
         {/* Search and Actions */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 mb-4">
+        <div className="bg-vx-surface rounded-lg shadow-sm border border-vx-border mb-4">
           <div className="p-4 flex items-center gap-3">
             <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-vx-text-muted" />
               <Input
                 placeholder="Cari kontak..."
                 value={searchQuery}
@@ -217,7 +217,7 @@ export default function ContactsPage() {
                 className="pl-10"
               />
             </div>
-            <Button onClick={handleAddContact} className="bg-blue-600 hover:bg-blue-700">
+            <Button onClick={handleAddContact} className="bg-vx-purple hover:bg-vx-purple/90">
               <Plus className="h-4 w-4 mr-2" />
               Tambah Kontak
             </Button>
@@ -225,13 +225,13 @@ export default function ContactsPage() {
         </div>
 
         {/* Contacts Table */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+        <div className="bg-vx-surface rounded-lg shadow-sm border border-vx-border overflow-hidden">
           {loading ? (
             <div className="flex items-center justify-center h-64">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-vx-purple"></div>
             </div>
           ) : filteredContacts.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-64 text-gray-500">
+            <div className="flex flex-col items-center justify-center h-64 text-vx-text-muted">
               <Users className="h-12 w-12 mb-3 opacity-50" />
               <p className="text-sm">
                 {searchQuery ? 'Tidak ada kontak yang ditemukan' : 'Belum ada kontak'}
@@ -240,30 +240,30 @@ export default function ContactsPage() {
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full">
-                <thead className="bg-gray-50 border-b border-gray-200">
+                <thead className="bg-vx-surface-elevated border-b border-vx-border">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-vx-text-muted uppercase tracking-wider">
                       Kontak
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-vx-text-muted uppercase tracking-wider">
                       Telepon
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-vx-text-muted uppercase tracking-wider">
                       Email
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-left text-xs font-medium text-vx-text-muted uppercase tracking-wider">
                       Dibuat
                     </th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-right text-xs font-medium text-vx-text-muted uppercase tracking-wider">
                       Aksi
                     </th>
                   </tr>
                 </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
+                <tbody className="bg-vx-surface divide-y divide-vx-border">
                   {filteredContacts.map((contact) => (
                     <tr 
                       key={contact.id} 
-                      className="hover:bg-gray-50 transition-colors cursor-pointer"
+                      className="hover:bg-vx-surface-hover transition-colors cursor-pointer"
                       onClick={() => handleSelectContact(contact)}
                     >
                       <td className="px-6 py-4 whitespace-nowrap">
@@ -272,28 +272,28 @@ export default function ContactsPage() {
                             {getInitial(contact.name)}
                           </div>
                           <div className="ml-3">
-                            <p className="text-sm font-medium text-gray-900">{contact.name}</p>
+                            <p className="text-sm font-medium text-vx-text">{contact.name}</p>
                           </div>
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center text-sm text-gray-600">
-                          <Phone className="h-3.5 w-3.5 mr-1.5 text-gray-400" />
+                        <div className="flex items-center text-sm text-vx-text-secondary">
+                          <Phone className="h-3.5 w-3.5 mr-1.5 text-vx-text-muted" />
                           {contact.phone_number}
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         {contact.email ? (
-                          <div className="flex items-center text-sm text-gray-600">
-                            <Mail className="h-3.5 w-3.5 mr-1.5 text-gray-400" />
+                          <div className="flex items-center text-sm text-vx-text-secondary">
+                            <Mail className="h-3.5 w-3.5 mr-1.5 text-vx-text-muted" />
                             {contact.email}
                           </div>
                         ) : (
-                          <span className="text-sm text-gray-400">-</span>
+                          <span className="text-sm text-vx-text-muted">-</span>
                         )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <span className="text-xs text-gray-500">
+                        <span className="text-xs text-vx-text-muted">
                           {formatDate(contact.created_at)}
                         </span>
                       </td>
@@ -304,7 +304,7 @@ export default function ContactsPage() {
                               e.stopPropagation();
                               handleSendMessage(contact);
                             }}
-                            className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                            className="p-2 text-vx-teal hover:bg-vx-teal/5 rounded-lg transition-colors"
                             title="Kirim Pesan"
                           >
                             <Send className="h-4 w-4" />
@@ -314,7 +314,7 @@ export default function ContactsPage() {
                               e.stopPropagation();
                               handleEditContact(contact);
                             }}
-                            className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                            className="p-2 text-vx-purple hover:bg-vx-purple/5 rounded-lg transition-colors"
                             title="Edit"
                           >
                             <Edit className="h-4 w-4" />
@@ -324,7 +324,7 @@ export default function ContactsPage() {
                               e.stopPropagation();
                               handleDeleteContact(contact);
                             }}
-                            className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                            className="p-2 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/5 rounded-lg transition-colors"
                             title="Delete"
                           >
                             <Trash2 className="h-4 w-4" />

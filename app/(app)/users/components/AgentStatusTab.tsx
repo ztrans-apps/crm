@@ -101,11 +101,11 @@ export default function AgentStatusTab() {
       (new Date().getTime() - new Date(lastActivity).getTime()) < 2 * 60 * 1000
 
     if (status === 'available' && isTrulyOnline) {
-      return 'bg-green-100 text-green-700'
+      return 'bg-vx-teal/10 text-vx-teal'
     } else if (status === 'busy' && isTrulyOnline) {
-      return 'bg-yellow-100 text-yellow-700'
+      return 'bg-yellow-100 dark:bg-yellow-500/10 text-yellow-700 dark:text-yellow-400'
     } else {
-      return 'bg-gray-100 text-gray-700'
+      return 'bg-vx-surface-hover text-vx-text-secondary'
     }
   }
 
@@ -164,8 +164,8 @@ export default function AgentStatusTab() {
               >
                 <div className="flex-1">
                   <p className="font-medium">{agent.full_name}</p>
-                  <p className="text-sm text-gray-500">{agent.email}</p>
-                  <p className="text-xs text-gray-400 mt-1">
+                  <p className="text-sm text-vx-text-muted">{agent.email}</p>
+                  <p className="text-xs text-vx-text-muted mt-1">
                     Last activity: {agent.last_activity 
                       ? new Date(agent.last_activity).toLocaleString() 
                       : 'Never'}
@@ -189,7 +189,7 @@ export default function AgentStatusTab() {
               </div>
             ))}
             {agents.length === 0 && !loading && (
-              <p className="text-center text-gray-500 py-8">No agents found</p>
+              <p className="text-center text-vx-text-muted py-8">No agents found</p>
             )}
           </div>
         </CardContent>
@@ -199,7 +199,7 @@ export default function AgentStatusTab() {
         <CardHeader>
           <CardTitle>Info</CardTitle>
         </CardHeader>
-        <CardContent className="text-sm text-gray-600 space-y-2">
+        <CardContent className="text-sm text-vx-text-secondary space-y-2">
           <p>• Agent status otomatis update setiap 30 detik (heartbeat system)</p>
           <p>• Agent dianggap online jika last activity kurang dari 2 menit</p>
           <p>• Gunakan "Set Offline" untuk manual set agent ke offline</p>

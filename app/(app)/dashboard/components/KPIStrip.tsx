@@ -64,7 +64,7 @@ export function KPIStrip() {
     return (
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-5">
         {[...Array(5)].map((_, i) => (
-          <div key={i} className="h-32 animate-pulse rounded-lg bg-gray-200 dark:bg-gray-800" />
+          <div key={i} className="h-32 animate-pulse rounded-lg bg-vx-surface-hover" />
         ))}
       </div>
     )

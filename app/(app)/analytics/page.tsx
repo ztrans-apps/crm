@@ -11,7 +11,7 @@ export default function AnalyticsPage() {
       <div className="space-y-6">
         <div>
           <h1 className="text-2xl font-bold">Analytics</h1>
-          <p className="text-gray-600">View performance metrics and insights</p>
+          <p className="text-vx-text-secondary">View performance metrics and insights</p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -68,7 +68,7 @@ export default function AnalyticsPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="flex flex-col items-center justify-center py-12 text-gray-500">
+            <div className="flex flex-col items-center justify-center py-12 text-vx-text-muted">
               <BarChart3 className="h-12 w-12 mb-4 opacity-20" />
               <p>No data available yet</p>
               <p className="text-sm">Start using the system to see analytics</p>

@@ -56,7 +56,7 @@ export function AgentProductivity({ dateRange }: AgentProductivityProps) {
           <CardTitle>Produktivitas Agen</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="h-96 animate-pulse bg-gray-200 dark:bg-gray-800 rounded" />
+          <div className="h-96 animate-pulse bg-vx-surface-hover rounded" />
         </CardContent>
       </Card>
     )
@@ -74,7 +74,7 @@ export function AgentProductivity({ dateRange }: AgentProductivityProps) {
   const statusColors = {
     online: 'text-green-500',
     away: 'text-yellow-500',
-    offline: 'text-gray-500'
+    offline: 'text-vx-text-muted'
   }
 
   const statusLabels = {
@@ -93,17 +93,17 @@ export function AgentProductivity({ dateRange }: AgentProductivityProps) {
         <div>
           <h3 className="mb-4 text-sm font-medium">Distribusi Beban Kerja</h3>
           <div className="grid grid-cols-3 gap-4">
-            <div className="rounded-lg bg-green-50 p-4 dark:bg-green-950">
-              <p className="text-sm text-gray-600 dark:text-gray-400">Seimbang</p>
-              <p className="text-2xl font-bold text-green-600">{data.workloadDistribution.balanced}</p>
+            <div className="rounded-lg bg-vx-teal/10 p-4">
+              <p className="text-sm text-vx-text-secondary">Seimbang</p>
+              <p className="text-2xl font-bold text-vx-teal">{data.workloadDistribution.balanced}</p>
             </div>
             <div className="rounded-lg bg-red-50 p-4 dark:bg-red-950">
-              <p className="text-sm text-gray-600 dark:text-gray-400">Overload</p>
-              <p className="text-2xl font-bold text-red-600">{data.workloadDistribution.overloaded}</p>
+              <p className="text-sm text-vx-text-secondary">Overload</p>
+              <p className="text-2xl font-bold text-red-600 dark:text-red-400">{data.workloadDistribution.overloaded}</p>
             </div>
             <div className="rounded-lg bg-yellow-50 p-4 dark:bg-yellow-950">
-              <p className="text-sm text-gray-600 dark:text-gray-400">Underutilized</p>
-              <p className="text-2xl font-bold text-yellow-600">{data.workloadDistribution.underutilized}</p>
+              <p className="text-sm text-vx-text-secondary">Underutilized</p>
+              <p className="text-2xl font-bold text-yellow-600 dark:text-yellow-400">{data.workloadDistribution.underutilized}</p>
             </div>
           </div>
         </div>
@@ -137,8 +137,8 @@ export function AgentProductivity({ dateRange }: AgentProductivityProps) {
                     <td className="py-3 text-right">
                       <span className={cn(
                         'font-medium',
-                        agent.resolutionRate >= 80 ? 'text-green-600' : 
-                        agent.resolutionRate >= 60 ? 'text-yellow-600' : 'text-red-600'
+                        agent.resolutionRate >= 80 ? 'text-vx-teal' : 
+                        agent.resolutionRate >= 60 ? 'text-yellow-600 dark:text-yellow-400' : 'text-red-600 dark:text-red-400'
                       )}>
                         {agent.resolutionRate}%
                       </span>

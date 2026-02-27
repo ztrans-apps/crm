@@ -43,7 +43,7 @@ export function CustomerProfile({ contact, onUpdate, canEdit }: CustomerProfileP
   return (
     <div className="space-y-2">
       <div>
-        <label className="text-[10px] text-gray-500 flex items-center mb-0.5">
+        <label className="text-[10px] text-vx-text-muted flex items-center mb-0.5">
           <Mail className="h-2.5 w-2.5 mr-1" />
           Email
         </label>
@@ -57,7 +57,7 @@ export function CustomerProfile({ contact, onUpdate, canEdit }: CustomerProfileP
         />
       </div>
       <div>
-        <label className="text-[10px] text-gray-500 flex items-center mb-0.5">
+        <label className="text-[10px] text-vx-text-muted flex items-center mb-0.5">
           <Building className="h-2.5 w-2.5 mr-1" />
           Perusahaan
         </label>
@@ -71,7 +71,7 @@ export function CustomerProfile({ contact, onUpdate, canEdit }: CustomerProfileP
         />
       </div>
       <div>
-        <label className="text-[10px] text-gray-500 flex items-center mb-0.5">
+        <label className="text-[10px] text-vx-text-muted flex items-center mb-0.5">
           <Briefcase className="h-2.5 w-2.5 mr-1" />
           Posisi
         </label>

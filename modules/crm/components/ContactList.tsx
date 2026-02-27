@@ -66,8 +66,8 @@ export function ContactList({ onAddContact, onSelectContact }: ContactListProps)
       <Card>
         <CardContent className="flex items-center justify-center py-16">
           <div className="text-center">
-            <Loader2 className="h-12 w-12 text-gray-400 animate-spin mx-auto mb-3" />
-            <p className="text-gray-600">Loading contacts...</p>
+            <Loader2 className="h-12 w-12 text-vx-text-muted animate-spin mx-auto mb-3" />
+            <p className="text-vx-text-secondary">Loading contacts...</p>
           </div>
         </CardContent>
       </Card>
@@ -79,7 +79,7 @@ export function ContactList({ onAddContact, onSelectContact }: ContactListProps)
       {/* Search Bar */}
       <div className="flex gap-2">
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-vx-text-muted" />
           <Input
             placeholder="Search contacts..."
             value={searchQuery}
@@ -88,7 +88,7 @@ export function ContactList({ onAddContact, onSelectContact }: ContactListProps)
           />
         </div>
         {onAddContact && (
-          <Button onClick={onAddContact} className="bg-blue-600 hover:bg-blue-700">
+          <Button onClick={onAddContact} className="bg-vx-purple hover:bg-vx-purple/90">
             <Plus className="h-4 w-4 mr-2" />
             Add Contact
           </Button>
@@ -99,15 +99,15 @@ export function ContactList({ onAddContact, onSelectContact }: ContactListProps)
       {filteredContacts.length === 0 && !searchQuery && (
         <Card className="border-2 border-dashed">
           <CardContent className="flex flex-col items-center justify-center py-16">
-            <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mb-4">
-              <Users className="h-10 w-10 text-blue-600" />
+            <div className="w-20 h-20 bg-vx-purple/10 rounded-full flex items-center justify-center mb-4">
+              <Users className="h-10 w-10 text-vx-purple" />
             </div>
-            <h3 className="text-xl font-semibold text-gray-900 mb-2">No Contacts Yet</h3>
-            <p className="text-gray-600 mb-6 text-center max-w-md">
+            <h3 className="text-xl font-semibold text-vx-text mb-2">No Contacts Yet</h3>
+            <p className="text-vx-text-secondary mb-6 text-center max-w-md">
               Start building your contact list to manage customer relationships
             </p>
             {onAddContact && (
-              <Button onClick={onAddContact} size="lg" className="bg-blue-600 hover:bg-blue-700">
+              <Button onClick={onAddContact} size="lg" className="bg-vx-purple hover:bg-vx-purple/90">
                 <Plus className="h-4 w-4 mr-2" />
                 Add Your First Contact
               </Button>
@@ -120,8 +120,8 @@ export function ContactList({ onAddContact, onSelectContact }: ContactListProps)
       {filteredContacts.length === 0 && searchQuery && (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12">
-            <Search className="h-12 w-12 text-gray-400 mb-3" />
-            <p className="text-gray-600">No contacts found for "{searchQuery}"</p>
+            <Search className="h-12 w-12 text-vx-text-muted mb-3" />
+            <p className="text-vx-text-secondary">No contacts found for "{searchQuery}"</p>
           </CardContent>
         </Card>
       )}
@@ -138,14 +138,14 @@ export function ContactList({ onAddContact, onSelectContact }: ContactListProps)
               <CardContent className="p-4">
                 <div className="flex items-center gap-4">
                   <Avatar className="h-12 w-12">
-                    <AvatarFallback className="bg-blue-100 text-blue-700">
+                    <AvatarFallback className="bg-vx-purple/10 text-vx-purple">
                       {getInitials(contact.name)}
                     </AvatarFallback>
                   </Avatar>
                   
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
-                      <h3 className="font-semibold text-gray-900 truncate">
+                      <h3 className="font-semibold text-vx-text truncate">
                         {contact.name || contact.phone_number}
                       </h3>
                       {contact.tags && contact.tags.length > 0 && (
@@ -159,7 +159,7 @@ export function ContactList({ onAddContact, onSelectContact }: ContactListProps)
                       )}
                     </div>
                     
-                    <div className="flex items-center gap-4 text-sm text-gray-600">
+                    <div className="flex items-center gap-4 text-sm text-vx-text-secondary">
                       <div className="flex items-center gap-1">
                         <Phone className="h-3 w-3" />
                         {contact.phone_number}
@@ -173,7 +173,7 @@ export function ContactList({ onAddContact, onSelectContact }: ContactListProps)
                     </div>
                     
                     {contact.last_message && (
-                      <div className="flex items-center gap-1 mt-2 text-sm text-gray-500">
+                      <div className="flex items-center gap-1 mt-2 text-sm text-vx-text-muted">
                         <MessageSquare className="h-3 w-3" />
                         <span className="truncate">{contact.last_message}</span>
                         {contact.last_message_at && (

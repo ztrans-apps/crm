@@ -56,7 +56,7 @@ export function CustomerLoad() {
           <CardTitle>Beban Pelanggan</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="h-96 animate-pulse bg-gray-200 dark:bg-gray-800 rounded" />
+          <div className="h-96 animate-pulse bg-vx-surface-hover rounded" />
         </CardContent>
       </Card>
     )
@@ -97,7 +97,7 @@ export function CustomerLoad() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-2xl font-bold">{data.peakHour.hour}</p>
-                <p className="text-sm text-gray-600 dark:text-gray-400">
+                <p className="text-sm text-vx-text-secondary">
                   {data.peakHour.count} percakapan
                 </p>
               </div>
@@ -109,13 +109,13 @@ export function CustomerLoad() {
         <div>
           <h3 className="mb-4 text-sm font-medium">Pelanggan Baru vs Kembali</h3>
           <div className="grid grid-cols-2 gap-4">
-            <div className="rounded-lg bg-blue-50 p-4 dark:bg-blue-950">
-              <p className="text-sm text-gray-600 dark:text-gray-400">Baru</p>
-              <p className="text-2xl font-bold text-blue-600">{data.newVsReturning.new}</p>
+            <div className="rounded-lg bg-vx-purple/10 p-4">
+              <p className="text-sm text-vx-text-secondary">Baru</p>
+              <p className="text-2xl font-bold text-vx-purple">{data.newVsReturning.new}</p>
             </div>
-            <div className="rounded-lg bg-green-50 p-4 dark:bg-green-950">
-              <p className="text-sm text-gray-600 dark:text-gray-400">Kembali</p>
-              <p className="text-2xl font-bold text-green-600">{data.newVsReturning.returning}</p>
+            <div className="rounded-lg bg-vx-teal/10 p-4">
+              <p className="text-sm text-vx-text-secondary">Kembali</p>
+              <p className="text-2xl font-bold text-vx-teal">{data.newVsReturning.returning}</p>
             </div>
           </div>
         </div>
@@ -124,12 +124,12 @@ export function CustomerLoad() {
         <div>
           <h3 className="mb-4 text-sm font-medium">Waktu Tunggu Rata-rata</h3>
           <div className="grid grid-cols-2 gap-4">
-            <div className="rounded-lg bg-gray-50 p-4 dark:bg-gray-900">
-              <p className="text-sm text-gray-600 dark:text-gray-400">Jam Puncak</p>
+            <div className="rounded-lg bg-vx-surface-elevated p-4">
+              <p className="text-sm text-vx-text-secondary">Jam Puncak</p>
               <p className="text-xl font-bold">{formatTime(data.avgWaitTime.peak)}</p>
             </div>
-            <div className="rounded-lg bg-gray-50 p-4 dark:bg-gray-900">
-              <p className="text-sm text-gray-600 dark:text-gray-400">Jam Normal</p>
+            <div className="rounded-lg bg-vx-surface-elevated p-4">
+              <p className="text-sm text-vx-text-secondary">Jam Normal</p>
               <p className="text-xl font-bold">{formatTime(data.avgWaitTime.offPeak)}</p>
             </div>
           </div>

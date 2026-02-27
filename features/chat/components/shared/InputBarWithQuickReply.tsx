@@ -80,18 +80,18 @@ export function InputBarWithQuickReply({
   }
 
   return (
-    <div ref={containerRef} className="bg-white p-2 relative">
+    <div ref={containerRef} className="bg-vx-surface p-2 relative">
       {/* Reply preview */}
       {replyingTo && (
-        <div className="mb-2 p-2 bg-blue-50 border-l-4 border-blue-500 rounded flex items-start justify-between">
+        <div className="mb-2 p-2 bg-vx-purple/5 border-l-4 border-vx-purple rounded flex items-start justify-between">
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1">
-              <MessageSquare className="h-3 w-3 text-blue-600" />
-              <p className="text-xs font-medium text-blue-700">
+              <MessageSquare className="h-3 w-3 text-vx-purple" />
+              <p className="text-xs font-medium text-vx-purple">
                 Replying to {replyingTo.is_from_me ? 'yourself' : (replyingTo.contact?.name || 'Customer')}
               </p>
             </div>
-            <p className="text-xs text-gray-600 truncate">
+            <p className="text-xs text-vx-text-secondary truncate">
               {replyingTo.content || (replyingTo.media_type ? `[${replyingTo.media_type}]` : 'Message')}
             </p>
           </div>
@@ -126,7 +126,7 @@ export function InputBarWithQuickReply({
             onChange(value + (value ? ' /' : '/'))
             inputRef.current?.focus()
           }}
-          className="text-gray-500 hover:text-gray-700 h-9 w-9"
+          className="text-vx-text-muted hover:text-vx-text-secondary h-9 w-9"
           type="button"
           title="Quick Reply (type /)"
         >
@@ -148,7 +148,7 @@ export function InputBarWithQuickReply({
           {value && (
             <button
               onClick={() => onChange('')}
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-vx-text-muted hover:text-vx-text-secondary"
             >
               <X className="h-4 w-4" />
             </button>
@@ -172,7 +172,7 @@ export function InputBarWithQuickReply({
 
       {/* Hint */}
       {!value && (
-        <div className="mt-2 flex items-center gap-2 text-xs text-gray-400">
+        <div className="mt-2 flex items-center gap-2 text-xs text-vx-text-muted">
           <Zap className="h-3 w-3" />
           <span>Tip: Type "/" to use quick replies</span>
         </div>

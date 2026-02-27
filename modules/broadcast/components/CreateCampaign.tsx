@@ -244,7 +244,7 @@ export function CreateCampaign({ onSuccess }: CreateCampaignProps) {
     return (
       <Card>
         <CardContent className="flex items-center justify-center py-16">
-          <Loader2 className="h-12 w-12 text-gray-400 animate-spin" />
+          <Loader2 className="h-12 w-12 text-vx-text-muted animate-spin" />
         </CardContent>
       </Card>
     );
@@ -264,7 +264,7 @@ export function CreateCampaign({ onSuccess }: CreateCampaignProps) {
             {/* Nama Campaign */}
             <div className="space-y-2">
               <Label htmlFor="name">Nama Campaign</Label>
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-vx-text-muted">
                 Gunakan huruf kecil, angka, dan garis bawah. Tidak boleh ada spasi atau simbol
               </p>
               <Input
@@ -279,7 +279,7 @@ export function CreateCampaign({ onSuccess }: CreateCampaignProps) {
             {/* Pengirim */}
             <div className="space-y-2">
               <Label htmlFor="sender">Pengirim</Label>
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-vx-text-muted">
                 Pilih nama pengirim yang akan tampil di daftar log
               </p>
               <select
@@ -301,7 +301,7 @@ export function CreateCampaign({ onSuccess }: CreateCampaignProps) {
             {/* Akun WhatsApp */}
             <div className="space-y-2">
               <Label htmlFor="whatsapp">Akun WhatsApp</Label>
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-vx-text-muted">
                 Pilih Akun WhatsApp yang akan digunakan untuk mengirim pesan
               </p>
               <select
@@ -331,10 +331,10 @@ export function CreateCampaign({ onSuccess }: CreateCampaignProps) {
                       const status = account?.status || 'disconnected';
                       
                       // Determine color based on quality/status
-                      let bgColor = 'bg-gray-500';
+                      let bgColor = 'bg-vx-text-muted';
                       let badgeColor = 'bg-gray-600';
-                      let borderColor = 'border-gray-200';
-                      let bgLight = 'bg-gray-50';
+                      let borderColor = 'border-vx-border';
+                      let bgLight = 'bg-vx-surface-elevated';
                       
                       if (quality === 'healthy' || status === 'connected') {
                         bgColor = 'bg-green-500';
@@ -376,7 +376,7 @@ export function CreateCampaign({ onSuccess }: CreateCampaignProps) {
             {/* Daftar Penerima */}
             <div className="space-y-2">
               <Label htmlFor="recipients">Daftar Penerima</Label>
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-vx-text-muted">
                 Pilih daftar penerima pesan
               </p>
               <select
@@ -393,7 +393,7 @@ export function CreateCampaign({ onSuccess }: CreateCampaignProps) {
                   </option>
                 ))}
               </select>
-              <p className="text-xs text-blue-600">
+              <p className="text-xs text-vx-purple">
                 Belum punya daftar? <button type="button" onClick={() => setShowRecipientForm(true)} className="underline">Buat Baru di Sini</button>
               </p>
             </div>
@@ -401,7 +401,7 @@ export function CreateCampaign({ onSuccess }: CreateCampaignProps) {
             {/* Konten Template */}
             <div className="space-y-2">
               <Label htmlFor="template">Konten Template</Label>
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-vx-text-muted">
                 Pilih template pesan yang ingin digunakan
               </p>
               <select
@@ -423,7 +423,7 @@ export function CreateCampaign({ onSuccess }: CreateCampaignProps) {
             {/* Tanggal & Waktu */}
             <div className="space-y-2">
               <Label htmlFor="scheduled">Tanggal & Waktu Pengiriman</Label>
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-vx-text-muted">
                 Pilih tanggal dan waktu pengiriman pesan
               </p>
               <Input
@@ -453,7 +453,7 @@ export function CreateCampaign({ onSuccess }: CreateCampaignProps) {
                 variant="outline"
                 onClick={handleReset}
                 disabled={saving}
-                className="text-red-600 border-red-600 hover:bg-red-50"
+                className="text-red-600 dark:text-red-400 border-red-600 hover:bg-red-50 dark:hover:bg-red-500/5"
               >
                 <RefreshCw className="h-4 w-4 mr-2" />
                 Reset
@@ -469,7 +469,7 @@ export function CreateCampaign({ onSuccess }: CreateCampaignProps) {
               <Button
                 onClick={() => handleSubmit(false)}
                 disabled={saving}
-                className="flex-1 bg-green-600 hover:bg-green-700"
+                className="flex-1 bg-vx-teal hover:bg-vx-teal/90"
               >
                 {saving ? (
                   <>
@@ -486,7 +486,7 @@ export function CreateCampaign({ onSuccess }: CreateCampaignProps) {
               <Button
                 onClick={() => handleSubmit(true)}
                 disabled={saving || !formData.scheduled_at}
-                className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex-1 bg-vx-purple hover:bg-vx-purple/90 disabled:opacity-50 disabled:cursor-not-allowed"
                 title={!formData.scheduled_at ? 'Isi tanggal & waktu terlebih dahulu' : ''}
               >
                 {saving ? (
@@ -635,9 +635,9 @@ export function CreateCampaign({ onSuccess }: CreateCampaignProps) {
       {/* Recipient Form Dialog - Placeholder for now */}
       {showRecipientForm && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" onClick={() => setShowRecipientForm(false)}>
-          <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4" onClick={(e) => e.stopPropagation()}>
+          <div className="bg-vx-surface rounded-lg p-6 max-w-md w-full mx-4" onClick={(e) => e.stopPropagation()}>
             <h3 className="text-lg font-semibold mb-4">Buat Daftar Penerima Baru</h3>
-            <p className="text-gray-600 mb-4">
+            <p className="text-vx-text-secondary mb-4">
               Fitur ini akan membuka form untuk membuat daftar penerima baru. 
               Untuk saat ini, silakan gunakan tab "Daftar Penerima" untuk membuat daftar baru.
             </p>

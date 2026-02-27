@@ -65,7 +65,7 @@ export function WhatsAppPerformance() {
           <CardTitle>Performa WhatsApp</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="h-96 animate-pulse bg-gray-200 dark:bg-gray-800 rounded" />
+          <div className="h-96 animate-pulse bg-vx-surface-hover rounded" />
         </CardContent>
       </Card>
     )
@@ -87,15 +87,15 @@ export function WhatsAppPerformance() {
         <div>
           <h3 className="mb-4 text-sm font-medium">Alur Pengiriman Pesan (24 Jam)</h3>
           <div className="space-y-3">
-            <div className="flex items-center justify-between rounded-lg bg-blue-50 p-3 dark:bg-blue-950">
+            <div className="flex items-center justify-between rounded-lg bg-vx-purple/10 p-3">
               <span className="text-sm font-medium">Terkirim</span>
               <span className="text-lg font-bold">{data.messageFunnel.sent}</span>
             </div>
-            <div className="flex items-center justify-between rounded-lg bg-green-50 p-3 dark:bg-green-950">
+            <div className="flex items-center justify-between rounded-lg bg-vx-teal/10 p-3">
               <span className="text-sm font-medium">Delivered</span>
               <span className="text-lg font-bold">{data.messageFunnel.delivered}</span>
             </div>
-            <div className="flex items-center justify-between rounded-lg bg-purple-50 p-3 dark:bg-purple-950">
+            <div className="flex items-center justify-between rounded-lg bg-vx-purple/10 p-3">
               <span className="text-sm font-medium">Dibaca</span>
               <span className="text-lg font-bold">{data.messageFunnel.read}</span>
             </div>
@@ -105,8 +105,8 @@ export function WhatsAppPerformance() {
             </div>
           </div>
           <div className="mt-4 text-center">
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              Tingkat Pengiriman: <span className="font-bold text-green-600">{deliveryRate}%</span>
+            <p className="text-sm text-vx-text-secondary">
+              Tingkat Pengiriman: <span className="font-bold text-vx-teal">{deliveryRate}%</span>
             </p>
           </div>
         </div>
@@ -114,11 +114,11 @@ export function WhatsAppPerformance() {
         {/* Broadcast Success */}
         <div>
           <h3 className="mb-4 text-sm font-medium">Tingkat Keberhasilan Broadcast</h3>
-          <div className="rounded-lg bg-gray-50 p-4 dark:bg-gray-900">
+          <div className="rounded-lg bg-vx-surface-elevated p-4">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-2xl font-bold">{data.broadcastSuccessRate.percentage}%</p>
-                <p className="text-sm text-gray-600 dark:text-gray-400">
+                <p className="text-sm text-vx-text-secondary">
                   {data.broadcastSuccessRate.successful} dari {data.broadcastSuccessRate.total} berhasil
                 </p>
               </div>
@@ -132,7 +132,7 @@ export function WhatsAppPerformance() {
           <h3 className="mb-4 text-sm font-medium">Sesi Aktif</h3>
           <div className="space-y-2">
             {data.activeSessions.length === 0 ? (
-              <p className="text-sm text-gray-500">Tidak ada sesi aktif</p>
+              <p className="text-sm text-vx-text-muted">Tidak ada sesi aktif</p>
             ) : (
               data.activeSessions.slice(0, 5).map(session => (
                 <div key={session.sessionId} className="flex items-center justify-between rounded-lg border p-3">
@@ -146,7 +146,7 @@ export function WhatsAppPerformance() {
                     )}
                     <span className="text-sm font-medium">{session.phoneNumber}</span>
                   </div>
-                  <span className="text-xs text-gray-500">{session.status}</span>
+                  <span className="text-xs text-vx-text-muted">{session.status}</span>
                 </div>
               ))
             )}
@@ -157,12 +157,12 @@ export function WhatsAppPerformance() {
         <div>
           <h3 className="mb-4 text-sm font-medium">Antrian Pesan</h3>
           <div className="grid grid-cols-2 gap-4">
-            <div className="rounded-lg bg-gray-50 p-3 dark:bg-gray-900">
-              <p className="text-sm text-gray-600 dark:text-gray-400">Kedalaman Antrian</p>
+            <div className="rounded-lg bg-vx-surface-elevated p-3">
+              <p className="text-sm text-vx-text-secondary">Kedalaman Antrian</p>
               <p className="text-2xl font-bold">{data.queueMetrics.depth}</p>
             </div>
-            <div className="rounded-lg bg-gray-50 p-3 dark:bg-gray-900">
-              <p className="text-sm text-gray-600 dark:text-gray-400">Kecepatan Proses</p>
+            <div className="rounded-lg bg-vx-surface-elevated p-3">
+              <p className="text-sm text-vx-text-secondary">Kecepatan Proses</p>
               <p className="text-2xl font-bold">{data.queueMetrics.processingRate}/min</p>
             </div>
           </div>

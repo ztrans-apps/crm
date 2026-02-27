@@ -95,7 +95,7 @@ export function LocationMap({
 
   return (
     <div className="w-full max-w-[300px]">
-      <div className="bg-gray-100 rounded-lg overflow-hidden border border-gray-200">
+      <div className="bg-vx-surface-hover rounded-lg overflow-hidden border border-vx-border">
         {/* Leaflet Map */}
         <div 
           ref={containerRef}
@@ -106,19 +106,19 @@ export function LocationMap({
         {/* Location Info */}
         <div className="p-3">
           <div className="flex items-start gap-2 mb-2">
-            <MapPin className="h-4 w-4 text-red-500 shrink-0 mt-0.5" />
+            <MapPin className="h-4 w-4 text-red-500 dark:text-red-400 shrink-0 mt-0.5" />
             <div className="flex-1 min-w-0">
               {name && (
-                <p className="text-sm font-medium text-gray-900 truncate mb-1">
+                <p className="text-sm font-medium text-vx-text truncate mb-1">
                   {name}
                 </p>
               )}
               {address ? (
-                <p className="text-xs text-gray-600 line-clamp-2">
+                <p className="text-xs text-vx-text-secondary line-clamp-2">
                   {address}
                 </p>
               ) : (
-                <p className="text-xs text-gray-500 font-mono">
+                <p className="text-xs text-vx-text-muted font-mono">
                   {latitude.toFixed(6)}, {longitude.toFixed(6)}
                 </p>
               )}
@@ -130,7 +130,7 @@ export function LocationMap({
             href={getGoogleMapsLink()}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center justify-center gap-2 w-full py-2 px-3 bg-green-600 hover:bg-green-700 text-white text-xs font-medium rounded transition-colors"
+            className="flex items-center justify-center gap-2 w-full py-2 px-3 vx-gradient hover:opacity-90 text-white text-xs font-medium rounded transition-colors"
           >
             <ExternalLink className="h-3.5 w-3.5" />
             Open in Google Maps

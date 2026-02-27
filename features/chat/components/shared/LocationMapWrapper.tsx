@@ -10,13 +10,13 @@ const LocationMap = dynamic(
     ssr: false,
     loading: () => (
       <div className="w-full max-w-[300px]">
-        <div className="bg-gray-100 rounded-lg overflow-hidden border border-gray-200">
-          <div className="w-full h-[200px] bg-gray-200 animate-pulse flex items-center justify-center">
-            <span className="text-gray-400 text-sm">Loading map...</span>
+        <div className="bg-vx-surface-hover rounded-lg overflow-hidden border border-vx-border">
+          <div className="w-full h-[200px] bg-vx-surface-hover animate-pulse flex items-center justify-center">
+            <span className="text-vx-text-muted text-sm">Loading map...</span>
           </div>
           <div className="p-3">
-            <div className="h-4 bg-gray-200 rounded animate-pulse mb-2"></div>
-            <div className="h-3 bg-gray-200 rounded animate-pulse w-3/4"></div>
+            <div className="h-4 bg-vx-surface-hover rounded animate-pulse mb-2"></div>
+            <div className="h-3 bg-vx-surface-hover rounded animate-pulse w-3/4"></div>
           </div>
         </div>
       </div>

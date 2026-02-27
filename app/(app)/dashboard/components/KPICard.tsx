@@ -31,15 +31,15 @@ export function KPICard({
   }
 
   const iconColors = {
-    good: 'text-green-600 dark:text-green-400',
+    good: 'text-vx-teal',
     warning: 'text-yellow-600 dark:text-yellow-400',
     critical: 'text-red-600 dark:text-red-400'
   }
 
   const trendColors = {
-    up: 'text-green-600 dark:text-green-400',
+    up: 'text-vx-teal',
     down: 'text-red-600 dark:text-red-400',
-    stable: 'text-gray-600 dark:text-gray-400'
+    stable: 'text-vx-text-secondary'
   }
 
   const TrendIcon = trend === 'up' ? ArrowUp : trend === 'down' ? ArrowDown : Minus
@@ -51,11 +51,11 @@ export function KPICard({
     )}>
       <div className="flex items-start justify-between">
         <div className="flex-1">
-          <p className="text-sm font-medium text-gray-600 dark:text-gray-400">
+          <p className="text-sm font-medium text-vx-text-secondary">
             {title}
           </p>
           <div className="mt-2 flex items-baseline gap-2">
-            <h3 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+            <h3 className="text-2xl font-bold text-vx-text">
               {value}{suffix}
             </h3>
             <div className={cn('flex items-center text-sm font-medium', trendColors[trend])}>
@@ -64,7 +64,7 @@ export function KPICard({
             </div>
           </div>
           {subtitle && (
-            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+            <p className="mt-1 text-xs text-vx-text-muted">
               {subtitle}
             </p>
           )}

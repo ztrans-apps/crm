@@ -211,7 +211,7 @@ export default function EditRolePage() {
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading role...</p>
+          <p className="mt-4 text-vx-text-secondary">Loading role...</p>
         </div>
       </div>
     )
@@ -222,7 +222,7 @@ export default function EditRolePage() {
       <div className="p-6">
         <Card>
           <CardContent className="p-6">
-            <p className="text-red-600">You don't have permission to edit roles.</p>
+            <p className="text-red-600 dark:text-red-400">You don't have permission to edit roles.</p>
             <Button onClick={() => router.push('/admin/rbac')} className="mt-4">
               Go Back
             </Button>
@@ -247,7 +247,7 @@ export default function EditRolePage() {
           </Button>
           <div>
             <h1 className="text-3xl font-bold">Edit Role: {role?.role_name}</h1>
-            <p className="text-gray-600 mt-1">Manage role permissions</p>
+            <p className="text-vx-text-secondary mt-1">Manage role permissions</p>
           </div>
         </div>
         <div className="flex gap-2">
@@ -255,7 +255,7 @@ export default function EditRolePage() {
             <Button
               variant="outline"
               onClick={handleDelete}
-              className="text-red-600 border-red-600 hover:bg-red-50"
+              className="text-red-600 dark:text-red-400 border-red-600 hover:bg-red-50 dark:hover:bg-red-500/5"
             >
               <Trash2 className="h-4 w-4 mr-2" />
               Delete
@@ -269,8 +269,8 @@ export default function EditRolePage() {
       </div>
 
       {error && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
-          <p className="text-red-800">{error}</p>
+        <div className="bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/20 rounded-lg p-4 mb-6">
+          <p className="text-red-600 dark:text-red-400">{error}</p>
         </div>
       )}
 
@@ -294,8 +294,8 @@ export default function EditRolePage() {
                   onClick={() => setSelectedModule(null)}
                   className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors ${
                     selectedModule === null
-                      ? 'bg-blue-50 text-blue-700 font-medium'
-                      : 'hover:bg-gray-50 text-gray-700'
+                      ? 'bg-vx-purple/5 text-vx-purple font-medium'
+                      : 'hover:bg-vx-surface-hover text-vx-text-secondary'
                   }`}
                 >
                   All Modules ({allPermissions.length})
@@ -306,13 +306,13 @@ export default function EditRolePage() {
                     onClick={() => setSelectedModule(module)}
                     className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors ${
                       selectedModule === module
-                        ? 'bg-blue-50 text-blue-700 font-medium'
-                        : 'hover:bg-gray-50 text-gray-700'
+                        ? 'bg-vx-purple/5 text-vx-purple font-medium'
+                        : 'hover:bg-vx-surface-hover text-vx-text-secondary'
                     }`}
                   >
                     <div className="flex items-center justify-between">
                       <span className="capitalize">{module}</span>
-                      <span className="text-xs text-gray-500">({count})</span>
+                      <span className="text-xs text-vx-text-muted">({count})</span>
                     </div>
                   </button>
                 ))}
@@ -325,7 +325,7 @@ export default function EditRolePage() {
                 <h3 className="text-lg font-semibold capitalize">
                   {selectedModule || 'All'} Permissions
                 </h3>
-                <p className="text-sm text-gray-600">
+                <p className="text-sm text-vx-text-secondary">
                   {selectedPermissions.size} of {allPermissions.length} permissions selected
                 </p>
               </div>
@@ -334,18 +334,18 @@ export default function EditRolePage() {
                 {filteredPermissions.map((permission) => (
                   <div
                     key={permission.id}
-                    className="flex items-start justify-between p-4 border rounded-lg hover:bg-gray-50 transition-colors"
+                    className="flex items-start justify-between p-4 border rounded-lg hover:bg-vx-surface-hover transition-colors"
                   >
                     <div className="flex-1">
-                      <div className="font-medium text-gray-900">
+                      <div className="font-medium text-vx-text">
                         {permission.permission_name}
                       </div>
                       {permission.description && (
-                        <div className="text-sm text-gray-600 mt-1">
+                        <div className="text-sm text-vx-text-secondary mt-1">
                           {permission.description}
                         </div>
                       )}
-                      <div className="text-xs text-gray-500 mt-1">
+                      <div className="text-xs text-vx-text-muted mt-1">
                         {permission.permission_key}
                       </div>
                     </div>
@@ -357,7 +357,7 @@ export default function EditRolePage() {
                 ))}
 
                 {filteredPermissions.length === 0 && (
-                  <div className="text-center py-12 text-gray-500">
+                  <div className="text-center py-12 text-vx-text-muted">
                     No permissions found matching your search.
                   </div>
                 )}

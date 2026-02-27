@@ -48,11 +48,11 @@ export default function ApiDocsPage() {
   }, [])
 
   return (
-    <div className="min-h-screen bg-white">
-      <div className="border-b border-gray-200 bg-white px-6 py-4">
+    <div className="min-h-screen bg-vx-surface">
+      <div className="border-b border-vx-border bg-vx-surface px-6 py-4">
         <div className="max-w-7xl mx-auto">
-          <h1 className="text-2xl font-bold text-gray-900">API Documentation</h1>
-          <p className="mt-1 text-sm text-gray-500">
+          <h1 className="text-2xl font-bold text-vx-text">API Documentation</h1>
+          <p className="mt-1 text-sm text-vx-text-muted">
             Complete API reference for WhatsApp CRM Platform
           </p>
         </div>

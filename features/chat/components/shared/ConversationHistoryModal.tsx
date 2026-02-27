@@ -108,37 +108,37 @@ export function ConversationHistoryModal({
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-5xl h-[90vh] flex flex-col">
+      <div className="bg-vx-surface rounded-lg shadow-xl w-full max-w-5xl h-[90vh] flex flex-col">
         {/* Modal Header with Close Button */}
-        <div className="flex items-center justify-between px-4 py-2 border-b bg-gray-50">
-          <h2 className="text-sm font-semibold text-gray-700">Conversation History</h2>
+        <div className="flex items-center justify-between px-4 py-2 border-b bg-vx-surface-elevated">
+          <h2 className="text-sm font-semibold text-vx-text-secondary">Conversation History</h2>
           <button
             onClick={onClose}
-            className="p-1.5 hover:bg-gray-200 rounded-full transition-colors"
+            className="p-1.5 hover:bg-vx-surface-hover rounded-full transition-colors"
           >
-            <X className="h-4 w-4 text-gray-500" />
+            <X className="h-4 w-4 text-vx-text-muted" />
           </button>
         </div>
 
         {/* Chat Window Content - Exact replica */}
-        <div className="flex-1 flex flex-col bg-gray-50 relative min-h-0">
+        <div className="flex-1 flex flex-col bg-vx-surface-elevated relative min-h-0">
           {/* Chat Header - Same as ChatWindow */}
-          <div className="bg-white p-3 border-b">
+          <div className="bg-vx-surface p-3 border-b">
             <div className="flex items-center justify-between">
               <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 rounded-full bg-green-500 flex items-center justify-center text-white text-sm font-semibold">
+                <div className="w-10 h-10 rounded-full vx-gradient flex items-center justify-center text-white text-sm font-semibold">
                   {conversation ? getAvatarInitial(conversation.contact) : 'U'}
                 </div>
                 <div>
                   <h3 className="font-semibold text-base">
                     {conversation ? getDisplayName(conversation.contact) : 'Loading...'}
                   </h3>
-                  <div className="flex items-center space-x-2 text-xs text-gray-500">
+                  <div className="flex items-center space-x-2 text-xs text-vx-text-muted">
                     <span>{conversation?.contact?.phone_number}</span>
                     {conversation?.assigned_to && (
                       <>
                         <span>•</span>
-                        <span className="text-blue-600">Assigned</span>
+                        <span className="text-vx-purple">Assigned</span>
                       </>
                     )}
                   </div>
@@ -148,7 +148,7 @@ export function ConversationHistoryModal({
               {/* Status indicators */}
               <div className="flex items-center space-x-2">
                 {conversation?.status === 'closed' && (
-                  <span className="px-2 py-1 bg-gray-100 text-gray-700 text-xs rounded-full">
+                  <span className="px-2 py-1 bg-vx-surface-hover text-vx-text-secondary text-xs rounded-full">
                     Selesai
                   </span>
                 )}
@@ -157,8 +157,8 @@ export function ConversationHistoryModal({
           </div>
 
           {/* Read-only notice - Same style as closed conversation notice */}
-          <div className="bg-yellow-50 border-b border-yellow-200 px-3 py-2">
-            <div className="flex items-center justify-center gap-2 text-xs text-yellow-800">
+          <div className="bg-yellow-50 dark:bg-yellow-500/10 border-b border-yellow-200 dark:border-yellow-500/20 px-3 py-2">
+            <div className="flex items-center justify-center gap-2 text-xs text-yellow-800 dark:text-yellow-400">
               <span>⚠️ Read-only mode: This conversation is closed.</span>
               {conversation?.closed_by_profile && conversation?.closed_at && (
                 <span className="font-medium">
@@ -176,13 +176,13 @@ export function ConversationHistoryModal({
             >
               {loading ? (
                 <div className="flex items-center justify-center h-full">
-                  <div className="text-center text-gray-500">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-500 mx-auto mb-2"></div>
+                  <div className="text-center text-vx-text-muted">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-vx-teal mx-auto mb-2"></div>
                     <p className="text-sm">Loading messages...</p>
                   </div>
                 </div>
               ) : messages.length === 0 ? (
-                <div className="flex items-center justify-center h-full text-gray-500">
+                <div className="flex items-center justify-center h-full text-vx-text-muted">
                   <p>No messages yet</p>
                 </div>
               ) : (
@@ -201,10 +201,10 @@ export function ConversationHistoryModal({
           </div>
 
           {/* Input Area Placeholder - Disabled state */}
-          <div className="bg-white border-t p-3">
-            <div className="flex items-center gap-2 px-4 py-2 bg-gray-100 rounded-lg border border-gray-200">
-              <MessageSquare className="h-4 w-4 text-gray-400" />
-              <span className="text-sm text-gray-400 flex-1">
+          <div className="bg-vx-surface border-t p-3">
+            <div className="flex items-center gap-2 px-4 py-2 bg-vx-surface-hover rounded-lg border border-vx-border">
+              <MessageSquare className="h-4 w-4 text-vx-text-muted" />
+              <span className="text-sm text-vx-text-muted flex-1">
                 Cannot reply to closed conversation
               </span>
             </div>

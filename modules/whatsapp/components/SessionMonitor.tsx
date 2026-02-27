@@ -15,32 +15,32 @@ export function SessionMonitor({ refreshInterval = 5000 }: SessionMonitorProps) 
   const getStateIcon = (state: string) => {
     switch (state) {
       case 'CONNECTED':
-        return <CheckCircle2 className="h-4 w-4 text-green-600" />;
+        return <CheckCircle2 className="h-4 w-4 text-vx-teal" />;
       case 'CONNECTING':
-        return <Loader2 className="h-4 w-4 text-blue-600 animate-spin" />;
+        return <Loader2 className="h-4 w-4 text-vx-purple animate-spin" />;
       case 'DISCONNECTED':
-        return <AlertCircle className="h-4 w-4 text-yellow-600" />;
+        return <AlertCircle className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />;
       case 'LOGGED_OUT':
-        return <LogOut className="h-4 w-4 text-gray-600" />;
+        return <LogOut className="h-4 w-4 text-vx-text-secondary" />;
       case 'ERROR':
-        return <XCircle className="h-4 w-4 text-red-600" />;
+        return <XCircle className="h-4 w-4 text-red-600 dark:text-red-400" />;
       default:
-        return <Activity className="h-4 w-4 text-gray-400" />;
+        return <Activity className="h-4 w-4 text-vx-text-muted" />;
     }
   };
 
   const getStateBadge = (state: string) => {
     switch (state) {
       case 'CONNECTED':
-        return <Badge className="bg-green-100 text-green-800 hover:bg-green-100">Connected</Badge>;
+        return <Badge className="bg-vx-teal/10 text-vx-teal hover:bg-vx-teal/10">Connected</Badge>;
       case 'CONNECTING':
-        return <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100">Connecting</Badge>;
+        return <Badge className="bg-vx-purple/10 text-vx-purple hover:bg-vx-purple/10">Connecting</Badge>;
       case 'DISCONNECTED':
-        return <Badge className="bg-yellow-100 text-yellow-800 hover:bg-yellow-100">Disconnected</Badge>;
+        return <Badge className="bg-yellow-100 dark:bg-yellow-500/10 text-yellow-700 dark:text-yellow-400 hover:bg-yellow-100 dark:hover:bg-yellow-500/10">Disconnected</Badge>;
       case 'LOGGED_OUT':
-        return <Badge className="bg-gray-100 text-gray-800 hover:bg-gray-100">Logged Out</Badge>;
+        return <Badge className="bg-vx-surface-hover text-vx-text hover:bg-vx-surface-hover">Logged Out</Badge>;
       case 'ERROR':
-        return <Badge className="bg-red-100 text-red-800 hover:bg-red-100">Error</Badge>;
+        return <Badge className="bg-red-100 dark:bg-red-500/10 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-500/10">Error</Badge>;
       default:
         return <Badge variant="outline">Unknown</Badge>;
     }
@@ -55,11 +55,11 @@ export function SessionMonitor({ refreshInterval = 5000 }: SessionMonitorProps) 
       case 'DISCONNECTED':
         return 'border-yellow-200 bg-yellow-50';
       case 'LOGGED_OUT':
-        return 'border-gray-200 bg-gray-50';
+        return 'border-vx-border bg-vx-surface-elevated';
       case 'ERROR':
         return 'border-red-200 bg-red-50';
       default:
-        return 'border-gray-200';
+        return 'border-vx-border';
     }
   };
 
@@ -118,7 +118,7 @@ export function SessionMonitor({ refreshInterval = 5000 }: SessionMonitorProps) 
         </CardHeader>
         <CardContent>
           <div className="flex items-center justify-center py-8">
-            <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+            <Loader2 className="h-8 w-8 animate-spin text-vx-text-muted" />
           </div>
         </CardContent>
       </Card>
@@ -137,11 +137,11 @@ export function SessionMonitor({ refreshInterval = 5000 }: SessionMonitorProps) 
         </CardHeader>
         <CardContent>
           <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3">
-            <AlertCircle className="h-5 w-5 text-red-600 mt-0.5" />
+            <AlertCircle className="h-5 w-5 text-red-600 dark:text-red-400 mt-0.5" />
             <div>
               <h3 className="font-medium text-red-900">Failed to Load Sessions</h3>
-              <p className="text-sm text-red-700 mt-1">{error}</p>
-              <p className="text-xs text-red-600 mt-2">Check if database is accessible</p>
+              <p className="text-sm text-red-600 dark:text-red-400 mt-1">{error}</p>
+              <p className="text-xs text-red-600 dark:text-red-400 mt-2">Check if database is accessible</p>
             </div>
           </div>
         </CardContent>
@@ -169,40 +169,40 @@ export function SessionMonitor({ refreshInterval = 5000 }: SessionMonitorProps) 
 
         {/* Summary Stats */}
         <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
-          <div className="bg-gray-50 rounded-lg p-3 text-center">
-            <div className="text-2xl font-bold text-gray-900">{summary.total}</div>
-            <div className="text-xs text-gray-600 mt-1">Total</div>
+          <div className="bg-vx-surface-elevated rounded-lg p-3 text-center">
+            <div className="text-2xl font-bold text-vx-text">{summary.total}</div>
+            <div className="text-xs text-vx-text-secondary mt-1">Total</div>
           </div>
           <div className="bg-green-50 rounded-lg p-3 text-center">
-            <div className="text-2xl font-bold text-green-700">{summary.connected}</div>
-            <div className="text-xs text-green-600 mt-1">Connected</div>
+            <div className="text-2xl font-bold text-vx-teal">{summary.connected}</div>
+            <div className="text-xs text-vx-teal mt-1">Connected</div>
           </div>
           <div className="bg-blue-50 rounded-lg p-3 text-center">
-            <div className="text-2xl font-bold text-blue-700">{summary.connecting}</div>
-            <div className="text-xs text-blue-600 mt-1">Connecting</div>
+            <div className="text-2xl font-bold text-vx-purple">{summary.connecting}</div>
+            <div className="text-xs text-vx-purple mt-1">Connecting</div>
           </div>
           <div className="bg-yellow-50 rounded-lg p-3 text-center">
-            <div className="text-2xl font-bold text-yellow-700">{summary.disconnected}</div>
-            <div className="text-xs text-yellow-600 mt-1">Disconnected</div>
+            <div className="text-2xl font-bold text-yellow-700 dark:text-yellow-400">{summary.disconnected}</div>
+            <div className="text-xs text-yellow-600 dark:text-yellow-400 mt-1">Disconnected</div>
           </div>
-          <div className="bg-gray-50 rounded-lg p-3 text-center">
-            <div className="text-2xl font-bold text-gray-700">{summary.loggedOut}</div>
-            <div className="text-xs text-gray-600 mt-1">Logged Out</div>
+          <div className="bg-vx-surface-elevated rounded-lg p-3 text-center">
+            <div className="text-2xl font-bold text-vx-text-secondary">{summary.loggedOut}</div>
+            <div className="text-xs text-vx-text-secondary mt-1">Logged Out</div>
           </div>
           <div className="bg-red-50 rounded-lg p-3 text-center">
-            <div className="text-2xl font-bold text-red-700">{summary.error}</div>
-            <div className="text-xs text-red-600 mt-1">Error</div>
+            <div className="text-2xl font-bold text-red-600 dark:text-red-400">{summary.error}</div>
+            <div className="text-xs text-red-600 dark:text-red-400 mt-1">Error</div>
           </div>
         </div>
 
         {/* Session List */}
         {states.length === 0 ? (
-          <div className="text-center py-8 text-gray-500">
-            <Activity className="h-12 w-12 mx-auto mb-3 text-gray-300" />
+          <div className="text-center py-8 text-vx-text-muted">
+            <Activity className="h-12 w-12 mx-auto mb-3 text-vx-text-muted" />
             <p>No active sessions</p>
           </div>
         ) : (
-          <div className="text-sm text-gray-600">
+          <div className="text-sm text-vx-text-secondary">
             {states.length} session(s) monitored
           </div>
         )}

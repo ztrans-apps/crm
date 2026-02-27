@@ -65,7 +65,7 @@ export function AutomationImpact() {
           <CardTitle>Dampak Otomasi</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="h-96 animate-pulse bg-gray-200 dark:bg-gray-800 rounded" />
+          <div className="h-96 animate-pulse bg-vx-surface-hover rounded" />
         </CardContent>
       </Card>
     )
@@ -111,11 +111,11 @@ export function AutomationImpact() {
         {/* Auto-reply Success */}
         <div>
           <h3 className="mb-4 text-sm font-medium">Tingkat Keberhasilan Auto-reply</h3>
-          <div className="rounded-lg bg-purple-50 p-4 dark:bg-purple-950">
+          <div className="rounded-lg bg-vx-purple/10 p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-2xl font-bold text-purple-600">{data.autoReplySuccess.percentage}%</p>
-                <p className="text-sm text-gray-600 dark:text-gray-400">
+                <p className="text-2xl font-bold text-vx-purple">{data.autoReplySuccess.percentage}%</p>
+                <p className="text-sm text-vx-text-secondary">
                   {data.autoReplySuccess.successful} dari {data.autoReplySuccess.total} berhasil
                 </p>
               </div>
@@ -127,11 +127,11 @@ export function AutomationImpact() {
         {/* Time Saved */}
         <div>
           <h3 className="mb-4 text-sm font-medium">Waktu yang Dihemat</h3>
-          <div className="rounded-lg bg-green-50 p-4 dark:bg-green-950">
+          <div className="rounded-lg bg-vx-teal/10 p-4">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-2xl font-bold text-green-600">{data.timeSaved.hours} jam</p>
-                <p className="text-sm text-gray-600 dark:text-gray-400">
+                <p className="text-2xl font-bold text-vx-teal">{data.timeSaved.hours} jam</p>
+                <p className="text-sm text-vx-text-secondary">
                   Estimasi penghematan: ${data.timeSaved.estimatedCost}
                 </p>
               </div>
@@ -143,9 +143,9 @@ export function AutomationImpact() {
         {/* Escalation Rate */}
         <div>
           <h3 className="mb-4 text-sm font-medium">Tingkat Eskalasi</h3>
-          <div className="rounded-lg bg-gray-50 p-4 dark:bg-gray-900">
+          <div className="rounded-lg bg-vx-surface-elevated p-4">
             <p className="text-2xl font-bold">{data.escalationRate.percentage}%</p>
-            <p className="text-sm text-gray-600 dark:text-gray-400">
+            <p className="text-sm text-vx-text-secondary">
               {data.escalationRate.escalated} dari {data.escalationRate.total} percakapan
             </p>
           </div>
@@ -159,8 +159,8 @@ export function AutomationImpact() {
               <div key={intent.intent} className="flex items-center justify-between rounded-lg border p-3">
                 <span className="text-sm font-medium capitalize">{intent.intent.replace('_', ' ')}</span>
                 <div className="flex items-center gap-4">
-                  <span className="text-sm text-gray-600">{intent.count}</span>
-                  <span className="text-sm font-medium text-green-600">{intent.successRate}%</span>
+                  <span className="text-sm text-vx-text-secondary">{intent.count}</span>
+                  <span className="text-sm font-medium text-vx-teal">{intent.successRate}%</span>
                 </div>
               </div>
             ))}

@@ -183,7 +183,7 @@ export function RecipientListDetail({ list, onBack, onRefresh }: RecipientListDe
                       value={editData.description}
                       onChange={(e) => setEditData({ ...editData, description: e.target.value })}
                       placeholder="Deskripsi (opsional)"
-                      className="text-gray-600"
+                      className="text-vx-text-secondary"
                     />
                   </div>
                   <div className="flex gap-2">
@@ -191,7 +191,7 @@ export function RecipientListDetail({ list, onBack, onRefresh }: RecipientListDe
                       size="sm"
                       onClick={handleSaveEdit}
                       disabled={saving}
-                      className="bg-green-600 hover:bg-green-700"
+                      className="bg-vx-teal hover:bg-vx-teal/90"
                     >
                       {saving ? (
                         <>
@@ -225,7 +225,7 @@ export function RecipientListDetail({ list, onBack, onRefresh }: RecipientListDe
                     </Button>
                   </div>
                   {list.description && (
-                    <p className="text-gray-600 mt-1">{list.description}</p>
+                    <p className="text-vx-text-secondary mt-1">{list.description}</p>
                   )}
                 </div>
               )}
@@ -239,20 +239,20 @@ export function RecipientListDetail({ list, onBack, onRefresh }: RecipientListDe
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-3 gap-4">
-            <div className="text-center p-4 bg-gray-50 rounded-lg">
-              <Users className="h-6 w-6 mx-auto mb-2 text-gray-600" />
-              <div className="text-2xl font-bold text-gray-900">{list.total_contacts}</div>
-              <div className="text-sm text-gray-600">Total Kontak</div>
+            <div className="text-center p-4 bg-vx-surface-elevated rounded-lg">
+              <Users className="h-6 w-6 mx-auto mb-2 text-vx-text-secondary" />
+              <div className="text-2xl font-bold text-vx-text">{list.total_contacts}</div>
+              <div className="text-sm text-vx-text-secondary">Total Kontak</div>
             </div>
-            <div className="text-center p-4 bg-gray-50 rounded-lg">
-              <div className="text-sm text-gray-600 mb-1">Dibuat</div>
-              <div className="font-medium text-gray-900">
+            <div className="text-center p-4 bg-vx-surface-elevated rounded-lg">
+              <div className="text-sm text-vx-text-secondary mb-1">Dibuat</div>
+              <div className="font-medium text-vx-text">
                 {new Date(list.created_at).toLocaleDateString('id-ID')}
               </div>
             </div>
-            <div className="text-center p-4 bg-gray-50 rounded-lg">
-              <div className="text-sm text-gray-600 mb-1">Sumber</div>
-              <div className="font-medium text-gray-900 capitalize">{list.source}</div>
+            <div className="text-center p-4 bg-vx-surface-elevated rounded-lg">
+              <div className="text-sm text-vx-text-secondary mb-1">Sumber</div>
+              <div className="font-medium text-vx-text capitalize">{list.source}</div>
             </div>
           </div>
         </CardContent>
@@ -278,7 +278,7 @@ export function RecipientListDetail({ list, onBack, onRefresh }: RecipientListDe
         <CardContent className="space-y-4">
           {/* Search */}
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-vx-text-muted" />
             <Input
               placeholder="Cari nama atau nomor..."
               value={searchQuery}
@@ -290,12 +290,12 @@ export function RecipientListDetail({ list, onBack, onRefresh }: RecipientListDe
           {/* Table */}
           {loading ? (
             <div className="flex items-center justify-center py-8">
-              <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+              <Loader2 className="h-8 w-8 animate-spin text-vx-text-muted" />
             </div>
           ) : (
             <div className="border rounded-lg overflow-hidden">
               <table className="w-full">
-                <thead className="bg-gray-50">
+                <thead className="bg-vx-surface-elevated">
                   <tr>
                     <th className="px-4 py-3 text-left w-12">
                       <input
@@ -310,15 +310,15 @@ export function RecipientListDetail({ list, onBack, onRefresh }: RecipientListDe
                         }}
                       />
                     </th>
-                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Nama</th>
-                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Nomor Telepon</th>
-                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Saluran</th>
-                    <th className="px-4 py-3 text-left text-sm font-medium text-gray-700">Ditambahkan</th>
+                    <th className="px-4 py-3 text-left text-sm font-medium text-vx-text-secondary">Nama</th>
+                    <th className="px-4 py-3 text-left text-sm font-medium text-vx-text-secondary">Nomor Telepon</th>
+                    <th className="px-4 py-3 text-left text-sm font-medium text-vx-text-secondary">Saluran</th>
+                    <th className="px-4 py-3 text-left text-sm font-medium text-vx-text-secondary">Ditambahkan</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y">
                   {filteredContacts.map((contact) => (
-                    <tr key={contact.id} className="hover:bg-gray-50">
+                    <tr key={contact.id} className="hover:bg-vx-surface-hover">
                       <td className="px-4 py-3">
                         <input
                           type="checkbox"
@@ -332,16 +332,16 @@ export function RecipientListDetail({ list, onBack, onRefresh }: RecipientListDe
                           }}
                         />
                       </td>
-                      <td className="px-4 py-3 text-sm font-medium text-gray-900">
+                      <td className="px-4 py-3 text-sm font-medium text-vx-text">
                         {contact.contact.name}
                       </td>
-                      <td className="px-4 py-3 text-sm text-gray-900">
+                      <td className="px-4 py-3 text-sm text-vx-text">
                         {contact.contact.phone_number}
                       </td>
                       <td className="px-4 py-3 text-sm">
                         <Badge className="bg-green-100 text-green-700">WhatsApp</Badge>
                       </td>
-                      <td className="px-4 py-3 text-sm text-gray-600">
+                      <td className="px-4 py-3 text-sm text-vx-text-secondary">
                         {new Date(contact.added_at).toLocaleDateString('id-ID')}
                       </td>
                     </tr>
@@ -350,7 +350,7 @@ export function RecipientListDetail({ list, onBack, onRefresh }: RecipientListDe
               </table>
               
               {filteredContacts.length === 0 && (
-                <div className="text-center py-8 text-gray-500">
+                <div className="text-center py-8 text-vx-text-muted">
                   {searchQuery ? 'Tidak ada hasil pencarian' : 'Belum ada kontak'}
                 </div>
               )}

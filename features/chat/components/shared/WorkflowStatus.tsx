@@ -39,10 +39,10 @@ export function WorkflowStatusManager({
   const [updating, setUpdating] = useState(false)
 
   const statuses: { value: WorkflowStatus; label: string; icon: any; color: string }[] = [
-    { value: 'incoming', label: 'Masuk', icon: Inbox, color: 'text-blue-600' },
-    { value: 'waiting', label: 'Menunggu', icon: Clock, color: 'text-yellow-600' },
-    { value: 'in_progress', label: 'Progress', icon: PlayCircle, color: 'text-green-600' },
-    { value: 'done', label: 'Selesai', icon: CheckCircle2, color: 'text-gray-600' },
+    { value: 'incoming', label: 'Masuk', icon: Inbox, color: 'text-vx-purple' },
+    { value: 'waiting', label: 'Menunggu', icon: Clock, color: 'text-yellow-600 dark:text-yellow-400' },
+    { value: 'in_progress', label: 'Progress', icon: PlayCircle, color: 'text-vx-teal' },
+    { value: 'done', label: 'Selesai', icon: CheckCircle2, color: 'text-vx-text-secondary' },
   ]
 
   const handleStatusChange = async (newStatus: WorkflowStatus) => {
@@ -100,18 +100,18 @@ export function WorkflowStatusManager({
 
   return (
     <div className="space-y-2">
-      <label className="text-[10px] text-gray-500 block">Workflow Status</label>
+      <label className="text-[10px] text-vx-text-muted block">Workflow Status</label>
       
       {/* Warning message for agent */}
       {isDisabledForAgent && (
-        <div className="text-[10px] text-orange-600 bg-orange-50 px-2 py-1 rounded">
+        <div className="text-[10px] text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-500/10 px-2 py-1 rounded">
           Ambil obrolan terlebih dahulu
         </div>
       )}
       
       {/* Warning message for done status */}
       {isStatusDone && (
-        <div className="text-[10px] text-gray-600 bg-gray-50 px-2 py-1 rounded flex items-center gap-1">
+        <div className="text-[10px] text-vx-text-secondary bg-vx-surface-elevated px-2 py-1 rounded flex items-center gap-1">
           <CheckCircle2 className="h-3 w-3" />
           Chat sudah selesai
         </div>

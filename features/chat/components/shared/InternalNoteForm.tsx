@@ -30,9 +30,9 @@ export function InternalNoteForm({ onSave }: InternalNoteFormProps) {
 
   return (
     <div className="space-y-3">
-      <div className="flex items-start gap-2 p-2 bg-blue-50 rounded-lg border border-blue-200">
-        <AlertCircle className="h-4 w-4 text-blue-600 mt-0.5 flex-shrink-0" />
-        <p className="text-xs text-blue-700">
+      <div className="flex items-start gap-2 p-2 bg-vx-purple/5 rounded-lg border border-vx-purple/20">
+        <AlertCircle className="h-4 w-4 text-vx-purple mt-0.5 flex-shrink-0" />
+        <p className="text-xs text-vx-purple">
           Catatan internal untuk agent. Gunakan untuk mencatat komplain, info penting, atau catatan handover.
         </p>
       </div>
@@ -41,7 +41,7 @@ export function InternalNoteForm({ onSave }: InternalNoteFormProps) {
         value={content}
         onChange={(e) => setContent(e.target.value)}
         placeholder="Tulis catatan internal di sini... (misal: Customer komplain produk rusak, perlu follow up besok)"
-        className="w-full px-3 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+        className="w-full px-3 py-2 text-sm border border-vx-border rounded-lg focus:outline-none focus:ring-2 focus:ring-vx-purple/30 resize-none"
         rows={4}
         disabled={saving}
       />
@@ -50,7 +50,7 @@ export function InternalNoteForm({ onSave }: InternalNoteFormProps) {
         onClick={handleSave}
         disabled={!content.trim() || saving}
         size="sm"
-        className="w-full bg-blue-600 hover:bg-blue-700"
+        className="w-full bg-vx-purple hover:bg-vx-purple/90"
       >
         <Save className="h-3 w-3 mr-2" />
         {saving ? 'Menyimpan...' : 'Simpan Catatan'}

@@ -96,20 +96,20 @@ export default function ChatbotsPage() {
 
   return (
     <PermissionGuard permission={['chatbot.manage']}>
-      <div className="h-full bg-gray-50 p-6">
+      <div className="h-full bg-vx-surface-elevated p-6">
         {/* Header */}
         <div className="mb-6">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-                <Bot className="h-6 w-6 text-blue-600" />
+              <h1 className="text-2xl font-bold text-vx-text flex items-center gap-2">
+                <Bot className="h-6 w-6 text-vx-purple" />
                 Chatbots
               </h1>
-              <p className="text-sm text-gray-600 mt-1">
+              <p className="text-sm text-vx-text-secondary mt-1">
                 Automate conversations with AI-powered chatbots
               </p>
             </div>
-            <Button onClick={handleCreate} className="bg-blue-600 hover:bg-blue-700">
+            <Button onClick={handleCreate} className="bg-vx-purple hover:bg-vx-purple/90">
               <Plus className="h-4 w-4 mr-2" />
               Create Chatbot
             </Button>
@@ -120,20 +120,20 @@ export default function ChatbotsPage() {
         {loading ? (
           <Card>
             <CardContent className="flex items-center justify-center py-16">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-vx-purple"></div>
             </CardContent>
           </Card>
         ) : chatbots.length === 0 ? (
           <Card className="border-2 border-dashed">
             <CardContent className="flex flex-col items-center justify-center py-16">
-              <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mb-4">
-                <Bot className="h-10 w-10 text-blue-600" />
+              <div className="w-20 h-20 bg-vx-purple/10 rounded-full flex items-center justify-center mb-4">
+                <Bot className="h-10 w-10 text-vx-purple" />
               </div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-2">No Chatbots Yet</h3>
-              <p className="text-gray-600 mb-6 text-center max-w-md">
+              <h3 className="text-xl font-semibold text-vx-text mb-2">No Chatbots Yet</h3>
+              <p className="text-vx-text-secondary mb-6 text-center max-w-md">
                 Create your first chatbot to automate responses and handle common questions
               </p>
-              <Button onClick={handleCreate} className="bg-blue-600 hover:bg-blue-700">
+              <Button onClick={handleCreate} className="bg-vx-purple hover:bg-vx-purple/90">
                 <Plus className="h-4 w-4 mr-2" />
                 Create Your First Chatbot
               </Button>
@@ -147,22 +147,22 @@ export default function ChatbotsPage() {
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
                       <div className="flex items-center gap-3 mb-2">
-                        <h3 className="text-lg font-semibold text-gray-900">{chatbot.name}</h3>
+                        <h3 className="text-lg font-semibold text-vx-text">{chatbot.name}</h3>
                         {chatbot.is_active ? (
-                          <span className="px-2 py-0.5 bg-green-100 text-green-700 rounded text-xs font-medium">
+                          <span className="px-2 py-0.5 bg-vx-teal/10 text-vx-teal rounded text-xs font-medium">
                             Active
                           </span>
                         ) : (
-                          <span className="px-2 py-0.5 bg-gray-100 text-gray-700 rounded text-xs font-medium">
+                          <span className="px-2 py-0.5 bg-vx-surface-hover text-vx-text-secondary rounded text-xs font-medium">
                             Inactive
                           </span>
                         )}
-                        <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-xs">
+                        <span className="px-2 py-0.5 bg-vx-purple/10 text-vx-purple rounded text-xs">
                           {chatbot.trigger_type}
                         </span>
                       </div>
-                      <p className="text-gray-600 mb-4">{chatbot.description}</p>
-                      <div className="flex items-center gap-4 text-sm text-gray-500">
+                      <p className="text-vx-text-secondary mb-4">{chatbot.description}</p>
+                      <div className="flex items-center gap-4 text-sm text-vx-text-muted">
                         <span>Priority: {chatbot.priority}</span>
                         <span>Created: {new Date(chatbot.created_at).toLocaleDateString()}</span>
                       </div>
@@ -172,29 +172,29 @@ export default function ChatbotsPage() {
                         onClick={() => handleToggleActive(chatbot)}
                         className={`p-2 rounded-lg transition-colors ${
                           chatbot.is_active
-                            ? 'text-green-600 hover:bg-green-50'
-                            : 'text-gray-600 hover:bg-gray-100'
+                            ? 'text-vx-teal hover:bg-vx-teal/5'
+                            : 'text-vx-text-secondary hover:bg-vx-surface-hover'
                         }`}
                         title={chatbot.is_active ? 'Deactivate' : 'Activate'}
                       >
                         <Power className="h-4 w-4" />
                       </button>
                       <button
-                        className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                        className="p-2 text-vx-purple hover:bg-vx-purple/5 rounded-lg transition-colors"
                         title="Analytics"
                       >
                         <BarChart3 className="h-4 w-4" />
                       </button>
                       <button
                         onClick={() => handleEdit(chatbot)}
-                        className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                        className="p-2 text-vx-text-secondary hover:bg-vx-surface-hover rounded-lg transition-colors"
                         title="Edit"
                       >
                         <Edit className="h-4 w-4" />
                       </button>
                       <button
                         onClick={() => handleDelete(chatbot)}
-                        className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                        className="p-2 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-500/5 rounded-lg transition-colors"
                         title="Delete"
                       >
                         <Trash2 className="h-4 w-4" />

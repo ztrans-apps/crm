@@ -113,8 +113,8 @@ export function QuickRepliesModal({
 
           <div className="space-y-4">
             {/* Preview */}
-            <div className="p-3 bg-gray-50 rounded-md">
-              <label className="text-xs text-gray-500 block mb-1">Preview</label>
+            <div className="p-3 bg-vx-surface-elevated rounded-md">
+              <label className="text-xs text-vx-text-muted block mb-1">Preview</label>
               <p className="text-sm whitespace-pre-wrap">
                 {replaceVariables(selectedReply.content, variableValues)}
               </p>
@@ -173,7 +173,7 @@ export function QuickRepliesModal({
 
         {/* Search */}
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-vx-text-muted" />
           <Input
             placeholder="Search quick replies..."
             value={searchQuery}
@@ -208,8 +208,8 @@ export function QuickRepliesModal({
         {/* Quick replies list */}
         <div className="flex-1 overflow-y-auto space-y-2">
           {filteredReplies.length === 0 ? (
-            <div className="text-center py-8 text-gray-500">
-              <Zap className="h-12 w-12 mx-auto mb-2 text-gray-300" />
+            <div className="text-center py-8 text-vx-text-muted">
+              <Zap className="h-12 w-12 mx-auto mb-2 text-vx-text-muted" />
               <p>No quick replies found</p>
             </div>
           ) : (
@@ -220,7 +220,7 @@ export function QuickRepliesModal({
                 <button
                   key={reply.id}
                   onClick={() => handleSelectReply(reply)}
-                  className="w-full text-left p-3 border rounded-lg hover:bg-gray-50 transition-colors"
+                  className="w-full text-left p-3 border rounded-lg hover:bg-vx-surface-hover transition-colors"
                 >
                   <div className="flex items-start justify-between mb-1">
                     <h4 className="font-medium text-sm">{reply.title}</h4>
@@ -230,7 +230,7 @@ export function QuickRepliesModal({
                       </Badge>
                     )}
                   </div>
-                  <p className="text-sm text-gray-600 line-clamp-2">
+                  <p className="text-sm text-vx-text-secondary line-clamp-2">
                     {reply.content}
                   </p>
                   {reply.category && (

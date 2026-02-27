@@ -226,7 +226,7 @@ export function RecipientLists() {
     return (
       <Card>
         <CardContent className="flex items-center justify-center py-16">
-          <Loader2 className="h-12 w-12 text-gray-400 animate-spin" />
+          <Loader2 className="h-12 w-12 text-vx-text-muted animate-spin" />
         </CardContent>
       </Card>
     );
@@ -239,7 +239,7 @@ export function RecipientLists() {
         <CardContent className="p-4">
           <div className="flex gap-4">
             <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-vx-text-muted" />
               <Input
                 placeholder="Cari daftar penerima..."
                 value={searchQuery}
@@ -259,9 +259,9 @@ export function RecipientLists() {
       {filteredLists.length === 0 ? (
         <Card className="border-2 border-dashed">
           <CardContent className="flex flex-col items-center justify-center py-16">
-            <Users className="h-16 w-16 text-gray-400 mb-4" />
-            <h3 className="text-xl font-semibold text-gray-900 mb-2">Belum Ada Daftar Penerima</h3>
-            <p className="text-gray-600 mb-6">Buat daftar penerima untuk broadcast campaign</p>
+            <Users className="h-16 w-16 text-vx-text-muted mb-4" />
+            <h3 className="text-xl font-semibold text-vx-text mb-2">Belum Ada Daftar Penerima</h3>
+            <p className="text-vx-text-secondary mb-6">Buat daftar penerima untuk broadcast campaign</p>
             <Button onClick={() => setShowForm(true)} className="bg-purple-600 hover:bg-purple-700">
               <Plus className="h-4 w-4 mr-2" />
               Buat Daftar Pertama
@@ -276,18 +276,18 @@ export function RecipientLists() {
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
                     <div className="flex items-center gap-3 mb-2">
-                      <h3 className="text-lg font-semibold text-gray-900">{list.name}</h3>
+                      <h3 className="text-lg font-semibold text-vx-text">{list.name}</h3>
                       {getSourceBadge(list.source, list.filter_criteria)}
                     </div>
                     
                     {list.description && (
-                      <p className="text-gray-600 mb-3">{list.description}</p>
+                      <p className="text-vx-text-secondary mb-3">{list.description}</p>
                     )}
                     
-                    <div className="flex items-center gap-2 text-sm text-gray-600">
+                    <div className="flex items-center gap-2 text-sm text-vx-text-secondary">
                       <Users className="h-4 w-4" />
                       <span>{list.total_contacts} kontak</span>
-                      <span className="text-gray-400">•</span>
+                      <span className="text-vx-text-muted">•</span>
                       <span>{new Date(list.created_at).toLocaleDateString('id-ID')}</span>
                     </div>
                   </div>
@@ -343,7 +343,7 @@ export function RecipientLists() {
                   className={`p-4 border-2 rounded-lg cursor-pointer transition-all ${
                     selectedSource === 'import'
                       ? 'border-blue-500 bg-blue-50'
-                      : 'border-gray-200 hover:border-blue-300'
+                      : 'border-vx-border hover:border-vx-purple/30'
                   }`}
                 >
                   <div className="flex items-center gap-2 mb-2">
@@ -355,7 +355,7 @@ export function RecipientLists() {
                     />
                     <h4 className="font-semibold">Impor Excel</h4>
                   </div>
-                  <p className="text-sm text-gray-600">
+                  <p className="text-sm text-vx-text-secondary">
                     Unggah kontak penerima dari excel yang Anda sediakan
                   </p>
                 </div>
@@ -365,7 +365,7 @@ export function RecipientLists() {
                   className={`p-4 border-2 rounded-lg cursor-pointer transition-all ${
                     selectedSource === 'import-variabel'
                       ? 'border-blue-500 bg-blue-50'
-                      : 'border-gray-200 hover:border-blue-300'
+                      : 'border-vx-border hover:border-vx-purple/30'
                   }`}
                 >
                   <div className="flex items-center gap-2 mb-2">
@@ -377,7 +377,7 @@ export function RecipientLists() {
                     />
                     <h4 className="font-semibold">Impor Excel Dengan Variabel</h4>
                   </div>
-                  <p className="text-sm text-gray-600">
+                  <p className="text-sm text-vx-text-secondary">
                     Unggah kontak penerima dari excel yang Anda sediakan
                   </p>
                 </div>
@@ -387,7 +387,7 @@ export function RecipientLists() {
                   className={`p-4 border-2 rounded-lg cursor-pointer transition-all ${
                     selectedSource === 'crm'
                       ? 'border-blue-500 bg-blue-50'
-                      : 'border-gray-200 hover:border-blue-300'
+                      : 'border-vx-border hover:border-vx-purple/30'
                   }`}
                 >
                   <div className="flex items-center gap-2 mb-2">
@@ -399,7 +399,7 @@ export function RecipientLists() {
                     />
                     <h4 className="font-semibold">Dari Kontak CRM</h4>
                   </div>
-                  <p className="text-sm text-gray-600">
+                  <p className="text-sm text-vx-text-secondary">
                     Pilih daftar penerima langsung dari CRM Barantum
                   </p>
                 </div>
@@ -408,7 +408,7 @@ export function RecipientLists() {
 
             {/* Import Excel */}
             {(selectedSource === 'import' || selectedSource === 'import-variabel') && (
-              <div className="space-y-4 p-4 bg-gray-50 rounded-lg">
+              <div className="space-y-4 p-4 bg-vx-surface-elevated rounded-lg">
                 <div>
                   <h4 className="font-semibold mb-2">Ikuti langkah-langkah berikut agar proses unggah berhasil:</h4>
                   
@@ -419,7 +419,7 @@ export function RecipientLists() {
                       </div>
                       <div>
                         <h5 className="font-medium">Unduh Template</h5>
-                        <p className="text-sm text-gray-600 mb-2">
+                        <p className="text-sm text-vx-text-secondary mb-2">
                           Gunakan hanya template resmi dari Barantum untuk mengisi daftar penerima.
                         </p>
                         <Button
@@ -440,8 +440,8 @@ export function RecipientLists() {
                       </div>
                       <div>
                         <h5 className="font-medium">Isi Template Yang Diunduh Sesuai Petunjuk</h5>
-                        <p className="text-sm text-gray-600">Agar file berhasil diunggah, pastikan:</p>
-                        <ul className="text-sm text-gray-600 list-disc ml-5 mt-1">
+                        <p className="text-sm text-vx-text-secondary">Agar file berhasil diunggah, pastikan:</p>
+                        <ul className="text-sm text-vx-text-secondary list-disc ml-5 mt-1">
                           <li>Jangan menghapus baris pertama (header) dan menambah column baru</li>
                           <li>Tulis nomor telepon dengan kode negara di awal</li>
                         </ul>
@@ -460,7 +460,7 @@ export function RecipientLists() {
                       </div>
                       <div className="flex-1">
                         <h5 className="font-medium mb-2">Unggah Template</h5>
-                        <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
+                        <div className="border-2 border-dashed border-vx-border rounded-lg p-6 text-center">
                           <input
                             type="file"
                             accept=".csv,.xlsx,.xls"
@@ -473,21 +473,21 @@ export function RecipientLists() {
                               <div className="text-green-600">
                                 <CheckCircle className="h-8 w-8 mx-auto mb-2" />
                                 <p className="font-medium">{uploadedFile.name}</p>
-                                <p className="text-sm text-gray-500">Klik untuk ganti file</p>
+                                <p className="text-sm text-vx-text-muted">Klik untuk ganti file</p>
                               </div>
                             ) : (
                               <div>
-                                <Upload className="h-8 w-8 mx-auto mb-2 text-gray-400" />
-                                <p className="font-medium text-gray-700">Pilih Dokumen</p>
-                                <p className="text-sm text-gray-500">Tidak ada file terpilih</p>
+                                <Upload className="h-8 w-8 mx-auto mb-2 text-vx-text-muted" />
+                                <p className="font-medium text-vx-text-secondary">Pilih Dokumen</p>
+                                <p className="text-sm text-vx-text-muted">Tidak ada file terpilih</p>
                               </div>
                             )}
                           </label>
                         </div>
-                        <p className="text-xs text-gray-500 mt-2">
+                        <p className="text-xs text-vx-text-muted mt-2">
                           💡 Catatan: Anda memiliki 2 akun WhatsApp dengan batas unggah berbeda:
                         </p>
-                        <p className="text-xs text-gray-500">
+                        <p className="text-xs text-vx-text-muted">
                           Jackal Holidays (622150600678) — Maksimal 100,000 kontak per file sesuai kebijakan Meta.
                         </p>
                       </div>
@@ -509,7 +509,7 @@ export function RecipientLists() {
                 </select>
 
                 <div className="border rounded-lg">
-                  <div className="p-3 bg-gray-50 border-b flex items-center justify-between">
+                  <div className="p-3 bg-vx-surface-elevated border-b flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <input
                         type="checkbox"
@@ -525,7 +525,7 @@ export function RecipientLists() {
                       <span className="text-sm font-medium">Pilih Semua</span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="text-sm text-gray-600">Lihat</span>
+                      <span className="text-sm text-vx-text-secondary">Lihat</span>
                       <select className="text-sm border rounded px-2 py-1">
                         <option>15</option>
                         <option>25</option>
@@ -536,16 +536,16 @@ export function RecipientLists() {
 
                   <div className="max-h-96 overflow-y-auto">
                     <table className="w-full">
-                      <thead className="bg-gray-50 sticky top-0">
+                      <thead className="bg-vx-surface-elevated sticky top-0">
                         <tr>
-                          <th className="px-4 py-2 text-left text-sm font-medium text-gray-700 w-12"></th>
-                          <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">NAMA</th>
-                          <th className="px-4 py-2 text-left text-sm font-medium text-gray-700">NOMOR</th>
+                          <th className="px-4 py-2 text-left text-sm font-medium text-vx-text-secondary w-12"></th>
+                          <th className="px-4 py-2 text-left text-sm font-medium text-vx-text-secondary">NAMA</th>
+                          <th className="px-4 py-2 text-left text-sm font-medium text-vx-text-secondary">NOMOR</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y">
                         {contacts.map((contact) => (
-                          <tr key={contact.id} className="hover:bg-gray-50">
+                          <tr key={contact.id} className="hover:bg-vx-surface-hover">
                             <td className="px-4 py-3">
                               <input
                                 type="checkbox"
@@ -574,7 +574,7 @@ export function RecipientLists() {
                     </table>
                     
                     {contacts.length === 0 && (
-                      <div className="text-center py-8 text-gray-500">
+                      <div className="text-center py-8 text-vx-text-muted">
                         Tidak ada kontak tersedia
                       </div>
                     )}
@@ -582,7 +582,7 @@ export function RecipientLists() {
                 </div>
 
                 {selectedContacts.length > 0 && (
-                  <div className="text-sm text-gray-600">
+                  <div className="text-sm text-vx-text-secondary">
                     {selectedContacts.length} kontak dipilih
                   </div>
                 )}

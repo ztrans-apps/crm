@@ -466,11 +466,11 @@ export function InputBar({
 
   // Attachment menu items - Simplified
   const attachmentMenuItems = [
-    { icon: ImageIcon, label: 'Image', color: 'text-green-600', action: 'image' },
-    { icon: Video, label: 'Video', color: 'text-blue-600', action: 'video' },
-    { icon: Mic, label: 'Audio', color: 'text-orange-600', action: 'audio' },
+    { icon: ImageIcon, label: 'Image', color: 'text-vx-teal', action: 'image' },
+    { icon: Video, label: 'Video', color: 'text-vx-purple', action: 'video' },
+    { icon: Mic, label: 'Audio', color: 'text-orange-600 dark:text-orange-400', action: 'audio' },
     { icon: FileText, label: 'Document', color: 'text-purple-600', action: 'document' },
-    { icon: MapPin, label: 'Location', color: 'text-red-600', action: 'location' },
+    { icon: MapPin, label: 'Location', color: 'text-red-600 dark:text-red-400', action: 'location' },
   ]
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
@@ -699,26 +699,26 @@ export function InputBar({
   }
 
   return (
-    <div className="bg-white p-2" {...getRootProps()}>
+    <div className="bg-vx-surface p-2" {...getRootProps()}>
       <input {...getInputProps()} />
       
       {isDragActive && (
-        <div className="absolute inset-0 bg-green-50 border-2 border-dashed border-green-500 flex items-center justify-center z-10">
-          <p className="text-green-600 font-medium">Drop file here...</p>
+        <div className="absolute inset-0 bg-vx-teal/10 border-2 border-dashed border-vx-teal flex items-center justify-center z-10">
+          <p className="text-vx-teal font-medium">Drop file here...</p>
         </div>
       )}
 
       {/* Reply preview */}
       {replyingTo && (
-        <div className="mb-2 p-2 bg-blue-50 border-l-4 border-blue-500 rounded flex items-start justify-between">
+        <div className="mb-2 p-2 bg-vx-purple/10 border-l-4 border-vx-purple rounded flex items-start justify-between">
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1">
-              <MessageSquare className="h-3 w-3 text-blue-600" />
-              <p className="text-xs font-medium text-blue-700">
+              <MessageSquare className="h-3 w-3 text-vx-purple" />
+              <p className="text-xs font-medium text-vx-purple">
                 Replying to {replyingTo.is_from_me ? 'yourself' : (replyingTo.contact?.name || 'Customer')}
               </p>
             </div>
-            <p className="text-xs text-gray-600 truncate">
+            <p className="text-xs text-vx-text-secondary truncate">
               {replyingTo.content || (replyingTo.media_type ? `[${replyingTo.media_type}]` : 'Message')}
             </p>
           </div>
@@ -737,12 +737,12 @@ export function InputBar({
 
       {/* Selected file preview with caption input */}
       {selectedFile && (
-        <div className="mb-2 p-3 bg-gray-50 rounded-lg border border-gray-200">
+        <div className="mb-2 p-3 bg-vx-surface-elevated rounded-lg border border-vx-border">
           <div className="flex items-start gap-3 mb-2">
             {/* File preview */}
             <div className="shrink-0">
               {selectedFile.type.startsWith('image/') ? (
-                <div className="w-16 h-16 rounded overflow-hidden bg-gray-200">
+                <div className="w-16 h-16 rounded overflow-hidden bg-vx-surface-hover">
                   <img
                     src={URL.createObjectURL(selectedFile)}
                     alt="Preview"
@@ -750,11 +750,11 @@ export function InputBar({
                   />
                 </div>
               ) : (
-                <div className="w-16 h-16 rounded bg-blue-100 flex items-center justify-center">
+                <div className="w-16 h-16 rounded bg-vx-purple/10 flex items-center justify-center">
                   {selectedFile.type.startsWith('video/') ? (
-                    <Video className="h-8 w-8 text-blue-600" />
+                    <Video className="h-8 w-8 text-vx-purple" />
                   ) : selectedFile.type.startsWith('audio/') ? (
-                    <Mic className="h-8 w-8 text-orange-600" />
+                    <Mic className="h-8 w-8 text-orange-600 dark:text-orange-400" />
                   ) : (
                     <FileText className="h-8 w-8 text-purple-600" />
                   )}
@@ -764,8 +764,8 @@ export function InputBar({
             
             {/* File info */}
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-gray-700 truncate">{selectedFile.name}</p>
-              <p className="text-xs text-gray-500">
+              <p className="text-sm font-medium text-vx-text-secondary truncate">{selectedFile.name}</p>
+              <p className="text-xs text-vx-text-muted">
                 {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
               </p>
             </div>
@@ -811,7 +811,7 @@ export function InputBar({
                 // Focus caption input after emoji selection
                 setTimeout(() => captionInputRef.current?.focus(), 100)
               }}
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-vx-text-muted hover:text-vx-text-secondary"
             >
               <Smile className="h-4 w-4" />
             </button>
@@ -835,7 +835,7 @@ export function InputBar({
             <Button
               variant="ghost"
               size="icon"
-              className="text-gray-500 hover:text-gray-700 h-9 w-9"
+              className="text-vx-text-muted hover:text-vx-text-secondary h-9 w-9"
               type="button"
             >
               <Plus className="h-5 w-5" />
@@ -847,10 +847,10 @@ export function InputBar({
                 <button
                   key={item.action}
                   onClick={() => handleAttachmentAction(item.action)}
-                  className="flex items-center gap-3 px-4 py-2 rounded-lg hover:bg-gray-100 transition-colors text-left min-w-[180px]"
+                  className="flex items-center gap-3 px-4 py-2 rounded-lg hover:bg-vx-surface-hover transition-colors text-left min-w-[180px]"
                 >
                   <item.icon className={`h-5 w-5 ${item.color}`} />
-                  <span className="text-sm font-medium text-gray-700">{item.label}</span>
+                  <span className="text-sm font-medium text-vx-text-secondary">{item.label}</span>
                 </button>
               ))}
             </div>
@@ -875,7 +875,7 @@ export function InputBar({
             <Button
               variant="ghost"
               size="icon"
-              className="text-gray-500 hover:text-gray-700 h-9 w-9"
+              className="text-vx-text-muted hover:text-vx-text-secondary h-9 w-9"
               type="button"
             >
               <Smile className="h-5 w-5" />
@@ -895,7 +895,7 @@ export function InputBar({
                   {emojiSearch && (
                     <button
                       onClick={() => setEmojiSearch('')}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                      className="absolute right-2 top-1/2 -translate-y-1/2 text-vx-text-muted hover:text-vx-text-secondary"
                     >
                       <X className="h-4 w-4" />
                     </button>
@@ -913,8 +913,8 @@ export function InputBar({
                         onClick={() => setEmojiCategory(key)}
                         className={`px-3 py-1.5 text-lg rounded transition-colors shrink-0 ${
                           emojiCategory === key
-                            ? 'bg-blue-100'
-                            : 'hover:bg-gray-100'
+                            ? 'bg-vx-purple/10'
+                            : 'hover:bg-vx-surface-hover'
                         }`}
                         title={cat.name}
                       >
@@ -927,7 +927,7 @@ export function InputBar({
                   <Popover>
                     <PopoverTrigger asChild>
                       <button
-                        className="ml-2 px-2 py-1.5 text-lg rounded hover:bg-gray-100 transition-colors shrink-0"
+                        className="ml-2 px-2 py-1.5 text-lg rounded hover:bg-vx-surface-hover transition-colors shrink-0"
                         title="Skin tone"
                       >
                         {skinTone ? skinTone : '🟡'}
@@ -939,8 +939,8 @@ export function InputBar({
                           <button
                             key={tone.modifier}
                             onClick={() => setSkinTone(tone.modifier)}
-                            className={`px-3 py-2 text-lg rounded hover:bg-gray-100 transition-colors text-left ${
-                              skinTone === tone.modifier ? 'bg-blue-100' : ''
+                            className={`px-3 py-2 text-lg rounded hover:bg-vx-surface-hover transition-colors text-left ${
+                              skinTone === tone.modifier ? 'bg-vx-purple/10' : ''
                             }`}
                             title={tone.label}
                           >
@@ -960,7 +960,7 @@ export function InputBar({
                     <button
                       key={index}
                       onClick={() => handleEmojiClick(emoji)}
-                      className="text-2xl hover:bg-gray-100 rounded p-1 transition-colors"
+                      className="text-2xl hover:bg-vx-surface-hover rounded p-1 transition-colors"
                     >
                       {emoji}
                     </button>
@@ -975,7 +975,7 @@ export function InputBar({
         <Button
           onClick={handleSend}
           disabled={selectedFile ? (disabled || sending) : (!value.trim() || disabled || sending)}
-          className="bg-blue-600 hover:bg-blue-700 h-9 px-4"
+          className="vx-gradient hover:opacity-90 h-9 px-4"
         >
           {sending ? (
             <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
@@ -995,7 +995,7 @@ export function InputBar({
           <div className="space-y-4 overflow-y-auto flex-1">
             {/* Search Location */}
             <div>
-              <label className="text-sm font-medium text-gray-700 mb-2 block">
+              <label className="text-sm font-medium text-vx-text-secondary mb-2 block">
                 Search Location
               </label>
               <div className="flex gap-2">
@@ -1017,7 +1017,7 @@ export function InputBar({
                   className="shrink-0"
                 >
                   {searching ? (
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-600"></div>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-vx-text-secondary"></div>
                   ) : (
                     'Search'
                   )}
@@ -1032,15 +1032,15 @@ export function InputBar({
                   <button
                     key={index}
                     onClick={() => handleSelectSearchResult(result)}
-                    className="w-full text-left px-3 py-2 hover:bg-gray-50 border-b last:border-b-0 transition-colors"
+                    className="w-full text-left px-3 py-2 hover:bg-vx-surface-hover border-b last:border-b-0 transition-colors"
                   >
                     <div className="flex items-start gap-2">
-                      <MapPin className="h-4 w-4 text-red-500 mt-0.5 shrink-0" />
+                      <MapPin className="h-4 w-4 text-red-500 dark:text-red-400 mt-0.5 shrink-0" />
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-gray-900 truncate">
+                        <p className="text-sm font-medium text-vx-text truncate">
                           {result.display_name.split(',')[0]}
                         </p>
-                        <p className="text-xs text-gray-500 line-clamp-1">
+                        <p className="text-xs text-vx-text-muted line-clamp-1">
                           {result.display_name}
                         </p>
                       </div>
@@ -1052,7 +1052,7 @@ export function InputBar({
 
             {/* Location Name Input */}
             <div>
-              <label className="text-sm font-medium text-gray-700 mb-2 block">
+              <label className="text-sm font-medium text-vx-text-secondary mb-2 block">
                 Location Name (Optional)
               </label>
               <Input
@@ -1067,10 +1067,10 @@ export function InputBar({
             {currentLocation && (
               <div>
                 <Suspense fallback={
-                  <div className="w-full h-[300px] bg-gray-100 rounded-lg border flex items-center justify-center">
+                  <div className="w-full h-[300px] bg-vx-surface-hover rounded-lg border flex items-center justify-center">
                     <div className="text-center">
-                      <MapPin className="h-8 w-8 text-red-500 mx-auto mb-2 animate-bounce" />
-                      <p className="text-sm text-gray-600">Loading map...</p>
+                      <MapPin className="h-8 w-8 text-red-500 dark:text-red-400 mx-auto mb-2 animate-bounce" />
+                      <p className="text-sm text-vx-text-secondary">Loading map...</p>
                     </div>
                   </div>
                 }>
@@ -1101,7 +1101,7 @@ export function InputBar({
             <Button
               onClick={handleSendLocation}
               disabled={!currentLocation}
-              className="bg-blue-600 hover:bg-blue-700 flex-1"
+              className="vx-gradient hover:opacity-90 flex-1"
             >
               <MapPin className="h-4 w-4 mr-2" />
               Send Location
