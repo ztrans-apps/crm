@@ -182,4 +182,4 @@ export const POST = withAuth(async (request, ctx) => {
       
       throw sendError
     }
-}, { permission: 'chat.send' })
+}, { permission: 'chat.reply' })

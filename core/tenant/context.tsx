@@ -46,7 +46,14 @@ export function TenantProvider({
       
       // Fetch from API
       const response = await fetch('/api/tenant/current');
-      if (!response.ok) throw new Error('Failed to fetch tenant');
+      if (!response.ok) {
+        // If unauthorized (401), user needs to login - don't throw error
+        if (response.status === 401) {
+          console.log('User not authenticated');
+          return;
+        }
+        throw new Error('Failed to fetch tenant');
+      }
       
       const data = await response.json();
       setTenant(data.tenant);

@@ -1,7 +1,6 @@
 /**
  * WhatsApp Init API
  * Register a WhatsApp Business number (Meta Cloud API)
- * No QR code or Baileys service needed.
  */
 
 import { NextRequest, NextResponse } from 'next/server';

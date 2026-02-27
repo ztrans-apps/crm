@@ -23,7 +23,7 @@ interface UseSessionStatesOptions {
 
 /**
  * Hook to fetch WhatsApp session states from Supabase
- * Uses Meta Cloud API — no external Baileys service needed
+ * Uses Meta Cloud API
  */
 export function useSessionStates({ 
   refreshInterval = 10000, 

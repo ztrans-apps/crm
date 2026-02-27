@@ -138,21 +138,21 @@ export async function canSendMessageToConversation(
   
   // Check if conversation is closed
   if (conversation.status === 'closed' || conversation.workflow_status === 'done') {
-    return permissions.has('conversation.manage') || permissions.has('chat.send')
+    return permissions.has('chat.reply.closed') || permissions.has('chat.reply')
   }
   
   // Check if conversation is unassigned
   if (!conversation.assigned_to) {
-    return permissions.has('conversation.manage') || permissions.has('conversation.assign')
+    return permissions.has('chat.reply.unassigned') || permissions.has('chat.assign')
   }
   
   // If user is assigned, they can send
   if (conversation.assigned_to === userId) {
-    return permissions.has('chat.send')
+    return permissions.has('chat.reply')
   }
 
-  // Users with conversation.manage can send to any conversation
-  return permissions.has('conversation.manage')
+  // Users with chat.view.all can send to any conversation
+  return permissions.has('chat.view.all') || permissions.has('chat.view_all')
 }
 
 /**
@@ -178,7 +178,7 @@ export async function canViewConversationAsync(
 ): Promise<boolean> {
   const permissions = await getUserPermissions(userId)
   
-  if (permissions.has('conversation.view.all') || permissions.has('conversation.manage')) {
+  if (permissions.has('chat.view.all') || permissions.has('chat.view_all')) {
     return true
   }
   
@@ -194,18 +194,18 @@ export async function getAvailableActions(
 ) {
   const permissions = await getUserPermissions(userId)
   const canSend = await canSendMessageToConversation(userId, conversation)
-  const hasManage = permissions.has('conversation.manage')
-  const hasAssign = permissions.has('conversation.assign')
+  const hasViewAll = permissions.has('chat.view.all') || permissions.has('chat.view_all')
+  const hasAssign = permissions.has('chat.assign')
   
   return {
     canSendMessage: canSend,
-    canPick: !hasManage && !conversation.assigned_to && conversation.status === 'open' && permissions.has('chat.send'),
-    canAssign: hasManage || hasAssign,
+    canPick: !hasViewAll && !conversation.assigned_to && conversation.status === 'open' && permissions.has('chat.reply'),
+    canAssign: hasViewAll || hasAssign,
     canHandover: conversation.assigned_to === userId,
-    canClose: hasManage || permissions.has('conversation.close'),
+    canClose: hasViewAll || permissions.has('chat.close'),
     canEditContact: permissions.has('contact.edit') || permissions.has('contact.manage'),
-    canApplyLabel: permissions.has('chat.send') || hasManage,
-    canCreateNote: permissions.has('chat.send') || hasManage,
-    canChangeStatus: permissions.has('chat.send') || hasManage,
+    canApplyLabel: permissions.has('chat.reply') || hasViewAll,
+    canCreateNote: permissions.has('chat.reply') || hasViewAll,
+    canChangeStatus: permissions.has('chat.reply') || hasViewAll,
   }
 }

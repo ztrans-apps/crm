@@ -8,10 +8,10 @@ import { createClient } from '@/lib/supabase/server'
 
 /**
  * Check if user has full access (can see all conversations)
- * Dynamic: checks for 'conversation.view.all' or 'conversation.manage' permission
+ * Dynamic: checks for 'chat.view.all' or 'chat.view_all' permission
  */
 export async function userHasFullAccess(userId: string): Promise<boolean> {
-  return await userHasAnyPermission(userId, ['conversation.view.all', 'conversation.manage'])
+  return await userHasAnyPermission(userId, ['chat.view.all', 'chat.view_all'])
 }
 
 /**
@@ -24,18 +24,18 @@ export async function isUserAdmin(userId: string): Promise<boolean> {
 
 /**
  * Check if user has management-level access
- * Dynamic: checks for 'conversation.assign' or 'admin.access' permission
+ * Dynamic: checks for 'admin.access', 'chat.assign', or 'user.manage_roles' permission
  */
 export async function isUserManagement(userId: string): Promise<boolean> {
-  return await userHasAnyPermission(userId, ['admin.access', 'conversation.assign', 'conversation.manage'])
+  return await userHasAnyPermission(userId, ['admin.access', 'chat.assign', 'user.manage_roles'])
 }
 
 /**
  * Check if user has agent-level role (can handle conversations)
- * Dynamic: checks for 'chat.send' or 'chat.view' permission
+ * Dynamic: checks for 'chat.reply' or 'chat.view' permission
  */
 export async function isUserAgent(userId: string): Promise<boolean> {
-  return await userHasAnyPermission(userId, ['chat.send', 'chat.view'])
+  return await userHasAnyPermission(userId, ['chat.reply', 'chat.view'])
 }
 
 /**

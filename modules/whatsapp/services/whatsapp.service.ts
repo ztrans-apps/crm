@@ -1,7 +1,6 @@
 /**
  * WhatsApp Service
  * Uses Meta WhatsApp Business Cloud API via internal API routes
- * Migrated from Baileys (localhost:3001) to Meta Cloud API
  */
 export class WhatsAppService {
   /**

@@ -1,6 +1,6 @@
 // Conversation service - handles conversation business logic
 import { BaseService } from './base.service'
-import { canViewConversation, getUserPermissions } from '@/lib/rbac/chat-permissions'
+import { canViewConversation, getUserPermissions, type UserRole } from '@/lib/rbac/chat-permissions'
 
 export interface ConversationFilters {
   status?: 'open' | 'closed'
@@ -35,10 +35,10 @@ export class ConversationService extends BaseService {
         `)
 
       // Dynamic permission-based filtering
-      // Users with conversation.view.all or conversation.manage see all
+      // Users with chat.view.all see all conversations
       // Others only see their assigned + unassigned conversations
       const permissions = await getUserPermissions(userId)
-      const hasFullAccess = permissions.has('conversation.view.all') || permissions.has('conversation.manage')
+      const hasFullAccess = permissions.has('chat.view.all') || permissions.has('chat.view_all')
       
       if (!hasFullAccess) {
         query = query.or(`and(assigned_to.eq.${userId}),and(assigned_to.is.null,workflow_status.in.(incoming,waiting))`)
@@ -73,7 +73,7 @@ export class ConversationService extends BaseService {
 
       // Filter by permission (additional security layer)
       const filtered = (data || []).filter(conv => 
-        canViewConversation(role, userId, conv)
+        canViewConversation(_role, userId, conv)
       )
 
       // Apply search filter in memory (for better performance)

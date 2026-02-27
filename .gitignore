@@ -34,17 +34,6 @@ yarn-error.log*
 .env*
 !.env.example
 
-# WhatsApp session cache
-.wwebjs_auth/
-.wwebjs_cache/
-.baileys_auth/
-
-# WhatsApp service runtime files
-whatsapp-service.pid
-whatsapp-service.log
-*.pid
-*.log
-
 # Temporary documentation (fixes, troubleshooting)
 FIX-*.md
 TROUBLESHOOT-*.md

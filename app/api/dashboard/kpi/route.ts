@@ -70,7 +70,7 @@ async function fetchKPIMetrics(
       .select('status', { count: 'exact' })
       .eq('status', 'active')
 
-    if (isAgent) {
+    if (isLimitedView) {
       activeConvQuery = activeConvQuery.eq('assigned_to', ctx.user.id)
     }
 
@@ -166,7 +166,7 @@ async function fetchKPIMetrics(
       .select('priority')
       .neq('status', 'closed')
 
-    if (isAgent) {
+    if (isLimitedView) {
       ticketsQuery = ticketsQuery.eq('assigned_to', ctx.user.id)
     }
 

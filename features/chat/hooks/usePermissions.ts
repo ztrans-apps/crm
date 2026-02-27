@@ -50,8 +50,8 @@ export function usePermissions({ role, userId, conversation }: UsePermissionsPro
   
   const permissions = useMemo(() => ({
     // Dynamic permission checks — no hardcoded role names
-    canViewAllConversations: userPerms.has('conversation.view.all') || userPerms.has('conversation.manage'),
-    canManageAgents: userPerms.has('conversation.assign') || userPerms.has('conversation.manage'),
+    canViewAllConversations: userPerms.has('chat.view.all') || userPerms.has('chat.view_all'),
+    canManageAgents: userPerms.has('chat.assign') || userPerms.has('user.manage_roles'),
     canEditContact: conversationActions.canEditContact,
     canApplyLabel: conversationActions.canApplyLabel,
     canCreateNote: conversationActions.canCreateNote,

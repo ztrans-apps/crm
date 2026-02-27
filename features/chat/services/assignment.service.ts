@@ -5,7 +5,7 @@ export type AssignmentMethod = 'manual' | 'round_robin' | 'least_active' | 'rand
 
 /**
  * Helper: Get IDs of users who have agent-capable roles
- * Looks up users who have the 'chat.send' permission via dynamic RBAC
+ * Looks up users who have the 'chat.reply' permission via dynamic RBAC
  */
 async function getAgentUserIds(supabase: any): Promise<string[]> {
   const { data } = await supabase
@@ -28,7 +28,7 @@ async function getAgentUserIds(supabase: any): Promise<string[]> {
     const role = (ur as any).roles
     if (!role?.role_permissions) continue
     for (const rp of role.role_permissions) {
-      if (rp.permissions?.permission_key === 'chat.send') {
+      if (rp.permissions?.permission_key === 'chat.reply') {
         agentIds.add((ur as any).user_id)
       }
     }

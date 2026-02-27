@@ -74,9 +74,9 @@ const API_PERMISSIONS: Record<string, string | string[]> = {
   '/api/delivery': ['analytics.view', 'analytics.view.all'],
 
   // ==================== SEND MESSAGE (chat) ====================
-  '/api/send-message': 'chat.send',
-  '/api/send-media': 'chat.send',
-  '/api/send-location': 'chat.send',
+  '/api/send-message': 'chat.reply',
+  '/api/send-media': 'chat.reply',
+  '/api/send-location': 'chat.reply',
 
   // ==================== AGENT STATUS ====================
   '/api/agent-status': 'chat.view',
