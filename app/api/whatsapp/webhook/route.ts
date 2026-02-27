@@ -46,18 +46,19 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
 
-    if (process.env.NODE_ENV !== 'production') {
-      console.log('[Webhook] Received:', JSON.stringify(body, null, 2))
-    }
+    console.log('[Webhook] Received webhook:', JSON.stringify(body, null, 2))
 
     // Validate webhook payload
     if (!body.object || body.object !== 'whatsapp_business_account') {
+      console.error('[Webhook] Invalid webhook object:', body.object)
       return NextResponse.json({ error: 'Invalid webhook object' }, { status: 400 })
     }
 
     // Process each entry
     for (const entry of body.entry || []) {
+      console.log('[Webhook] Processing entry:', entry.id)
       for (const change of entry.changes || []) {
+        console.log('[Webhook] Processing change:', change.field)
         if (change.field === 'messages') {
           await handleMessagesChange(change.value)
         }
@@ -82,7 +83,7 @@ async function handleMessagesChange(value: any) {
   // Handle incoming messages
   if (value.messages && value.messages.length > 0) {
     for (const message of value.messages) {
-      await handleIncomingMessage(message, value.metadata, supabase)
+      await handleIncomingMessage(message, value.metadata, supabase, value.contacts)
     }
   }
 
@@ -100,7 +101,8 @@ async function handleMessagesChange(value: any) {
 async function handleIncomingMessage(
   message: WebhookMessage,
   metadata: any,
-  supabase: any
+  supabase: any,
+  contacts?: any[] // Add contacts parameter
 ) {
   try {
     console.log('[Webhook] Processing incoming message:', message.id)
@@ -110,27 +112,31 @@ async function handleIncomingMessage(
     const messageId = message.id
     const timestamp = message.timestamp
 
+    // Get contact name from webhook payload
+    const contactProfile = contacts?.find(c => c.wa_id === from)
+    const contactName = contactProfile?.profile?.name || from
+
     // Default tenant ID - TODO: Get from phone_number_id mapping
     const DEFAULT_TENANT_ID = '00000000-0000-0000-0000-000000000001'
 
     // Get or create contact first
     let { data: contact } = await supabase
       .from('contacts')
-      .select('id, tenant_id')
+      .select('id, tenant_id, name')
       .eq('phone_number', from)
       .single()
 
     if (!contact) {
-      // Create new contact
+      // Create new contact with name from WhatsApp profile
       const { data: newContact, error: contactError } = await supabase
         .from('contacts')
         .insert({
           phone_number: from,
-          name: from, // Use phone number as name initially
-          user_id: null, // Will be set when user is created
+          name: contactName, // Use WhatsApp profile name
+          user_id: null,
           tenant_id: DEFAULT_TENANT_ID,
         })
-        .select('id, tenant_id')
+        .select('id, tenant_id, name')
         .single()
 
       if (contactError) {
@@ -139,6 +145,15 @@ async function handleIncomingMessage(
       }
 
       contact = newContact
+      console.log('[Webhook] Created new contact:', contactName, '(', from, ')')
+    } else if (contact.name === from || contact.name === contact.id) {
+      // Update contact name if it's still using phone number or ID
+      await supabase
+        .from('contacts')
+        .update({ name: contactName })
+        .eq('id', contact.id)
+      
+      console.log('[Webhook] Updated contact name:', contactName)
     }
 
     // Get or create conversation
