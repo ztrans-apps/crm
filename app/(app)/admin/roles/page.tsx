@@ -7,6 +7,7 @@ import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { PermissionGuard } from '@/lib/rbac'
 import type { Role, Permission } from '@/lib/rbac/types'
+import { toast } from '@/lib/stores/toast-store'
 
 interface RoleWithPermissions extends Role {
   permissions: Permission[]
@@ -60,11 +61,11 @@ export default function RolesPage() {
         await loadData()
       } else {
         const error = await res.json()
-        alert(error.error || 'Failed to delete role')
+        toast.error(error.error || 'Failed to delete role')
       }
     } catch (error) {
       console.error('Error deleting role:', error)
-      alert('Failed to delete role')
+      toast.error('Failed to delete role')
     }
   }
 
@@ -360,11 +361,11 @@ function RoleEditModal({
         onSave()
       } else {
         const error = await res.json()
-        alert(error.error || 'Failed to update role')
+        toast.error(error.error || 'Failed to update role')
       }
     } catch (error) {
       console.error('Error updating role:', error)
-      alert('Failed to update role')
+      toast.error('Failed to update role')
     } finally {
       setSaving(false)
     }
@@ -552,7 +553,7 @@ function RoleCreateModal({
 
   async function handleCreate() {
     if (!roleName.trim()) {
-      alert('Role name is required')
+      toast.warning('Role name is required')
       return
     }
 
@@ -573,11 +574,11 @@ function RoleCreateModal({
         onSave()
       } else {
         const error = await res.json()
-        alert(error.error || 'Failed to create role')
+        toast.error(error.error || 'Failed to create role')
       }
     } catch (error) {
       console.error('Error creating role:', error)
-      alert('Failed to create role')
+      toast.error('Failed to create role')
     } finally {
       setSaving(false)
     }

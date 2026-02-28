@@ -5,6 +5,7 @@ import { X, Shield } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { toast } from '@/lib/stores/toast-store';
 
 interface Role {
   id: string;
@@ -118,11 +119,11 @@ export default function UserFormModal({ user, isOpen, onClose, onSuccess }: User
         onClose();
       } else {
         const error = await response.json();
-        alert(error.error || 'Failed to save user');
+        toast.error(error.error || 'Failed to save user');
       }
     } catch (error) {
       console.error('Failed to save user:', error);
-      alert('Failed to save user');
+      toast.error('Failed to save user');
     } finally {
       setLoading(false);
     }

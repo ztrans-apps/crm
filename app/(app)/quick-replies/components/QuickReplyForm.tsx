@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { toast } from '@/lib/stores/toast-store';
 
 interface QuickReply {
   id: string;
@@ -79,11 +80,11 @@ export default function QuickReplyForm({
         onClose();
       } else {
         const error = await response.json();
-        alert(error.error || 'Failed to save quick reply');
+        toast.error(error.error || 'Failed to save quick reply');
       }
     } catch (error) {
       console.error('Failed to save quick reply:', error);
-      alert('Failed to save quick reply');
+      toast.error('Failed to save quick reply');
     } finally {
       setLoading(false);
     }

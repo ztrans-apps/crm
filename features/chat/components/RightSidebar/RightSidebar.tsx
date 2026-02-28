@@ -22,6 +22,7 @@ import {
   MessageSquare,
   Star
 } from 'lucide-react'
+import { toast } from '@/lib/stores/toast-store'
 
 // Import shared components
 import { WorkflowStatusManager as WorkflowStatus } from '../shared/WorkflowStatus'
@@ -204,9 +205,9 @@ export function RightSidebar({
     try {
       await onUpdateContact(conversation.contact.id, contactName, {})
       setEditingContact(false)
-      alert('Kontak berhasil diperbarui!')
+      toast.success('Kontak berhasil diperbarui!')
     } catch (error: any) {
-      alert('Gagal memperbarui kontak: ' + error.message)
+      toast.error('Gagal memperbarui kontak: ' + error.message)
     }
   }
 

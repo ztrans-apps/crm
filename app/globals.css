@@ -168,10 +168,10 @@
   --vx-text-secondary: #A89BBE;
   --vx-text-muted: #6B5E7B;
   --vx-border: #2E2244;
-  --vx-bubble-in: #241A36;
-  --vx-bubble-in-border: #2E2244;
-  --vx-bubble-incoming: #241A36;
-  --vx-bubble-outgoing: #1A2E1A;
+  --vx-bubble-in: #2D3748;
+  --vx-bubble-in-border: #4A5568;
+  --vx-bubble-incoming: #2D3748;
+  --vx-bubble-outgoing: #1A4D2E;
 }
 
 @layer base {

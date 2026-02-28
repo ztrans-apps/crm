@@ -7,6 +7,7 @@ import type { QuickReply } from '@/lib/types/chat'
 import { AuthGuard } from '@/core/auth'
 import { PermissionGuard } from '@/lib/rbac/components/PermissionGuard';
 import { ArrowLeft, PanelRightOpen } from 'lucide-react'
+import { toast } from '@/lib/stores/toast-store'
 
 // Import hooks
 import { useChat, useMessages, usePermissions } from '@/features/chat/hooks'
@@ -149,7 +150,7 @@ function UnifiedChatsContent() {
 
   const handleSaveNote = async (content: string, rating: number | null, noteType?: 'internal' | 'review') => {
     if (!selectedConversation || !userId) {
-      alert('Cannot save note')
+      toast.error('Cannot save note')
       return
     }
 
@@ -157,7 +158,7 @@ function UnifiedChatsContent() {
       await chatService.saveNote(selectedConversation.id, content, rating, userId, noteType)
       await loadSidebarData(selectedConversation.id)
     } catch (error: any) {
-      alert('Failed to save note: ' + error.message)
+      toast.error('Failed to save note: ' + error.message)
     }
   }
 
@@ -173,9 +174,9 @@ function UnifiedChatsContent() {
       await chatService.conversations.pickConversation(conversationId, userId)
       await refreshConversations()
       setSelectedConversationId(conversationId)
-      alert('Obrolan berhasil diambil!')
+      toast.success('Obrolan berhasil diambil!')
     } catch (error: any) {
-      alert('Gagal mengambil obrolan: ' + error.message)
+      toast.error('Gagal mengambil obrolan: ' + error.message)
     }
   }
 
@@ -207,7 +208,7 @@ function UnifiedChatsContent() {
       await chatService.conversations.assignConversation(selectedConversation.id, agentId)
       await refreshConversations()
     } catch (error: any) {
-      alert('Failed to assign agent: ' + error.message)
+      toast.error('Failed to assign agent: ' + error.message)
     }
   }
 
@@ -234,7 +235,7 @@ function UnifiedChatsContent() {
       await loadSidebarData(selectedConversation.id)
       await refreshConversations()
     } catch (error: any) {
-      alert('Failed to apply label: ' + error.message)
+      toast.error('Failed to apply label: ' + error.message)
     }
   }
 
@@ -246,7 +247,7 @@ function UnifiedChatsContent() {
       await loadSidebarData(selectedConversation.id)
       await refreshConversations()
     } catch (error: any) {
-      alert('Failed to remove label: ' + error.message)
+      toast.error('Failed to remove label: ' + error.message)
     }
   }
 
@@ -259,7 +260,7 @@ function UnifiedChatsContent() {
       await chatService.conversations.closeConversation(selectedConversation.id, userId)
       await refreshConversations()
     } catch (error: any) {
-      alert('Failed to close conversation: ' + error.message)
+      toast.error('Failed to close conversation: ' + error.message)
     }
   }
 

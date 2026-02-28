@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { 
   Send, Clock, Loader2, AlertCircle, RefreshCw 
 } from 'lucide-react';
+import { toast } from '@/lib/stores/toast-store';
 
 interface Template {
   id: string;
@@ -226,7 +227,7 @@ export function CreateCampaign({ onSuccess }: CreateCampaignProps) {
       if (response.ok) {
         handleReset();
         onSuccess?.();
-        alert('Campaign berhasil dibuat!');
+        toast.success('Campaign berhasil dibuat!');
       } else {
         const data = await response.json();
         throw new Error(data.error || 'Gagal membuat campaign');

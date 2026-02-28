@@ -11,6 +11,7 @@ import {
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { toast } from '@/lib/stores/toast-store';
 
 import { RecipientListDetail } from './RecipientListDetail';
 
@@ -116,22 +117,22 @@ export function RecipientLists() {
 
   const handleSubmit = async () => {
     if (!formData.name) {
-      alert('Nama daftar harus diisi');
+      toast.warning('Nama daftar harus diisi');
       return;
     }
 
     if (selectedSource === 'import' && !uploadedFile) {
-      alert('Pilih file Excel untuk diupload');
+      toast.warning('Pilih file Excel untuk diupload');
       return;
     }
 
     if (selectedSource === 'import-variabel' && !uploadedFile) {
-      alert('Pilih file Excel untuk diupload');
+      toast.warning('Pilih file Excel untuk diupload');
       return;
     }
 
     if (selectedSource === 'crm' && selectedContacts.length === 0) {
-      alert('Pilih minimal 1 kontak');
+      toast.warning('Pilih minimal 1 kontak');
       return;
     }
 
@@ -163,13 +164,13 @@ export function RecipientLists() {
         setSelectedSource('crm');
         setUploadedFile(null);
         setSelectedContacts([]);
-        alert('Daftar penerima berhasil dibuat!');
+        toast.success('Daftar penerima berhasil dibuat!');
       } else {
-        alert('Error: ' + (result.error || 'Gagal membuat daftar'));
+        toast.error('Error: ' + (result.error || 'Gagal membuat daftar'));
       }
     } catch (error) {
       console.error('Failed to save list:', error);
-      alert('Error: ' + error);
+      toast.error('Error: ' + error);
     } finally {
       setSaving(false);
     }

@@ -4,6 +4,7 @@
 import { useState, useEffect } from 'react'
 import { Input } from '@/components/ui/input'
 import { Mail, Building, Briefcase } from 'lucide-react'
+import { toast } from '@/lib/stores/toast-store'
 
 interface CustomerProfileProps {
   contact: any
@@ -36,7 +37,7 @@ export function CustomerProfile({ contact, onUpdate, canEdit }: CustomerProfileP
     try {
       await onUpdate(contact.id, contact.name, customFields)
     } catch (error: any) {
-      alert('Gagal memperbarui kontak: ' + error.message)
+      toast.error('Gagal memperbarui kontak: ' + error.message)
     }
   }
 

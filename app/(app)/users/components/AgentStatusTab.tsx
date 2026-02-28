@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { RefreshCw, Power } from 'lucide-react'
 import { usePermissions } from '@/lib/rbac'
+import { toast } from '@/lib/stores/toast-store'
 
 interface Agent {
   id: string
@@ -85,11 +86,11 @@ export default function AgentStatusTab() {
         throw new Error('Failed to reset')
       }
 
-      alert('Berhasil reset semua agent status!')
+      toast.success('Berhasil reset semua agent status!')
       loadAgents()
     } catch (error) {
       console.error('Error resetting:', error)
-      alert('Gagal reset agent status')
+      toast.error('Gagal reset agent status')
     } finally {
       setResetting(false)
     }
@@ -111,11 +112,11 @@ export default function AgentStatusTab() {
         throw new Error(data.error || 'Failed to update')
       }
 
-      alert('Berhasil update agent status!')
+      toast.success('Berhasil update agent status!')
       loadAgents()
     } catch (error: any) {
       console.error('Error updating:', error)
-      alert('Gagal update: ' + error.message)
+      toast.error('Gagal update: ' + error.message)
     } finally {
       setLoading(false)
     }

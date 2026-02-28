@@ -4,6 +4,7 @@ import "./globals.css";
 import "leaflet/dist/leaflet.css";
 import { TenantProvider } from "@core/tenant/context";
 import { ThemeProvider } from "@/components/layout/ThemeProvider";
+import { ToastContainer } from "@/components/ui/toast";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -20,11 +21,13 @@ export const metadata: Metadata = {
   description: "Enterprise WhatsApp CRM with multi-tenant support",
   icons: {
     icon: [
-      { url: '/logo-512.png', sizes: '512x512', type: 'image/png' },
+      { url: '/favicon.ico', sizes: 'any' },
+      { url: '/icon.png', type: 'image/png', sizes: '512x512' },
     ],
     apple: [
-      { url: '/logo-512.png', sizes: '512x512', type: 'image/png' },
+      { url: '/icon.png', type: 'image/png', sizes: '512x512' },
     ],
+    shortcut: '/favicon.ico',
   },
 };
 
@@ -47,6 +50,7 @@ export default function RootLayout({
           <TenantProvider>
             {children}
           </TenantProvider>
+          <ToastContainer />
         </ThemeProvider>
       </body>
     </html>

@@ -18,6 +18,7 @@ import {
 } from '@/components/ui/select'
 import { updateWorkflowStatus } from '@/lib/api/workflow'
 import type { WorkflowStatus } from '@/lib/types/chat'
+import { toast } from '@/lib/stores/toast-store'
 
 interface WorkflowStatusManagerProps {
   conversationId: string
@@ -52,19 +53,19 @@ export function WorkflowStatusManager({
 
     // Prevent rollback from "done" status
     if (currentStatus === 'done') {
-      alert('⚠️ Chat sudah selesai dan tidak bisa diubah lagi!')
+      toast.warning('⚠️ Chat sudah selesai dan tidak bisa diubah lagi!')
       return
     }
 
     // Check if limited user needs to pick conversation first
     if (isLimitedView && conversation && !conversation.assigned_to) {
-      alert('⚠️ Silakan ambil obrolan terlebih dahulu sebelum mengubah status!')
+      toast.warning('⚠️ Silakan ambil obrolan terlebih dahulu sebelum mengubah status!')
       return
     }
 
     // Check if limited user is assigned to this conversation
     if (isLimitedView && conversation && conversation.assigned_to !== currentUserId) {
-      alert('⚠️ Anda tidak memiliki akses untuk mengubah status obrolan ini!')
+      toast.warning('⚠️ Anda tidak memiliki akses untuk mengubah status obrolan ini!')
       return
     }
 
@@ -83,7 +84,7 @@ export function WorkflowStatusManager({
       onStatusChanged()
     } catch (error: any) {
       console.error('Error changing status:', error)
-      alert('Gagal mengubah status: ' + error.message)
+      toast.error('Gagal mengubah status: ' + error.message)
     } finally {
       setUpdating(false)
     }

@@ -4,6 +4,7 @@
 import { useState, useEffect } from 'react'
 import { UserCircle, X, ChevronDown, Zap } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { toast } from '@/lib/stores/toast-store'
 
 interface AgentAssignmentProps {
   conversationId: string
@@ -120,17 +121,17 @@ export function AgentAssignment({
       if (currentAgentId && onHandover) {
         // Handover to another agent
         await onHandover(conversationId, selectedAgent)
-        alert('Berhasil handover ke agent lain!')
+        toast.success('Berhasil handover ke agent lain!')
       } else if (onAssign) {
         // Assign to agent (first time)
         await onAssign(selectedAgent)
-        alert('Berhasil assign agent!')
+        toast.success('Berhasil assign agent!')
       }
       
       setShowDropdown(false)
       setSelectedAgent('')
     } catch (error: any) {
-      alert('Gagal: ' + error.message)
+      toast.error('Gagal: ' + error.message)
     }
   }
 
@@ -141,9 +142,9 @@ export function AgentAssignment({
 
     try {
       await onAutoAssign(conversationId)
-      alert('Berhasil auto-assign agent!')
+      toast.success('Berhasil auto-assign agent!')
     } catch (error: any) {
-      alert('Gagal auto-assign: ' + error.message)
+      toast.error('Gagal auto-assign: ' + error.message)
     }
   }
 
@@ -154,9 +155,9 @@ export function AgentAssignment({
 
     try {
       await onAssign('') // Empty string to unassign
-      alert('Agent berhasil di-unassign!')
+      toast.success('Agent berhasil di-unassign!')
     } catch (error: any) {
-      alert('Gagal unassign: ' + error.message)
+      toast.error('Gagal unassign: ' + error.message)
     }
   }
 

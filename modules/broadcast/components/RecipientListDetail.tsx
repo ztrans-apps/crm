@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { 
   ArrowLeft, Users, Search, Trash2, UserPlus, Loader2, Plus, Edit 
 } from 'lucide-react';
+import { toast } from '@/lib/stores/toast-store';
 
 interface RecipientList {
   id: string;
@@ -94,7 +95,7 @@ export function RecipientListDetail({ list, onBack, onRefresh }: RecipientListDe
 
   const handleSaveEdit = async () => {
     if (!editData.name.trim()) {
-      alert('Nama daftar harus diisi');
+      toast.warning('Nama daftar harus diisi');
       return;
     }
 
@@ -113,11 +114,11 @@ export function RecipientListDetail({ list, onBack, onRefresh }: RecipientListDe
         list.name = editData.name;
         list.description = editData.description;
       } else {
-        alert('Gagal menyimpan perubahan');
+        toast.error('Gagal menyimpan perubahan');
       }
     } catch (error) {
       console.error('Failed to save:', error);
-      alert('Error: ' + error);
+      toast.error('Error: ' + error);
     } finally {
       setSaving(false);
     }

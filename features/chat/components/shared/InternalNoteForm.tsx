@@ -4,6 +4,7 @@
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Save, AlertCircle } from 'lucide-react'
+import { toast } from '@/lib/stores/toast-store'
 
 interface InternalNoteFormProps {
   onSave: (content: string, noteType: 'internal') => Promise<void>
@@ -22,7 +23,7 @@ export function InternalNoteForm({ onSave }: InternalNoteFormProps) {
       setContent('')
     } catch (error) {
       console.error('Error saving internal note:', error)
-      alert('Gagal menyimpan catatan')
+      toast.error('Gagal menyimpan catatan')
     } finally {
       setSaving(false)
     }

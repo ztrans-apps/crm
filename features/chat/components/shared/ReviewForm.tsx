@@ -4,6 +4,7 @@
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Save, Star } from 'lucide-react'
+import { toast } from '@/lib/stores/toast-store'
 
 interface ReviewFormProps {
   onSave: (content: string, rating: number, noteType: 'review') => Promise<void>
@@ -25,7 +26,7 @@ export function ReviewForm({ onSave }: ReviewFormProps) {
       setRating(0)
     } catch (error) {
       console.error('Error saving review:', error)
-      alert('Gagal menyimpan review')
+      toast.error('Gagal menyimpan review')
     } finally {
       setSaving(false)
     }

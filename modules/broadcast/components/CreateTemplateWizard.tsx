@@ -12,6 +12,7 @@ import {
   FileText, Image as ImageIcon, Video, FileType,
   Phone, Globe, MessageSquare, Info, Plus
 } from 'lucide-react';
+import { toast } from '@/lib/stores/toast-store';
 
 interface TemplateData {
   // Step 1: Basic Information
@@ -259,11 +260,11 @@ export function CreateTemplateWizard({ open, onClose, onSuccess, editTemplate }:
         });
       } else {
         const error = await response.json();
-        alert(error.error || 'Failed to save template');
+        toast.error(error.error || 'Failed to save template');
       }
     } catch (error) {
       console.error('Failed to save template:', error);
-      alert('Failed to save template');
+      toast.error('Failed to save template');
     } finally {
       setSaving(false);
     }

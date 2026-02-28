@@ -1,9 +1,11 @@
 // Messages logic hook
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { chatService } from '../services'
 import { messageService } from '../services/message.service'
 import { createClient } from '@/lib/supabase/client'
 import type { MediaAttachment } from '@/lib/types/chat'
+import { toast } from '@/lib/stores/toast-store'
+import { useNotificationSound } from '@/lib/hooks/use-notification-sound'
 
 interface UseMessagesProps {
   conversationId: string | null
@@ -21,6 +23,7 @@ export function useMessages({
   canSendMessage
 }: UseMessagesProps) {
   const supabase = useMemo(() => createClient(), [])
+  const { play: playNotification } = useNotificationSound()
   const [messages, setMessages] = useState<any[]>([])
   const [messageInput, setMessageInput] = useState('')
   const [translations, setTranslations] = useState<Record<string, string>>({})
@@ -31,6 +34,9 @@ export function useMessages({
   const [hasMore, setHasMore] = useState(true)
   const [offset, setOffset] = useState(0)
   const MESSAGES_PER_PAGE = 20
+  
+  // Track if this is initial load to avoid notification on page load
+  const isInitialLoad = useRef(true)
 
   // Load messages for conversation (initial load)
   const loadMessages = useCallback(async (convId: string, reset = true) => {
@@ -89,12 +95,12 @@ export function useMessages({
     if (!messageInput.trim() && !media) return
 
     if (!conversation) {
-      alert('Silakan pilih conversation terlebih dahulu')
+      toast.warning('Silakan pilih conversation terlebih dahulu')
       return
     }
 
     if (!conversation.contact || !conversation.contact.phone_number) {
-      alert('Error: Contact tidak ditemukan')
+      toast.error('Error: Contact tidak ditemukan')
       return
     }
 
@@ -103,13 +109,13 @@ export function useMessages({
     
     
     if (!userId || !conversationSessionId) {
-      alert('Session tidak ditemukan. Pastikan WhatsApp sudah terhubung.')
+      toast.error('Session tidak ditemukan. Pastikan WhatsApp sudah terhubung.')
       return
     }
 
     // Check permission to send message
     if (canSendMessage === false) {
-      alert('Anda tidak memiliki akses untuk mengirim pesan ke conversation ini.')
+      toast.error('Anda tidak memiliki akses untuk mengirim pesan ke conversation ini.')
       return
     }
 
@@ -285,7 +291,7 @@ export function useMessages({
       
     } catch (error: any) {
       console.error('Send message error:', error)
-      alert('Gagal mengirim pesan: ' + error.message)
+      toast.error('Gagal mengirim pesan: ' + error.message)
       setMessageInput(tempMessage)
     } finally {
       setSending(false)
@@ -312,12 +318,18 @@ export function useMessages({
   // Load messages when conversation changes
   useEffect(() => {
     if (conversationId) {
+      isInitialLoad.current = true
       loadMessages(conversationId, true)
       markAsRead(conversationId)
+      // After a short delay, mark as not initial load
+      setTimeout(() => {
+        isInitialLoad.current = false
+      }, 1000)
     } else {
       setMessages([])
       setOffset(0)
       setHasMore(true)
+      isInitialLoad.current = true
     }
   }, [conversationId])
 
@@ -345,6 +357,12 @@ export function useMessages({
               // Check if message already exists
               const exists = prev.some(m => m.id === newMessage.id)
               if (exists) return prev
+              
+              // Play notification sound for incoming messages (not from me)
+              // Only play if not initial load and message is from customer
+              if (!isInitialLoad.current && !newMessage.is_from_me && newMessage.sender_type === 'customer') {
+                playNotification()
+              }
               
               // Add new message
               return [...prev, newMessage]

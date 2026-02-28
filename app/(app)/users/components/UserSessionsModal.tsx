@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { X, Check, Loader2, ChevronDown } from 'lucide-react'
+import { toast } from '@/lib/stores/toast-store'
 
 interface WhatsAppSession {
   id: string
@@ -142,11 +143,11 @@ export default function UserSessionsModal({
         }
       }
 
-      alert('Session assignments updated successfully')
+      toast.success('Session assignments updated successfully')
       onClose()
     } catch (error: any) {
       console.error('Error saving assignments:', error)
-      alert(error.message || 'Failed to update session assignments')
+      toast.error(error.message || 'Failed to update session assignments')
     } finally {
       setSaving(false)
     }

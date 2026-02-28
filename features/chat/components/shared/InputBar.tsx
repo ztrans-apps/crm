@@ -20,6 +20,7 @@ import {
   Video,
   X
 } from 'lucide-react'
+import { toast } from '@/lib/stores/toast-store'
 import {
   Popover,
   PopoverContent,
@@ -561,11 +562,11 @@ export function InputBar({
             },
             (error) => {
               console.error('Error getting location:', error)
-              alert('Unable to get your location. Please enable location services.')
+              toast.error('Unable to get your location. Please enable location services.')
             }
           )
         } else {
-          alert('Geolocation is not supported by your browser')
+          toast.error('Geolocation is not supported by your browser')
         }
         break
     }
@@ -620,14 +621,14 @@ export function InputBar({
         setSearchResults(data)
         
         if (data.length === 0) {
-          alert('No locations found. Try a different search term.')
+          toast.info('No locations found. Try a different search term.')
         }
       } else {
         throw new Error('Invalid response format')
       }
     } catch (error: any) {
       console.error('[Location Search] Error:', error)
-      alert(error.message || 'Failed to search location. Please try again.')
+      toast.error(error.message || 'Failed to search location. Please try again.')
       setSearchResults([])
     } finally {
       setSearching(false)
