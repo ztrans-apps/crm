@@ -1,6 +1,8 @@
 // API route for chat operations that require service role (bypasses RLS)
 import { NextRequest, NextResponse } from 'next/server'
-import { withAuth } from '@/lib/rbac/with-auth'
+import { withAuth } from '@/lib/middleware/with-auth'
+import { ConversationService } from '@/lib/services/conversation-service'
+import { ContactService } from '@/lib/services/contact-service'
 
 export const POST = withAuth(async (req, ctx) => {
   const body = await req.json()
@@ -8,6 +10,10 @@ export const POST = withAuth(async (req, ctx) => {
 
   const supabase = ctx.serviceClient
   const tenantId = ctx.tenantId
+
+  // Initialize services
+  const conversationService = new ConversationService(supabase, tenantId)
+  const contactService = new ContactService(supabase, tenantId)
 
   switch (action) {
     // ==================== LABELS ====================
@@ -227,21 +233,14 @@ export const POST = withAuth(async (req, ctx) => {
         return NextResponse.json({ error: 'Missing conversationId' }, { status: 400 })
       }
 
-      const { error } = await supabase
-        .from('conversations')
-        .update({
-          read_status: 'read',
-          unread_count: 0,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', conversationId)
-
-      if (error) {
+      try {
+        // Use ConversationService to mark as read
+        await conversationService.markAsRead(conversationId, ctx.user.id)
+        return NextResponse.json({ success: true })
+      } catch (error: any) {
         console.error('[mark_as_read] Error:', error)
         return NextResponse.json({ error: error.message }, { status: 500 })
       }
-
-      return NextResponse.json({ success: true })
     }
 
     case 'close_conversation': {
@@ -251,22 +250,24 @@ export const POST = withAuth(async (req, ctx) => {
         return NextResponse.json({ error: 'Missing conversationId' }, { status: 400 })
       }
 
-      const { error } = await supabase
-        .from('conversations')
-        .update({
-          status: 'closed',
-          closed_at: new Date().toISOString(),
-          closed_by: ctx.user.id,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', conversationId)
+      try {
+        // Use ConversationService to close conversation
+        await conversationService.updateStatus(conversationId, 'closed', ctx.user.id)
+        
+        // Also update closed_at and closed_by fields (not in DTO, direct update)
+        await supabase
+          .from('conversations')
+          .update({
+            closed_at: new Date().toISOString(),
+            closed_by: ctx.user.id,
+          })
+          .eq('id', conversationId)
 
-      if (error) {
+        return NextResponse.json({ success: true })
+      } catch (error: any) {
         console.error('[close_conversation] Error:', error)
         return NextResponse.json({ error: error.message }, { status: 500 })
       }
-
-      return NextResponse.json({ success: true })
     }
 
     case 'pick_conversation': {
@@ -276,23 +277,30 @@ export const POST = withAuth(async (req, ctx) => {
         return NextResponse.json({ error: 'Missing conversationId' }, { status: 400 })
       }
 
-      const { error } = await supabase
-        .from('conversations')
-        .update({
-          assigned_to: ctx.user.id,
-          assignment_method: 'manual',
-          workflow_status: 'waiting',
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', conversationId)
-        .is('assigned_to', null)
+      try {
+        // Use ConversationService to assign conversation
+        await conversationService.updateConversation(
+          conversationId,
+          {
+            assigned_to: ctx.user.id,
+            workflow_status: 'waiting',
+          },
+          ctx.user.id
+        )
 
-      if (error) {
+        // Also update assignment_method field (not in DTO, direct update)
+        await supabase
+          .from('conversations')
+          .update({
+            assignment_method: 'manual',
+          })
+          .eq('id', conversationId)
+
+        return NextResponse.json({ success: true })
+      } catch (error: any) {
         console.error('[pick_conversation] Error:', error)
         return NextResponse.json({ error: error.message }, { status: 500 })
       }
-
-      return NextResponse.json({ success: true })
     }
 
     case 'assign_conversation': {
@@ -302,22 +310,24 @@ export const POST = withAuth(async (req, ctx) => {
         return NextResponse.json({ error: 'Missing conversationId or agentId' }, { status: 400 })
       }
 
-      const { error } = await supabase
-        .from('conversations')
-        .update({
-          assigned_to: agentId,
-          assignment_method: 'manual',
-          workflow_status: 'waiting',
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', conversationId)
+      try {
+        // Use ConversationService to assign conversation
+        await conversationService.assignConversation(conversationId, agentId, ctx.user.id)
 
-      if (error) {
+        // Also update assignment_method and workflow_status fields
+        await supabase
+          .from('conversations')
+          .update({
+            assignment_method: 'manual',
+            workflow_status: 'waiting',
+          })
+          .eq('id', conversationId)
+
+        return NextResponse.json({ success: true })
+      } catch (error: any) {
         console.error('[assign_conversation] Error:', error)
         return NextResponse.json({ error: error.message }, { status: 500 })
       }
-
-      return NextResponse.json({ success: true })
     }
 
     case 'handover_conversation': {
@@ -327,36 +337,36 @@ export const POST = withAuth(async (req, ctx) => {
         return NextResponse.json({ error: 'Missing required parameters' }, { status: 400 })
       }
 
-      // Update conversation assignment
-      const { error: updateError } = await supabase
-        .from('conversations')
-        .update({
-          assigned_to: toAgentId,
-          assignment_method: 'manual',
-          workflow_status: 'waiting',
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', conversationId)
-        .eq('assigned_to', fromAgentId)
+      try {
+        // Use ConversationService to assign conversation
+        await conversationService.assignConversation(conversationId, toAgentId, ctx.user.id)
 
-      if (updateError) {
-        console.error('[handover_conversation] Error:', updateError)
-        return NextResponse.json({ error: updateError.message }, { status: 500 })
+        // Update assignment_method and workflow_status
+        await supabase
+          .from('conversations')
+          .update({
+            assignment_method: 'manual',
+            workflow_status: 'waiting',
+          })
+          .eq('id', conversationId)
+
+        // Log handover
+        await supabase
+          .from('handover_logs')
+          .insert({
+            conversation_id: conversationId,
+            from_agent_id: fromAgentId,
+            to_agent_id: toAgentId,
+            reason: reason || null,
+            handover_at: new Date().toISOString(),
+            tenant_id: tenantId,
+          })
+
+        return NextResponse.json({ success: true })
+      } catch (error: any) {
+        console.error('[handover_conversation] Error:', error)
+        return NextResponse.json({ error: error.message }, { status: 500 })
       }
-
-      // Log handover
-      await supabase
-        .from('handover_logs')
-        .insert({
-          conversation_id: conversationId,
-          from_agent_id: fromAgentId,
-          to_agent_id: toAgentId,
-          reason: reason || null,
-          handover_at: new Date().toISOString(),
-          tenant_id: tenantId,
-        })
-
-      return NextResponse.json({ success: true })
     }
 
     case 'update_workflow_status': {
@@ -366,20 +376,14 @@ export const POST = withAuth(async (req, ctx) => {
         return NextResponse.json({ error: 'Missing conversationId or status' }, { status: 400 })
       }
 
-      const { error } = await supabase
-        .from('conversations')
-        .update({
-          workflow_status: status,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', conversationId)
-
-      if (error) {
+      try {
+        // Use ConversationService to update workflow status
+        await conversationService.updateWorkflowStatus(conversationId, status, ctx.user.id)
+        return NextResponse.json({ success: true })
+      } catch (error: any) {
         console.error('[update_workflow_status] Error:', error)
         return NextResponse.json({ error: error.message }, { status: 500 })
       }
-
-      return NextResponse.json({ success: true })
     }
 
     // ==================== CONTACTS ====================
@@ -390,28 +394,22 @@ export const POST = withAuth(async (req, ctx) => {
         return NextResponse.json({ error: 'Missing contactId' }, { status: 400 })
       }
 
-      const updateData: any = { updated_at: new Date().toISOString() }
-      if (name !== undefined) updateData.name = name
-      if (metadata !== undefined) {
-        // Extract email and phone from metadata if provided
-        if (metadata.email) updateData.email = metadata.email
-        if (metadata.mobile_phone) updateData.phone_number = metadata.mobile_phone
-        updateData.metadata = metadata
-      }
+      try {
+        const updateData: any = {}
+        if (name !== undefined) updateData.name = name
+        if (metadata !== undefined) {
+          // Extract email from metadata if provided
+          if (metadata.email) updateData.email = metadata.email
+          updateData.metadata = metadata
+        }
 
-      const { data, error } = await supabase
-        .from('contacts')
-        .update(updateData)
-        .eq('id', contactId)
-        .select()
-        .single()
-
-      if (error) {
+        // Use ContactService to update contact
+        const updated = await contactService.updateContact(contactId, updateData, ctx.user.id)
+        return NextResponse.json({ success: true, data: updated })
+      } catch (error: any) {
         console.error('[update_contact] Error:', error)
         return NextResponse.json({ error: error.message }, { status: 500 })
       }
-
-      return NextResponse.json({ success: true, data })
     }
 
     case 'update_contact_metadata': {
@@ -421,34 +419,27 @@ export const POST = withAuth(async (req, ctx) => {
         return NextResponse.json({ error: 'Missing contactId' }, { status: 400 })
       }
 
-      // Get existing metadata
-      const { data: existingContact } = await supabase
-        .from('contacts')
-        .select('metadata')
-        .eq('id', contactId)
-        .single()
+      try {
+        // Get existing contact
+        const existing = await contactService.getContact(contactId)
 
-      const mergedMetadata = {
-        ...(existingContact?.metadata || {}),
-        ...metadata,
+        const mergedMetadata = {
+          ...(existing.metadata || {}),
+          ...metadata,
+        }
+
+        // Use ContactService to update contact
+        const updated = await contactService.updateContact(
+          contactId,
+          { metadata: mergedMetadata },
+          ctx.user.id
+        )
+
+        return NextResponse.json({ success: true, data: updated })
+      } catch (error: any) {
+        console.error('[update_contact_metadata] Error:', error)
+        return NextResponse.json({ error: error.message }, { status: 500 })
       }
-
-      const { data: metaData, error: metaError } = await supabase
-        .from('contacts')
-        .update({
-          metadata: mergedMetadata,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', contactId)
-        .select()
-        .single()
-
-      if (metaError) {
-        console.error('[update_contact_metadata] Error:', metaError)
-        return NextResponse.json({ error: metaError.message }, { status: 500 })
-      }
-
-      return NextResponse.json({ success: true, data: metaData })
     }
 
     case 'create_contact': {
@@ -458,26 +449,22 @@ export const POST = withAuth(async (req, ctx) => {
         return NextResponse.json({ error: 'Missing phoneNumber' }, { status: 400 })
       }
 
-      const contactInsert: any = {
-        phone_number: phoneNumber,
-        name: contactName || null,
-        metadata: contactMeta || {},
-        created_at: new Date().toISOString(),
-        tenant_id: tenantId,
+      try {
+        // Use ContactService to create contact
+        const newContact = await contactService.createContact(
+          {
+            phone_number: phoneNumber,
+            name: contactName || undefined,
+            metadata: contactMeta || undefined,
+          },
+          ctx.user.id
+        )
+
+        return NextResponse.json({ success: true, data: newContact })
+      } catch (error: any) {
+        console.error('[create_contact] Error:', error)
+        return NextResponse.json({ error: error.message }, { status: 500 })
       }
-
-      const { data: newContact, error: createError } = await supabase
-        .from('contacts')
-        .insert(contactInsert)
-        .select()
-        .single()
-
-      if (createError) {
-        console.error('[create_contact] Error:', createError)
-        return NextResponse.json({ error: createError.message }, { status: 500 })
-      }
-
-      return NextResponse.json({ success: true, data: newContact })
     }
 
     case 'update_contact_from_whatsapp': {
@@ -487,40 +474,39 @@ export const POST = withAuth(async (req, ctx) => {
         return NextResponse.json({ data: null })
       }
 
-      // Find contact
-      const { data: waContact, error: waFindErr } = await supabase
-        .from('contacts')
-        .select('*')
-        .eq('phone_number', phoneNumber)
-        .single()
+      try {
+        // Find contact using ContactService
+        const waContact = await contactService.getContactByPhoneNumber(phoneNumber)
 
-      if (waFindErr || !waContact) {
-        return NextResponse.json({ data: null })
-      }
-
-      // Only update if name is not set
-      if (!waContact.name || waContact.name.trim() === '') {
-        const { data: waUpdated, error: waUpdErr } = await supabase
-          .from('contacts')
-          .update({
-            name: pushname,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', waContact.id)
-          .select()
-
-        if (waUpdErr) {
-          console.error('[update_contact_from_whatsapp] Error:', waUpdErr)
-          return NextResponse.json({ error: waUpdErr.message }, { status: 500 })
+        if (!waContact) {
+          return NextResponse.json({ data: null })
         }
 
-        return NextResponse.json({ success: true, data: waUpdated?.[0] })
-      }
+        // Only update if name is not set
+        if (!waContact.name || waContact.name.trim() === '') {
+          const updated = await contactService.updateContact(
+            waContact.id,
+            { name: pushname },
+            ctx.user.id
+          )
 
-      return NextResponse.json({ success: true, data: waContact })
+          return NextResponse.json({ success: true, data: updated })
+        }
+
+        return NextResponse.json({ success: true, data: waContact })
+      } catch (error: any) {
+        console.error('[update_contact_from_whatsapp] Error:', error)
+        return NextResponse.json({ error: error.message }, { status: 500 })
+      }
     }
 
     default:
       return NextResponse.json({ error: `Unknown action: ${action}` }, { status: 400 })
   }
+}, {
+  permission: 'conversation.manage',
+  rateLimit: {
+    maxRequests: 100,
+    windowSeconds: 60,
+  },
 })

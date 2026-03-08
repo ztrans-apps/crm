@@ -1,5 +1,15 @@
 // Chat feature types
 import { Database } from '@/types/database.types'
+// Import DTO types for type safety across frontend-backend boundary
+import type { 
+  ContactOutput, 
+  MessageOutput, 
+  MessageStatus as DTOMessageStatus,
+  MessageDirection,
+  MediaType as DTOMediaType,
+  ConversationOutput,
+  BroadcastOutput,
+} from '@/lib/dto'
 
 // Database table types
 export type Label = Database['public']['Tables']['labels']['Row']
@@ -21,10 +31,16 @@ export type ChatbotSession = Database['public']['Tables']['chatbot_sessions']['R
 export type ChatbotSessionInsert = Database['public']['Tables']['chatbot_sessions']['Insert']
 export type ChatbotSessionUpdate = Database['public']['Tables']['chatbot_sessions']['Update']
 
+// Use database types for internal operations, but prefer DTO types for API interactions
 export type Conversation = Database['public']['Tables']['conversations']['Row']
 export type Message = Database['public']['Tables']['messages']['Row']
 export type Contact = Database['public']['Tables']['contacts']['Row']
 export type Chatbot = Database['public']['Tables']['chatbots']['Row']
+
+// Re-export DTO types for API interactions (Requirement 9.10)
+export type { ContactOutput, MessageOutput, ConversationOutput, BroadcastOutput }
+export type MessageStatus = DTOMessageStatus
+export type MessageDirection = MessageDirection
 
 // Workflow status types
 export type WorkflowStatus = 'incoming' | 'waiting' | 'in_progress' | 'done'
@@ -55,8 +71,8 @@ export interface AgentWorkflowAnalytics {
   incoming_count: number
 }
 
-// Media types
-export type MediaType = 'image' | 'video' | 'audio' | 'document' | 'location' | 'vcard'
+// Media types - use DTO type for consistency
+export type MediaType = DTOMediaType | 'location' | 'vcard' // Extended with additional types
 
 export interface MediaAsset {
   id: string

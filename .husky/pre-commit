@@ -1,0 +1,28 @@
+#!/usr/bin/env sh
+. "$(dirname -- "$0")/_/husky.sh"
+
+# Run security checks before commit
+echo "🔒 Running security checks..."
+
+# Run ESLint with security rules
+echo "📝 Checking for security issues with ESLint..."
+npx eslint --config .eslintrc.security.json --ext .ts,.tsx,.js,.jsx . || {
+  echo "❌ ESLint security check failed. Please fix the issues before committing."
+  exit 1
+}
+
+# Run secret scanning
+echo "🔍 Scanning for secrets..."
+npx detect-secrets-launcher --baseline .secrets.baseline || {
+  echo "❌ Secret scanning failed. Potential secrets detected!"
+  exit 1
+}
+
+# Run type checking
+echo "🔧 Running TypeScript type checking..."
+npx tsc --noEmit || {
+  echo "❌ TypeScript type checking failed. Please fix type errors before committing."
+  exit 1
+}
+
+echo "✅ All security checks passed!"

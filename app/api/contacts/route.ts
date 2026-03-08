@@ -1,77 +1,111 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withAuth } from '@/lib/rbac/with-auth';
+import { ContactService } from '@/lib/services/contact-service';
+import { CreateContactSchema } from '@/lib/validation/schemas';
+import { z } from 'zod';
 
 /**
  * GET /api/contacts
+ * 
+ * List contacts with optional search filtering.
+ * 
+ * Query Parameters:
+ * - search: Optional search query (searches name, phone, email)
+ * - page: Page number (default: 1)
+ * - pageSize: Items per page (default: 50)
+ * 
+ * Requirements: 4.7, 9.1, 9.2
  * Permission: contact.view (enforced by middleware)
  */
 export const GET = withAuth(async (req, ctx) => {
-  const searchParams = req.nextUrl.searchParams;
-  const search = searchParams.get('search');
+  try {
+    const searchParams = req.nextUrl.searchParams;
+    const search = searchParams.get('search') || undefined;
+    const page = parseInt(searchParams.get('page') || '1', 10);
+    const pageSize = parseInt(searchParams.get('pageSize') || '50', 10);
 
-  let query = ctx.supabase
-    .from('contacts')
-    .select('*')
-    .eq('tenant_id', ctx.tenantId)
-    .order('created_at', { ascending: false });
+    // Initialize ContactService with authenticated context
+    const contactService = new ContactService(ctx.serviceClient, ctx.tenantId);
 
-  if (search) {
-    query = query.or(`name.ilike.%${search}%,phone_number.ilike.%${search}%,email.ilike.%${search}%`);
-  }
+    // Use service layer to fetch contacts
+    const result = await contactService.listContacts({
+      search,
+      page,
+      pageSize,
+      sortBy: 'created_at',
+      sortDirection: 'desc',
+    });
 
-  const { data, error } = await query;
-
-  if (error) {
+    // Return paginated response (backward compatible)
+    return NextResponse.json({
+      contacts: result.data,
+      pagination: {
+        total: result.total,
+        page: result.page,
+        pageSize: result.pageSize,
+        hasMore: result.hasMore,
+      },
+    });
+  } catch (error: any) {
     console.error('Error fetching contacts:', error);
-    return NextResponse.json({ error: 'Failed to fetch contacts' }, { status: 500 });
+    return NextResponse.json(
+      { error: 'Failed to fetch contacts', message: error.message },
+      { status: 500 }
+    );
   }
-
-  return NextResponse.json({ contacts: data || [] });
+}, {
+  permission: 'contact.view',
+  rateLimit: {
+    maxRequests: 100,
+    windowSeconds: 60,
+    keyPrefix: 'contacts:list',
+  },
 });
 
 /**
  * POST /api/contacts
+ * 
+ * Create a new contact.
+ * 
+ * Requirements: 4.7, 9.1, 9.2
  * Permission: contact.create
  */
 export const POST = withAuth(async (req, ctx) => {
-  const body = await req.json();
-  const { name, phone_number, email, notes, tags, avatar_url, metadata } = body;
+  try {
+    // Initialize ContactService with authenticated context
+    const contactService = new ContactService(ctx.serviceClient, ctx.tenantId);
 
-  if (!phone_number) {
-    return NextResponse.json({ error: 'Phone number is required' }, { status: 400 });
-  }
+    // Use validated body from middleware
+    const input = ctx.validatedBody;
 
-  // Check if contact with same phone already exists
-  const { data: existing } = await ctx.supabase
-    .from('contacts')
-    .select('id')
-    .eq('tenant_id', ctx.tenantId)
-    .eq('phone_number', phone_number)
-    .single();
+    // Create contact using service layer
+    const contact = await contactService.createContact(input, ctx.user.id);
 
-  if (existing) {
-    return NextResponse.json({ error: 'Contact with this phone number already exists' }, { status: 409 });
-  }
-
-  const { data, error } = await ctx.supabase
-    .from('contacts')
-    .insert({
-      tenant_id: ctx.tenantId,
-      name: name || null,
-      phone_number,
-      email: email || null,
-      notes: notes || null,
-      tags: tags || [],
-      avatar_url: avatar_url || null,
-      metadata: metadata || {},
-    })
-    .select()
-    .single();
-
-  if (error) {
+    return NextResponse.json({ contact }, { status: 201 });
+  } catch (error: any) {
     console.error('Error creating contact:', error);
-    return NextResponse.json({ error: 'Failed to create contact' }, { status: 500 });
+    
+    // Handle business rule violations (duplicate phone/email)
+    if (error.message.includes('already exists')) {
+      return NextResponse.json(
+        { error: 'Conflict', message: error.message },
+        { status: 409 }
+      );
+    }
+    
+    return NextResponse.json(
+      { error: 'Failed to create contact', message: error.message },
+      { status: 500 }
+    );
   }
-
-  return NextResponse.json({ contact: data }, { status: 201 });
-}, { permission: 'contact.create' });
+}, {
+  permission: 'contact.create',
+  rateLimit: {
+    maxRequests: 50,
+    windowSeconds: 60,
+    keyPrefix: 'contacts:create',
+  },
+  validation: {
+    body: CreateContactSchema,
+  },
+});

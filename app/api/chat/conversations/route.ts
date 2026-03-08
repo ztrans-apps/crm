@@ -1,106 +1,135 @@
-// API route using dynamic RBAC permission checks
-import { withAuth } from '@/core/auth/middleware'
-import { requireTenantIdFromHeaders } from '@core/tenant'
-import { chatService } from '@/features/chat/services'
+// API route using enhanced withAuth middleware with validation and rate limiting
+import { withAuth } from '@/lib/middleware/with-auth'
+import { ConversationService } from '@/lib/services/conversation-service'
+import { CreateConversationSchema, UpdateConversationSchema } from '@/lib/validation/schemas'
+import { NextResponse } from 'next/server'
 
 /**
  * GET /api/chat/conversations
- * Get conversations for current user
- * Requires authentication + conversation.view permission
+ * Get conversations for current user with filtering
+ * 
+ * **Requirements: 2.1, 2.5, 4.7, 9.1, 9.2**
+ * - Authentication required (2.1)
+ * - Permission-based authorization (2.5)
+ * - Service layer delegation (4.7)
+ * - No direct database access from API routes (9.1, 9.2)
  */
-export const GET = withAuth(async (req: Request, context) => {
-  try {
-    // Get tenant ID
-    const tenantId = requireTenantIdFromHeaders(req.headers)
+export const GET = withAuth(
+  async (req, context) => {
+    try {
+      // Initialize service with tenant context
+      const conversationService = new ConversationService(
+        context.supabase,
+        context.tenantId
+      )
 
-    // Get query params
-    const { searchParams } = new URL(req.url)
-    const status = searchParams.get('status') as 'open' | 'closed' | null
-    const searchQuery = searchParams.get('q')
+      // Get query params
+      const { searchParams } = new URL(req.url)
+      const status = searchParams.get('status') as 'open' | 'closed' | null
+      const workflowStatus = searchParams.get('workflow_status') as 'incoming' | 'waiting' | 'in_progress' | 'done' | null
+      const assignedTo = searchParams.get('assigned_to')
+      const contactId = searchParams.get('contact_id')
+      const page = parseInt(searchParams.get('page') || '1', 10)
+      const pageSize = parseInt(searchParams.get('pageSize') || '20', 10)
+      const sortBy = searchParams.get('sortBy') as 'created_at' | 'updated_at' | 'last_message_at' | null
+      const sortDirection = searchParams.get('sortDirection') as 'asc' | 'desc' | null
 
-    // Get conversations using service (with tenant filter)
-    // Pass userId - the service determines visibility based on permissions
-    const conversations = await chatService.conversations.getConversations(
-      context.user.id,
-      'user', // Role string is now just for display; actual access is permission-based
-      {
+      // Get conversations using service
+      const result = await conversationService.listConversations({
         status: status || undefined,
-        searchQuery: searchQuery || undefined,
-        tenantId, // Add tenant filter
-      }
-    )
+        workflow_status: workflowStatus || undefined,
+        assigned_to: assignedTo || undefined,
+        contact_id: contactId || undefined,
+        page,
+        pageSize,
+        sortBy: sortBy || undefined,
+        sortDirection: sortDirection || undefined,
+      })
 
-    return new Response(
-      JSON.stringify({
+      return NextResponse.json({
         success: true,
-        data: conversations,
-      }),
-      {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' },
-      }
-    )
-  } catch (error: any) {
-    return new Response(
-      JSON.stringify({
-        success: false,
-        error: error.message || 'Failed to get conversations',
-      }),
-      {
-        status: error.message === 'Tenant ID is required' ? 400 : 500,
-        headers: { 'Content-Type': 'application/json' },
-      }
-    )
+        data: result.data,
+        pagination: {
+          total: result.total,
+          page: result.page,
+          pageSize: result.pageSize,
+          hasMore: result.hasMore,
+        },
+      })
+    } catch (error: any) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: error.message || 'Failed to get conversations',
+        },
+        { status: 500 }
+      )
+    }
+  },
+  {
+    permission: 'conversation.view',
+    rateLimit: {
+      maxRequests: 100,
+      windowSeconds: 60,
+    },
   }
-})
+)
 
 /**
  * POST /api/chat/conversations
  * Create new conversation
- * Requires conversation.create permission
+ * 
+ * **Requirements: 1.2, 2.1, 2.5, 4.7, 9.1, 9.2**
+ * - Input validation with Zod (1.2)
+ * - Authentication required (2.1)
+ * - Permission-based authorization (2.5)
+ * - Service layer delegation (4.7)
+ * - No direct database access from API routes (9.1, 9.2)
  */
-export const POST = withAuth(async (req: Request, context) => {
-  try {
-    // Get tenant ID
-    const tenantId = requireTenantIdFromHeaders(req.headers)
-    
-    const body = await req.json()
-    const { phoneNumber, name, message } = body
+export const POST = withAuth(
+  async (req, context) => {
+    try {
+      // Validate request body
+      const body = context.validatedBody
 
-    if (!phoneNumber) {
-      throw new Error('Phone number is required')
+      // Initialize service with tenant context
+      const conversationService = new ConversationService(
+        context.supabase,
+        context.tenantId
+      )
+
+      // Create conversation using service
+      const conversation = await conversationService.createConversation(
+        body,
+        context.user.id
+      )
+
+      return NextResponse.json(
+        {
+          success: true,
+          data: conversation,
+        },
+        { status: 201 }
+      )
+    } catch (error: any) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: error.message || 'Failed to create conversation',
+        },
+        { status: 500 }
+      )
     }
-
-    // Create contact (with tenant)
-    const contact = await chatService.contacts.getOrCreateContact(
-      phoneNumber, 
-      name,
-      tenantId
-    )
-
-    // Create conversation
-    // ... implementation
-
-    return new Response(
-      JSON.stringify({
-        success: true,
-        data: { contact },
-      }),
-      {
-        status: 201,
-        headers: { 'Content-Type': 'application/json' },
-      }
-    )
-  } catch (error: any) {
-    return new Response(
-      JSON.stringify({
-        success: false,
-        error: error.message || 'Failed to create conversation',
-      }),
-      {
-        status: error.message === 'Tenant ID is required' ? 400 : 500,
-        headers: { 'Content-Type': 'application/json' },
-      }
-    )
+  },
+  {
+    permission: 'conversation.create',
+    validation: {
+      body: CreateConversationSchema,
+    },
+    rateLimit: {
+      maxRequests: 50,
+      windowSeconds: 60,
+    },
   }
-})
+)
+

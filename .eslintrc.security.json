@@ -1,0 +1,36 @@
+{
+  "extends": [
+    "plugin:security/recommended"
+  ],
+  "plugins": [
+    "security",
+    "no-secrets"
+  ],
+  "rules": {
+    "security/detect-object-injection": "warn",
+    "security/detect-non-literal-regexp": "warn",
+    "security/detect-non-literal-fs-filename": "warn",
+    "security/detect-eval-with-expression": "error",
+    "security/detect-no-csrf-before-method-override": "error",
+    "security/detect-buffer-noassert": "error",
+    "security/detect-child-process": "warn",
+    "security/detect-disable-mustache-escape": "error",
+    "security/detect-new-buffer": "error",
+    "security/detect-possible-timing-attacks": "warn",
+    "security/detect-pseudoRandomBytes": "error",
+    "security/detect-unsafe-regex": "error",
+    "no-secrets/no-secrets": ["error", {
+      "tolerance": 4.5,
+      "additionalRegexes": {
+        "Basic Auth": "Authorization: Basic [A-Za-z0-9+/=]+",
+        "Slack Token": "(xox[pboa]-[0-9]{12}-[0-9]{12}-[0-9]{12}-[a-z0-9]{32})",
+        "AWS Access Key": "(AKIA[0-9A-Z]{16})",
+        "Private Key": "-----BEGIN (RSA|DSA|EC|OPENSSH) PRIVATE KEY-----"
+      }
+    }],
+    "no-eval": "error",
+    "no-implied-eval": "error",
+    "no-new-func": "error",
+    "no-script-url": "error"
+  }
+}

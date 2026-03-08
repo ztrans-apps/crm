@@ -1,8 +1,23 @@
 /**
  * CRM Contacts Types
+ * 
+ * Re-exports from DTO layer for frontend consumption.
+ * Ensures type safety across frontend-backend boundary.
+ * 
+ * **Requirement 9.10**: UI components use TypeScript types from DTO definitions
  */
 
-export interface Contact {
+// Re-export DTO types for frontend use
+export type {
+  ContactOutput as Contact,
+  CreateContactInput,
+  UpdateContactInput,
+  ContactFilters as ContactFilter,
+  ContactListOutput,
+} from '@/lib/dto/contact.dto'
+
+// Legacy interface for backward compatibility (deprecated - use ContactOutput)
+export interface LegacyContact {
   id: string;
   tenant_id: string;
   phone_number: string;
@@ -13,28 +28,4 @@ export interface Contact {
   metadata: Record<string, any>;
   created_at: string;
   updated_at: string;
-}
-
-export interface CreateContactInput {
-  phone_number: string;
-  name?: string;
-  email?: string;
-  avatar_url?: string;
-  tags?: string[];
-  metadata?: Record<string, any>;
-}
-
-export interface UpdateContactInput {
-  name?: string;
-  email?: string;
-  avatar_url?: string;
-  tags?: string[];
-  metadata?: Record<string, any>;
-}
-
-export interface ContactFilter {
-  search?: string;
-  tags?: string[];
-  limit?: number;
-  offset?: number;
 }

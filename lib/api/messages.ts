@@ -1,39 +1,73 @@
 // API functions for messages
-import { createClient } from '@/lib/supabase/client'
-import type { 
-  MessageWithRelations, 
-  SendMessageResponse, 
-  UploadMediaResponse,
-  MediaAttachment 
-} from '@/lib/types/chat'
+import type { MessageOutput } from '@/lib/dto/message.dto'
+import type { ErrorResponse } from '@/lib/middleware/error-handler'
+
+/**
+ * API response wrapper for better error handling
+ */
+interface ApiResponse<T> {
+  success: boolean
+  data?: T
+  error?: ErrorResponse
+}
+
+export interface SendMessageResponse {
+  success: boolean
+  messageId?: string
+  error?: string
+}
+
+export interface UploadMediaResponse {
+  success: boolean
+  url?: string
+  filename?: string
+  size?: number
+  error?: string
+}
+
+export interface MediaAttachment {
+  file: File
+  type: 'image' | 'video' | 'audio' | 'document'
+}
 
 /**
  * Fetch messages for a conversation
  */
 export async function fetchMessages(
   conversationId: string
-): Promise<MessageWithRelations[]> {
-  const supabase = createClient()
+): Promise<ApiResponse<{ messages: MessageOutput[] }>> {
+  try {
+    const response = await fetch(`/api/conversations/${conversationId}/messages`, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' },
+    })
 
-  const { data, error } = await supabase
-    .from('messages')
-    .select(`
-      *,
-      sender:profiles(id, full_name, avatar_url)
-    `)
-    .eq('conversation_id', conversationId)
-    .order('created_at', { ascending: true })
+    if (!response.ok) {
+      const error: ErrorResponse = await response.json()
+      return { success: false, error }
+    }
 
-  if (error) {
+    const data = await response.json()
+    return { success: true, data }
+  } catch (error) {
     console.error('Error fetching messages:', error)
-    throw new Error(error.message)
+    return {
+      success: false,
+      error: {
+        error: 'NetworkError',
+        message: 'Failed to fetch messages',
+        code: 'NETWORK_ERROR',
+        requestId: '',
+        timestamp: new Date().toISOString(),
+      },
+    }
   }
-
-  return (data as MessageWithRelations[]) || []
 }
 
 /**
  * Send message via internal API route (Meta Cloud API)
+ * Note: This function still uses the legacy /api/send-message endpoint
+ * which will be migrated in a future task
  */
 export async function sendMessage(
   sessionId: string,
@@ -81,63 +115,14 @@ export async function sendMessage(
       const errorData = await response.json()
       return {
         success: false,
-        error: errorData.error || 'Failed to send message',
+        error: errorData.error || errorData.message || 'Failed to send message',
       }
     }
 
     const result = await response.json()
-
-    // Save message to database
-    const supabase = createClient()
-    const defaultTenantId = process.env.NEXT_PUBLIC_DEFAULT_TENANT_ID || '00000000-0000-0000-0000-000000000001'
-    const { data: messageData, error: dbError } = await supabase
-      .from('messages')
-      // @ts-ignore - Bypass Supabase type checking for RLS
-      .insert({
-        conversation_id: conversationId,
-        sender_type: 'agent',
-        sender_id: senderId,
-        message_type: media ? 'image' : 'text', // Simplified, should detect type
-        content: content || '',
-        media_url: media && result.mediaUrl ? result.mediaUrl : null,
-        media_type: media?.type || null,
-        media_filename: media?.file?.name || null,
-        media_size: media?.file?.size || null,
-        media_mime_type: media?.file?.type || null,
-        status: 'sent', // Use 'sent' as initial status (database constraint doesn't allow 'sending')
-        is_from_me: true,
-        whatsapp_message_id: result.messageId || null,
-        tenant_id: defaultTenantId,
-      })
-      .select()
-      .single()
-
-    if (dbError) {
-      console.error('Error saving message to database:', dbError)
-      // Message was sent but not saved to DB
-      return {
-        success: true,
-        messageId: result.messageId,
-      }
-    }
-
-    // Update conversation last message (keep as read since agent sent it)
-    await supabase
-      .from('conversations')
-      // @ts-ignore - Bypass Supabase type checking
-      .update({
-        last_message: content,
-        last_message_at: new Date().toISOString(),
-        read_status: 'read', // Agent's message doesn't make it unread
-        workflow_status: 'in_progress', // Auto-transition to in_progress when agent replies
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', conversationId)
-
     return {
       success: true,
-      // @ts-ignore
-      messageId: messageData.id,
+      messageId: result.messageId || result.id,
     }
   } catch (error) {
     console.error('Error sending message:', error)
@@ -150,6 +135,8 @@ export async function sendMessage(
 
 /**
  * Upload media file
+ * Note: This still uses Supabase Storage directly as file storage API
+ * is not yet migrated. This is acceptable for now as it's storage, not database access.
  */
 export async function uploadMedia(
   file: File,
@@ -188,39 +175,29 @@ export async function uploadMedia(
       }
     }
 
-    const supabase = createClient()
+    // Use file storage API endpoint
+    const formData = new FormData()
+    formData.append('file', file)
+    formData.append('conversationId', conversationId)
 
-    // Generate unique filename
-    const timestamp = Date.now()
-    const randomString = Math.random().toString(36).substring(7)
-    const extension = file.name.split('.').pop()
-    const filename = `${conversationId}/${timestamp}-${randomString}.${extension}`
+    const response = await fetch('/api/media/upload', {
+      method: 'POST',
+      body: formData,
+    })
 
-    // Upload to Supabase Storage
-    const { data, error } = await supabase.storage
-      .from('chat-media')
-      .upload(filename, file, {
-        cacheControl: '3600',
-        upsert: false,
-      })
-
-    if (error) {
-      console.error('Error uploading file:', error)
+    if (!response.ok) {
+      const error = await response.json()
       return {
         success: false,
-        error: error.message,
+        error: error.message || 'Failed to upload file',
       }
     }
 
-    // Get public URL
-    const { data: urlData } = supabase.storage
-      .from('chat-media')
-      .getPublicUrl(filename)
-
+    const data = await response.json()
     return {
       success: true,
-      url: urlData.publicUrl,
-      filename: file.name,
+      url: data.url,
+      filename: data.filename || file.name,
       size: file.size,
     }
   } catch (error) {
@@ -267,37 +244,61 @@ export async function translateMessage(
 /**
  * Mark message as read
  */
-export async function markMessageAsRead(messageId: string): Promise<void> {
-  const supabase = createClient()
-
-  const { error } = await supabase
-    .from('messages')
-    // @ts-ignore - Bypass Supabase type checking
-    .update({
-      status: 'read',
-      updated_at: new Date().toISOString(),
+export async function markMessageAsRead(messageId: string): Promise<ApiResponse<void>> {
+  try {
+    const response = await fetch(`/api/messages/${messageId}/read`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
     })
-    .eq('id', messageId)
 
-  if (error) {
+    if (!response.ok) {
+      const error: ErrorResponse = await response.json()
+      return { success: false, error }
+    }
+
+    return { success: true }
+  } catch (error) {
     console.error('Error marking message as read:', error)
-    throw new Error(error.message)
+    return {
+      success: false,
+      error: {
+        error: 'NetworkError',
+        message: 'Failed to mark message as read',
+        code: 'NETWORK_ERROR',
+        requestId: '',
+        timestamp: new Date().toISOString(),
+      },
+    }
   }
 }
 
 /**
  * Delete message
  */
-export async function deleteMessage(messageId: string): Promise<void> {
-  const supabase = createClient()
+export async function deleteMessage(messageId: string): Promise<ApiResponse<void>> {
+  try {
+    const response = await fetch(`/api/messages/${messageId}`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+    })
 
-  const { error } = await supabase
-    .from('messages')
-    .delete()
-    .eq('id', messageId)
+    if (!response.ok) {
+      const error: ErrorResponse = await response.json()
+      return { success: false, error }
+    }
 
-  if (error) {
+    return { success: true }
+  } catch (error) {
     console.error('Error deleting message:', error)
-    throw new Error(error.message)
+    return {
+      success: false,
+      error: {
+        error: 'NetworkError',
+        message: 'Failed to delete message',
+        code: 'NETWORK_ERROR',
+        requestId: '',
+        timestamp: new Date().toISOString(),
+      },
+    }
   }
 }

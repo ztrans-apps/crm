@@ -1,0 +1,433 @@
+openapi: 3.0.3
+info:
+  title: WhatsApp CRM API
+  description: |
+    Secure API for WhatsApp CRM system with comprehensive security features.
+    
+    ## Authentication
+    All endpoints require authentication via Bearer token in the Authorization header:
+    ```
+    Authorization: Bearer <your-token>
+    ```
+    
+    ## Rate Limiting
+    - Authentication endpoints: 5 requests/minute per IP
+    - Message sending: 100 requests/hour per tenant
+    - Standard API endpoints: 1000 requests/hour per tenant
+    - Admin endpoints: 500 requests/hour per user
+    
+    ## Error Codes
+    - AUTH_001: Authentication failed
+    - AUTHZ_001: Authorization failed
+    - VAL_001: Validation error
+    - RATE_001: Rate limit exceeded
+    - DB_001: Database error
+    - EXT_001: External service error
+    
+  version: 1.0.0
+  contact:
+    name: API Support
+    email: support@example.com
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: https://api.example.com/v1
+    description: Production server
+  - url: https://staging-api.example.com/v1
+    description: Staging server
+  - url: http://localhost:3000/api
+    description: Development server
+
+tags:
+  - name: Health
+    description: Health check endpoints
+  - name: Compliance
+    description: GDPR compliance endpoints
+  - name: Contacts
+    description: Contact management
+  - name: Messages
+    description: Message operations
+  - name: Broadcasts
+    description: Broadcast campaigns
+
+paths:
+  /health:
+    get:
+      tags:
+        - Health
+      summary: Basic health check
+      description: Returns 200 if all systems are operational
+      operationId: getHealth
+      responses:
+        '200':
+          description: System is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+                  timestamp:
+                    type: string
+                    format: date-time
+                  components:
+                    type: object
+                    properties:
+                      database:
+                        type: string
+                        enum: [up, down, degraded]
+                      redis:
+                        type: string
+                        enum: [up, down, degraded]
+                      storage:
+                        type: string
+                        enum: [up, down, degraded]
+
+  /compliance/export:
+    post:
+      tags:
+        - Compliance
+      summary: Export user data (GDPR Article 20)
+      description: Export all user data in JSON format
+      operationId: exportUserData
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                format:
+                  type: string
+                  enum: [json, file]
+                  default: json
+      responses:
+        '200':
+          description: Data exported successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserDataExport'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /compliance/delete:
+    post:
+      tags:
+        - Compliance
+      summary: Delete user data (GDPR Article 17)
+      description: Request deletion of all user data
+      operationId: deleteUserData
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - confirm
+              properties:
+                confirm:
+                  type: boolean
+                  description: Must be true to confirm deletion
+                permanent:
+                  type: boolean
+                  default: false
+                  description: If true, permanently delete immediately. Otherwise, soft delete with 30-day retention.
+      responses:
+        '200':
+          description: Deletion successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeletionResult'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /compliance/consent:
+    get:
+      tags:
+        - Compliance
+      summary: Get user consents
+      description: Get all consents for the authenticated user
+      operationId: getUserConsents
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Consents retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  consents:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Consent'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    
+    post:
+      tags:
+        - Compliance
+      summary: Grant consent
+      description: Grant consent for a specific purpose
+      operationId: grantConsent
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/GrantConsentInput'
+      responses:
+        '200':
+          description: Consent granted successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  consent:
+                    $ref: '#/components/schemas/Consent'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    
+    delete:
+      tags:
+        - Compliance
+      summary: Revoke consent
+      description: Revoke consent for a specific purpose
+      operationId: revokeConsent
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - consent_type
+              properties:
+                consent_type:
+                  type: string
+                  enum: [privacy_policy, terms_of_service, marketing, analytics, data_processing]
+      responses:
+        '200':
+          description: Consent revoked successfully
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    UserDataExport:
+      type: object
+      properties:
+        user:
+          type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+            email:
+              type: string
+              format: email
+            created_at:
+              type: string
+              format: date-time
+            updated_at:
+              type: string
+              format: date-time
+        contacts:
+          type: array
+          items:
+            type: object
+        messages:
+          type: array
+          items:
+            type: object
+        broadcasts:
+          type: array
+          items:
+            type: object
+        settings:
+          type: object
+        export_metadata:
+          type: object
+          properties:
+            exported_at:
+              type: string
+              format: date-time
+            export_version:
+              type: string
+            tenant_id:
+              type: string
+              format: uuid
+
+    DeletionResult:
+      type: object
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+        result:
+          type: object
+          properties:
+            deletedAt:
+              type: string
+              format: date-time
+            permanentDeletionScheduledFor:
+              type: string
+              format: date-time
+            itemsDeleted:
+              type: object
+              properties:
+                contacts:
+                  type: integer
+                messages:
+                  type: integer
+                broadcasts:
+                  type: integer
+                files:
+                  type: integer
+                apiKeys:
+                  type: integer
+                sessions:
+                  type: integer
+
+    Consent:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        tenant_id:
+          type: string
+          format: uuid
+        consent_type:
+          type: string
+          enum: [privacy_policy, terms_of_service, marketing, analytics, data_processing]
+        purpose:
+          type: string
+        granted:
+          type: boolean
+        granted_at:
+          type: string
+          format: date-time
+          nullable: true
+        revoked_at:
+          type: string
+          format: date-time
+          nullable: true
+        version:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    GrantConsentInput:
+      type: object
+      required:
+        - consent_type
+        - purpose
+        - version
+      properties:
+        consent_type:
+          type: string
+          enum: [privacy_policy, terms_of_service, marketing, analytics, data_processing]
+        purpose:
+          type: string
+          description: Description of what the consent is for
+        version:
+          type: string
+          description: Version of the policy/terms
+
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        code:
+          type: string
+        message:
+          type: string
+        request_id:
+          type: string
+          format: uuid
+        timestamp:
+          type: string
+          format: date-time
+
+  responses:
+    BadRequest:
+      description: Bad request
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: Validation error
+            code: VAL_001
+            message: Missing required field
+            request_id: 550e8400-e29b-41d4-a716-446655440000
+            timestamp: 2024-01-19T12:00:00Z
+
+    Unauthorized:
+      description: Unauthorized
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: Authentication failed
+            code: AUTH_001
+            message: Invalid or expired token
+            request_id: 550e8400-e29b-41d4-a716-446655440000
+            timestamp: 2024-01-19T12:00:00Z
+
+    InternalError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            error: Internal server error
+            code: DB_001
+            message: An unexpected error occurred
+            request_id: 550e8400-e29b-41d4-a716-446655440000
+            timestamp: 2024-01-19T12:00:00Z

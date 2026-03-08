@@ -1,104 +1,156 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { withAuth } from '@/lib/rbac/with-auth';
+import { ContactService } from '@/lib/services/contact-service';
+import { UpdateContactSchema } from '@/lib/validation/schemas';
+import { z } from 'zod';
+
+// Schema for validating contactId parameter
+const ContactIdParamSchema = z.object({
+  contactId: z.string().uuid(),
+});
 
 /**
  * GET /api/contacts/[contactId]
+ * 
+ * Get a single contact by ID.
+ * 
+ * Requirements: 4.7, 9.1, 9.2
  * Permission: contact.view (enforced by middleware)
  */
 export const GET = withAuth(async (req, ctx, params) => {
-  const { contactId } = await params;
+  try {
+    const { contactId } = await params;
 
-  const { data, error } = await ctx.supabase
-    .from('contacts')
-    .select('*')
-    .eq('id', contactId)
-    .eq('tenant_id', ctx.tenantId)
-    .single();
+    // Initialize ContactService with authenticated context
+    const contactService = new ContactService(ctx.serviceClient, ctx.tenantId);
 
-  if (error || !data) {
-    return NextResponse.json({ error: 'Contact not found' }, { status: 404 });
+    // Use service layer to fetch contact
+    const contact = await contactService.getContact(contactId);
+
+    return NextResponse.json({ contact });
+  } catch (error: any) {
+    console.error('Error fetching contact:', error);
+    
+    // Handle not found errors
+    if (error.message.includes('not found')) {
+      return NextResponse.json(
+        { error: 'Contact not found', message: error.message },
+        { status: 404 }
+      );
+    }
+    
+    return NextResponse.json(
+      { error: 'Failed to fetch contact', message: error.message },
+      { status: 500 }
+    );
   }
-
-  return NextResponse.json({ contact: data });
+}, {
+  permission: 'contact.view',
+  rateLimit: {
+    maxRequests: 200,
+    windowSeconds: 60,
+    keyPrefix: 'contacts:get',
+  },
 });
 
 /**
  * PUT /api/contacts/[contactId]
+ * 
+ * Update an existing contact.
+ * 
+ * Requirements: 4.7, 9.1, 9.2
  * Permission: contact.edit
  */
 export const PUT = withAuth(async (req, ctx, params) => {
-  const { contactId } = await params;
-  const body = await req.json();
-  const { name, phone_number, email, notes, tags, avatar_url, metadata } = body;
+  try {
+    const { contactId } = await params;
 
-  if (!phone_number) {
-    return NextResponse.json({ error: 'Phone number is required' }, { status: 400 });
-  }
+    // Initialize ContactService with authenticated context
+    const contactService = new ContactService(ctx.serviceClient, ctx.tenantId);
 
-  const { data: existing } = await ctx.supabase
-    .from('contacts')
-    .select('id')
-    .eq('id', contactId)
-    .eq('tenant_id', ctx.tenantId)
-    .single();
+    // Use validated body from middleware
+    const input = ctx.validatedBody;
 
-  if (!existing) {
-    return NextResponse.json({ error: 'Contact not found' }, { status: 404 });
-  }
+    // Update contact using service layer
+    const contact = await contactService.updateContact(contactId, input, ctx.user.id);
 
-  const { data, error } = await ctx.supabase
-    .from('contacts')
-    .update({
-      name: name || null,
-      phone_number,
-      email: email || null,
-      notes: notes || null,
-      tags: tags || [],
-      avatar_url: avatar_url || null,
-      metadata: metadata || {},
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', contactId)
-    .eq('tenant_id', ctx.tenantId)
-    .select()
-    .single();
-
-  if (error) {
+    return NextResponse.json({ contact });
+  } catch (error: any) {
     console.error('Error updating contact:', error);
-    return NextResponse.json({ error: 'Failed to update contact' }, { status: 500 });
+    
+    // Handle not found errors
+    if (error.message.includes('not found')) {
+      return NextResponse.json(
+        { error: 'Contact not found', message: error.message },
+        { status: 404 }
+      );
+    }
+    
+    // Handle business rule violations (duplicate email)
+    if (error.message.includes('already exists')) {
+      return NextResponse.json(
+        { error: 'Conflict', message: error.message },
+        { status: 409 }
+      );
+    }
+    
+    return NextResponse.json(
+      { error: 'Failed to update contact', message: error.message },
+      { status: 500 }
+    );
   }
-
-  return NextResponse.json({ contact: data });
-}, { permission: 'contact.edit' });
+}, {
+  permission: 'contact.edit',
+  rateLimit: {
+    maxRequests: 100,
+    windowSeconds: 60,
+    keyPrefix: 'contacts:update',
+  },
+  validation: {
+    body: UpdateContactSchema,
+  },
+});
 
 /**
  * DELETE /api/contacts/[contactId]
+ * 
+ * Delete a contact.
+ * 
+ * Requirements: 4.7, 9.1, 9.2
  * Permission: contact.delete
  */
 export const DELETE = withAuth(async (req, ctx, params) => {
-  const { contactId } = await params;
+  try {
+    const { contactId } = await params;
 
-  const { data: existing } = await ctx.supabase
-    .from('contacts')
-    .select('id')
-    .eq('id', contactId)
-    .eq('tenant_id', ctx.tenantId)
-    .single();
+    // Initialize ContactService with authenticated context
+    const contactService = new ContactService(ctx.serviceClient, ctx.tenantId);
 
-  if (!existing) {
-    return NextResponse.json({ error: 'Contact not found' }, { status: 404 });
-  }
+    // Delete contact using service layer
+    await contactService.deleteContact(contactId, ctx.user.id);
 
-  const { error } = await ctx.supabase
-    .from('contacts')
-    .delete()
-    .eq('id', contactId)
-    .eq('tenant_id', ctx.tenantId);
-
-  if (error) {
+    return NextResponse.json({ success: true });
+  } catch (error: any) {
     console.error('Error deleting contact:', error);
-    return NextResponse.json({ error: 'Failed to delete contact' }, { status: 500 });
+    
+    // Handle not found errors
+    if (error.message.includes('not found')) {
+      return NextResponse.json(
+        { error: 'Contact not found', message: error.message },
+        { status: 404 }
+      );
+    }
+    
+    return NextResponse.json(
+      { error: 'Failed to delete contact', message: error.message },
+      { status: 500 }
+    );
   }
-
-  return NextResponse.json({ success: true });
-}, { permission: 'contact.delete' });
+}, {
+  permission: 'contact.delete',
+  rateLimit: {
+    maxRequests: 50,
+    windowSeconds: 60,
+    keyPrefix: 'contacts:delete',
+  },
+});

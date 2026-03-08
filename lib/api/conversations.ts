@@ -1,6 +1,17 @@
 // API functions for conversations
-import { createClient } from '@/lib/supabase/client'
-import type { ConversationWithRelations, ConversationFilter } from '@/lib/types/chat'
+import type { ConversationOutput } from '@/lib/dto/conversation.dto'
+import type { ErrorResponse } from '@/lib/middleware/error-handler'
+
+/**
+ * API response wrapper for better error handling
+ */
+interface ApiResponse<T> {
+  success: boolean
+  data?: T
+  error?: ErrorResponse
+}
+
+export type ConversationFilter = 'all' | 'read' | 'unread'
 
 /**
  * Fetch conversations with filters and search
@@ -9,48 +20,37 @@ export async function fetchConversations(
   userId: string,
   filter: ConversationFilter = 'all',
   searchQuery?: string
-): Promise<ConversationWithRelations[]> {
-  const supabase = createClient()
+): Promise<ApiResponse<{ conversations: ConversationOutput[] }>> {
+  try {
+    const searchParams = new URLSearchParams()
+    if (filter !== 'all') searchParams.set('filter', filter)
+    if (searchQuery) searchParams.set('search', searchQuery)
 
-  // Build query
-  let query = supabase
-    .from('conversations')
-    .select(`
-      *,
-      contact:contacts(*),
-      labels:conversation_labels(
-        *,
-        label:labels(*)
-      ),
-      notes:conversation_notes(*),
-      chatbot_sessions(
-        *,
-        chatbot:chatbots(*)
-      )
-    `)
-    .order('last_message_at', { ascending: false })
+    const response = await fetch(`/api/conversations?${searchParams.toString()}`, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' },
+    })
 
-  // Apply filter
-  if (filter === 'read') {
-    query = query.eq('read_status', 'read')
-  } else if (filter === 'unread') {
-    query = query.eq('read_status', 'unread')
-  }
+    if (!response.ok) {
+      const error: ErrorResponse = await response.json()
+      return { success: false, error }
+    }
 
-  // Apply search if provided
-  if (searchQuery && searchQuery.trim()) {
-    // Note: Full-text search on message content would require additional setup
-    // For now, we'll fetch all and filter client-side
-  }
-
-  const { data, error } = await query
-
-  if (error) {
+    const data = await response.json()
+    return { success: true, data }
+  } catch (error) {
     console.error('Error fetching conversations:', error)
-    throw new Error(error.message)
+    return {
+      success: false,
+      error: {
+        error: 'NetworkError',
+        message: 'Failed to fetch conversations',
+        code: 'NETWORK_ERROR',
+        requestId: '',
+        timestamp: new Date().toISOString(),
+      },
+    }
   }
-
-  return (data as ConversationWithRelations[]) || []
 }
 
 /**
@@ -58,33 +58,33 @@ export async function fetchConversations(
  */
 export async function fetchConversationById(
   conversationId: string
-): Promise<ConversationWithRelations | null> {
-  const supabase = createClient()
+): Promise<ApiResponse<{ conversation: ConversationOutput }>> {
+  try {
+    const response = await fetch(`/api/conversations/${conversationId}`, {
+      method: 'GET',
+      headers: { 'Content-Type': 'application/json' },
+    })
 
-  const { data, error } = await supabase
-    .from('conversations')
-    .select(`
-      *,
-      contact:contacts(*),
-      labels:conversation_labels(
-        *,
-        label:labels(*)
-      ),
-      notes:conversation_notes(*),
-      chatbot_sessions(
-        *,
-        chatbot:chatbots(*)
-      )
-    `)
-    .eq('id', conversationId)
-    .single()
+    if (!response.ok) {
+      const error: ErrorResponse = await response.json()
+      return { success: false, error }
+    }
 
-  if (error) {
+    const data = await response.json()
+    return { success: true, data }
+  } catch (error) {
     console.error('Error fetching conversation:', error)
-    return null
+    return {
+      success: false,
+      error: {
+        error: 'NetworkError',
+        message: 'Failed to fetch conversation',
+        code: 'NETWORK_ERROR',
+        requestId: '',
+        timestamp: new Date().toISOString(),
+      },
+    }
   }
-
-  return data as ConversationWithRelations
 }
 
 /**
@@ -92,22 +92,31 @@ export async function fetchConversationById(
  */
 export async function markConversationAsRead(
   conversationId: string
-): Promise<void> {
-  const supabase = createClient()
-
-  const { error } = await supabase
-    .from('conversations')
-    // @ts-ignore - Supabase type issue
-    .update({
-      read_status: 'read',
-      unread_count: 0,
-      updated_at: new Date().toISOString(),
+): Promise<ApiResponse<void>> {
+  try {
+    const response = await fetch(`/api/conversations/${conversationId}/read`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
     })
-    .eq('id', conversationId)
 
-  if (error) {
+    if (!response.ok) {
+      const error: ErrorResponse = await response.json()
+      return { success: false, error }
+    }
+
+    return { success: true }
+  } catch (error) {
     console.error('Error marking conversation as read:', error)
-    throw new Error(error.message)
+    return {
+      success: false,
+      error: {
+        error: 'NetworkError',
+        message: 'Failed to mark conversation as read',
+        code: 'NETWORK_ERROR',
+        requestId: '',
+        timestamp: new Date().toISOString(),
+      },
+    }
   }
 }
 
@@ -116,21 +125,31 @@ export async function markConversationAsRead(
  */
 export async function markConversationAsUnread(
   conversationId: string
-): Promise<void> {
-  const supabase = createClient()
-
-  const { error } = await supabase
-    .from('conversations')
-    // @ts-ignore - Supabase type issue
-    .update({
-      read_status: 'unread',
-      updated_at: new Date().toISOString(),
+): Promise<ApiResponse<void>> {
+  try {
+    const response = await fetch(`/api/conversations/${conversationId}/unread`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
     })
-    .eq('id', conversationId)
 
-  if (error) {
+    if (!response.ok) {
+      const error: ErrorResponse = await response.json()
+      return { success: false, error }
+    }
+
+    return { success: true }
+  } catch (error) {
     console.error('Error marking conversation as unread:', error)
-    throw new Error(error.message)
+    return {
+      success: false,
+      error: {
+        error: 'NetworkError',
+        message: 'Failed to mark conversation as unread',
+        code: 'NETWORK_ERROR',
+        requestId: '',
+        timestamp: new Date().toISOString(),
+      },
+    }
   }
 }
 
@@ -140,24 +159,32 @@ export async function markConversationAsUnread(
 export async function closeConversation(
   conversationId: string,
   userId: string
-): Promise<void> {
-  const supabase = createClient()
-
-  const { error } = await supabase
-    .from('conversations')
-    // @ts-ignore - Supabase type issue
-    .update({
-      status: 'closed',
-      workflow_status: 'done', // Auto-transition to done when closed
-      closed_at: new Date().toISOString(),
-      closed_by: userId,
-      updated_at: new Date().toISOString(),
+): Promise<ApiResponse<void>> {
+  try {
+    const response = await fetch(`/api/conversations/${conversationId}/close`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId }),
     })
-    .eq('id', conversationId)
 
-  if (error) {
+    if (!response.ok) {
+      const error: ErrorResponse = await response.json()
+      return { success: false, error }
+    }
+
+    return { success: true }
+  } catch (error) {
     console.error('Error closing conversation:', error)
-    throw new Error(error.message)
+    return {
+      success: false,
+      error: {
+        error: 'NetworkError',
+        message: 'Failed to close conversation',
+        code: 'NETWORK_ERROR',
+        requestId: '',
+        timestamp: new Date().toISOString(),
+      },
+    }
   }
 }
 
@@ -166,23 +193,31 @@ export async function closeConversation(
  */
 export async function reopenConversation(
   conversationId: string
-): Promise<void> {
-  const supabase = createClient()
-
-  const { error } = await supabase
-    .from('conversations')
-    // @ts-ignore - Supabase type issue
-    .update({
-      status: 'open',
-      closed_at: null,
-      closed_by: null,
-      updated_at: new Date().toISOString(),
+): Promise<ApiResponse<void>> {
+  try {
+    const response = await fetch(`/api/conversations/${conversationId}/reopen`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
     })
-    .eq('id', conversationId)
 
-  if (error) {
+    if (!response.ok) {
+      const error: ErrorResponse = await response.json()
+      return { success: false, error }
+    }
+
+    return { success: true }
+  } catch (error) {
     console.error('Error reopening conversation:', error)
-    throw new Error(error.message)
+    return {
+      success: false,
+      error: {
+        error: 'NetworkError',
+        message: 'Failed to reopen conversation',
+        code: 'NETWORK_ERROR',
+        requestId: '',
+        timestamp: new Date().toISOString(),
+      },
+    }
   }
 }
 
@@ -192,21 +227,32 @@ export async function reopenConversation(
 export async function updateResponseWindow(
   conversationId: string,
   expiresAt: string
-): Promise<void> {
-  const supabase = createClient()
-
-  const { error } = await supabase
-    .from('conversations')
-    // @ts-ignore - Supabase type issue
-    .update({
-      response_window_expires_at: expiresAt,
-      updated_at: new Date().toISOString(),
+): Promise<ApiResponse<void>> {
+  try {
+    const response = await fetch(`/api/conversations/${conversationId}/response-window`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ expiresAt }),
     })
-    .eq('id', conversationId)
 
-  if (error) {
+    if (!response.ok) {
+      const error: ErrorResponse = await response.json()
+      return { success: false, error }
+    }
+
+    return { success: true }
+  } catch (error) {
     console.error('Error updating response window:', error)
-    throw new Error(error.message)
+    return {
+      success: false,
+      error: {
+        error: 'NetworkError',
+        message: 'Failed to update response window',
+        code: 'NETWORK_ERROR',
+        requestId: '',
+        timestamp: new Date().toISOString(),
+      },
+    }
   }
 }
 
@@ -216,22 +262,32 @@ export async function updateResponseWindow(
 export async function assignConversation(
   conversationId: string,
   agentId: string
-): Promise<void> {
-  const supabase = createClient()
-
-  const { error } = await supabase
-    .from('conversations')
-    // @ts-ignore - Supabase type issue
-    .update({
-      assigned_to: agentId,
-      workflow_status: 'waiting', // Auto-transition to waiting when assigned
-      updated_at: new Date().toISOString(),
+): Promise<ApiResponse<void>> {
+  try {
+    const response = await fetch(`/api/conversations/${conversationId}/assign`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ agentId }),
     })
-    .eq('id', conversationId)
 
-  if (error) {
+    if (!response.ok) {
+      const error: ErrorResponse = await response.json()
+      return { success: false, error }
+    }
+
+    return { success: true }
+  } catch (error) {
     console.error('Error assigning conversation:', error)
-    throw new Error(error.message)
+    return {
+      success: false,
+      error: {
+        error: 'NetworkError',
+        message: 'Failed to assign conversation',
+        code: 'NETWORK_ERROR',
+        requestId: '',
+        timestamp: new Date().toISOString(),
+      },
+    }
   }
 }
 
@@ -240,20 +296,30 @@ export async function assignConversation(
  */
 export async function unassignConversation(
   conversationId: string
-): Promise<void> {
-  const supabase = createClient()
-
-  const { error } = await supabase
-    .from('conversations')
-    // @ts-ignore - Supabase type issue
-    .update({
-      assigned_to: null,
-      updated_at: new Date().toISOString(),
+): Promise<ApiResponse<void>> {
+  try {
+    const response = await fetch(`/api/conversations/${conversationId}/unassign`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
     })
-    .eq('id', conversationId)
 
-  if (error) {
+    if (!response.ok) {
+      const error: ErrorResponse = await response.json()
+      return { success: false, error }
+    }
+
+    return { success: true }
+  } catch (error) {
     console.error('Error unassigning conversation:', error)
-    throw new Error(error.message)
+    return {
+      success: false,
+      error: {
+        error: 'NetworkError',
+        message: 'Failed to unassign conversation',
+        code: 'NETWORK_ERROR',
+        requestId: '',
+        timestamp: new Date().toISOString(),
+      },
+    }
   }
 }

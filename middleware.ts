@@ -1,8 +1,9 @@
 // middleware.ts
-// Root middleware for Next.js — Auth + RBAC enforcement
+// Root middleware for Next.js — Auth + RBAC enforcement + CORS
 
 import { type NextRequest, NextResponse } from 'next/server'
 import { updateSession } from '@/lib/supabase/middleware'
+import { RequestLogger } from '@/lib/middleware/request-logger'
 
 /**
  * API Route → Required Permission mapping
@@ -117,7 +118,102 @@ const SKIP_PERMISSION_ROUTES = [
   '/api/rbac/permissions',     // User's own permissions (needed for UI)
 ]
 
+/**
+ * Get allowed origins based on environment
+ * In development: Allow localhost and development URLs
+ * In production: Only allow whitelisted domains from environment variable
+ */
+function getAllowedOrigins(): string[] {
+  const isDevelopment = process.env.NODE_ENV === 'development'
+  
+  if (isDevelopment) {
+    // Development: Allow localhost on common ports
+    return [
+      'http://localhost:3000',
+      'http://localhost:3001',
+      'http://127.0.0.1:3000',
+      'http://127.0.0.1:3001',
+    ]
+  }
+  
+  // Production: Use environment variable for whitelisted origins
+  const allowedOrigins = process.env.ALLOWED_ORIGINS || ''
+  return allowedOrigins.split(',').map(origin => origin.trim()).filter(Boolean)
+}
+
+/**
+ * Check if origin is allowed based on environment and whitelist
+ */
+function isOriginAllowed(origin: string | null): boolean {
+  if (!origin) return false
+  
+  const allowedOrigins = getAllowedOrigins()
+  return allowedOrigins.includes(origin)
+}
+
+/**
+ * Add CORS headers to response
+ */
+function addCorsHeaders(response: NextResponse, origin: string | null, isPreflightRequest: boolean = false): NextResponse {
+  // Only add CORS headers if origin is allowed
+  if (origin && isOriginAllowed(origin)) {
+    response.headers.set('Access-Control-Allow-Origin', origin)
+    response.headers.set('Access-Control-Allow-Credentials', 'true')
+    
+    if (isPreflightRequest) {
+      // Preflight OPTIONS request
+      response.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS')
+      response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, X-Tenant-ID, X-API-Key')
+      response.headers.set('Access-Control-Max-Age', '86400') // 24 hours
+    }
+  }
+  
+  return response
+}
+
+/**
+ * Log CORS violation for security monitoring
+ */
+function logCorsViolation(request: NextRequest, origin: string | null, reason: string): void {
+  const ip = request.headers.get('x-forwarded-for')?.split(',')[0] || 
+             request.headers.get('x-real-ip') || 
+             'unknown'
+  
+  RequestLogger.logSecurityEvent({
+    type: 'suspicious_activity',
+    ip,
+    details: {
+      event: 'cors_violation',
+      origin,
+      reason,
+      path: request.nextUrl.pathname,
+      method: request.method,
+      userAgent: request.headers.get('user-agent') || 'unknown',
+    },
+    timestamp: new Date().toISOString(),
+  })
+}
+
 export async function middleware(request: NextRequest) {
+  const origin = request.headers.get('origin')
+  const pathname = request.nextUrl.pathname
+  
+  // Handle preflight OPTIONS requests for CORS
+  if (request.method === 'OPTIONS') {
+    // Check if origin is allowed
+    if (origin && isOriginAllowed(origin)) {
+      const response = new NextResponse(null, { status: 200 })
+      return addCorsHeaders(response, origin, true)
+    } else {
+      // Log CORS violation for non-whitelisted origin
+      if (origin) {
+        logCorsViolation(request, origin, 'origin_not_whitelisted')
+      }
+      // Return 403 for disallowed origins
+      return new NextResponse(null, { status: 403 })
+    }
+  }
+  
   // 1. Update Supabase session (handles auth redirects)
   const response = await updateSession(request)
   
@@ -137,9 +233,17 @@ export async function middleware(request: NextRequest) {
     modifiedResponse.cookies.set(cookie)
   })
 
-  // 3. API Route RBAC enforcement
-  const pathname = request.nextUrl.pathname
+  // 3. Add CORS headers to response if origin is present
+  if (origin) {
+    if (isOriginAllowed(origin)) {
+      addCorsHeaders(modifiedResponse, origin, false)
+    } else {
+      // Log CORS violation for non-whitelisted origin
+      logCorsViolation(request, origin, 'origin_not_whitelisted')
+    }
+  }
 
+  // 4. API Route RBAC enforcement
   if (pathname.startsWith('/api/')) {
     // Skip permission check for excluded routes
     const shouldSkip = SKIP_PERMISSION_ROUTES.some(route => pathname.startsWith(route))
