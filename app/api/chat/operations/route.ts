@@ -1,6 +1,6 @@
 // API route for chat operations that require service role (bypasses RLS)
 import { NextRequest, NextResponse } from 'next/server'
-import { withAuth } from '@/lib/middleware/with-auth'
+import { withAuth } from '@/lib/rbac/with-auth'
 import { ConversationService } from '@/lib/services/conversation-service'
 import { ContactService } from '@/lib/services/contact-service'
 

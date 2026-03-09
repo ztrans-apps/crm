@@ -1,5 +1,5 @@
 // API route using enhanced withAuth middleware with validation and rate limiting
-import { withAuth } from '@/lib/middleware/with-auth'
+import { withAuth } from '@/lib/rbac/with-auth'
 import { ConversationService } from '@/lib/services/conversation-service'
 import { CreateConversationSchema, UpdateConversationSchema } from '@/lib/validation/schemas'
 import { NextResponse } from 'next/server'
