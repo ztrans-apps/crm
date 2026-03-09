@@ -1,3 +1,6 @@
+// Public layout with company branding
+// Updated: March 9, 2026 - Enhanced footer and navigation
+
 export default function PublicLayout({
   children,
 }: {

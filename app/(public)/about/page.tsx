@@ -5,6 +5,8 @@ export const metadata: Metadata = {
   description: 'Learn more about BANGUN JAYA TRANSINDO - Your trusted WhatsApp CRM solution provider',
 }
 
+// Force rebuild - Updated: March 9, 2026
+
 export default function AboutPage() {
   return (
     <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">

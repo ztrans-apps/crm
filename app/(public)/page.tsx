@@ -6,6 +6,8 @@ export const metadata: Metadata = {
   description: 'Professional WhatsApp Business CRM solution by BANGUN JAYA TRANSINDO',
 }
 
+// Force rebuild - Updated: March 9, 2026
+
 export default function HomePage() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white">
