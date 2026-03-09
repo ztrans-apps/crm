@@ -9,13 +9,19 @@ export default function AboutPage() {
   return (
     <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-4xl mx-auto bg-white rounded-lg shadow-md p-8">
+        {/* Company Banner */}
+        <div className="bg-blue-600 text-white text-center py-6 px-4 rounded-lg mb-8">
+          <h2 className="text-3xl font-bold mb-2">BANGUN JAYA TRANSINDO</h2>
+          <p className="text-blue-100">WhatsApp Business CRM Platform</p>
+        </div>
+
         {/* Company Header */}
         <div className="text-center mb-12">
           <h1 className="text-4xl font-bold text-gray-900 mb-4">
-            BANGUN JAYA TRANSINDO
+            About Us
           </h1>
           <p className="text-xl text-gray-600">
-            WhatsApp Business CRM Solution Provider
+            Your Trusted WhatsApp CRM Solution Provider
           </p>
         </div>
 

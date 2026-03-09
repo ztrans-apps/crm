@@ -9,14 +9,17 @@ export default function TermsOfServicePage() {
   return (
     <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-4xl mx-auto bg-white rounded-lg shadow-md p-8">
+        {/* Company Banner */}
+        <div className="bg-blue-600 text-white text-center py-6 px-4 rounded-lg mb-8">
+          <h2 className="text-3xl font-bold mb-2">BANGUN JAYA TRANSINDO</h2>
+          <p className="text-blue-100">WhatsApp Business CRM Platform</p>
+        </div>
+
         {/* Header */}
         <div className="text-center mb-12">
           <h1 className="text-4xl font-bold text-gray-900 mb-2">
             Terms of Service
           </h1>
-          <p className="text-gray-600">
-            BANGUN JAYA TRANSINDO
-          </p>
           <p className="text-sm text-gray-500 mt-2">
             Last Updated: {new Date().toLocaleDateString('id-ID', { year: 'numeric', month: 'long', day: 'numeric' })}
           </p>
