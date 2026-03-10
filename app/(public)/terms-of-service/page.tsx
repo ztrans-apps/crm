@@ -250,6 +250,8 @@ export default function TermsOfServicePage() {
             <div className="bg-gray-50 p-4 rounded-lg">
               <p className="text-gray-700"><strong>Company:</strong> BANGUN JAYA TRANSINDO</p>
               <p className="text-gray-700"><strong>Service:</strong> WhatsApp Business CRM Platform</p>
+              <p className="text-gray-700"><strong>Phone:</strong> +62 817 906 8111</p>
+              <p className="text-gray-700"><strong>Website:</strong> https://voxentra-crm.com</p>
               <p className="text-gray-700 mt-2">
                 For support and inquiries, please contact us through your account dashboard.
               </p>

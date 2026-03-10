@@ -67,6 +67,8 @@ export default function AboutPage() {
               <p><strong>Company Name:</strong> BANGUN JAYA TRANSINDO</p>
               <p><strong>Business Type:</strong> Technology Solutions Provider</p>
               <p><strong>Service:</strong> WhatsApp Business CRM Platform</p>
+              <p><strong>Phone:</strong> +62 817 906 8111</p>
+              <p><strong>Website:</strong> https://voxentra-crm.com</p>
             </div>
           </section>
 
