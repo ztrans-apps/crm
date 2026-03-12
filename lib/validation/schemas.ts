@@ -89,7 +89,7 @@ export const SendMessageSchema = z.object({
 export const CreateBroadcastSchema = z.object({
   name: z.string().min(1).max(255),
   message_template: z.string().min(1).max(4096),
-  recipient_list_id: z.string().uuid(),
+  target_filter: z.record(z.string(), z.unknown()).optional(),
   scheduled_at: z.string().datetime().optional()
 })
 

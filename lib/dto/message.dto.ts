@@ -70,12 +70,14 @@ export interface MessageModel {
   id: string
   tenant_id: string
   conversation_id: string
+  sender_type: 'customer' | 'agent' | 'bot'
   sender_id: string | null
   content: string
   media_url: string | null
   media_type: MediaType | null
   status: MessageStatus
-  direction: MessageDirection
+  is_from_me: boolean
+  message_type: string
   metadata: Record<string, unknown> | null
   created_at: string
   delivered_at: string | null
@@ -149,7 +151,7 @@ export function toMessageOutput(model: MessageModel): MessageOutput {
     media_url: model.media_url,
     media_type: model.media_type,
     status: model.status,
-    direction: model.direction,
+    direction: model.is_from_me ? 'outbound' : 'inbound',
     created_at: model.created_at,
     delivered_at: model.delivered_at,
     read_at: model.read_at,
@@ -174,12 +176,14 @@ export function fromSendMessageInput(
   return {
     tenant_id: tenantId,
     conversation_id: input.conversation_id,
+    sender_type: 'agent',
     sender_id: senderId,
     content: input.content,
     media_url: input.media_url || null,
     media_type: input.media_type || null,
+    message_type: input.media_url ? input.media_type || 'image' : 'text',
     status: 'pending',
-    direction: 'outbound',
+    is_from_me: true,
     metadata: null,
   }
 }

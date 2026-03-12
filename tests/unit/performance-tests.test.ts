@@ -345,17 +345,18 @@ describe('Performance Tests - Requirement 23.5', () => {
 
       for (let batch = 0; batch < concurrentBatches; batch++) {
         for (let i = 0; i < requestsPerBatch; i++) {
-          const isHit = Math.random() < hitRate;
+          // Use deterministic hit condition
+          const isCacheHit = i < Math.floor(requestsPerBatch * hitRate);
           
           promises.push(
             monitor.recordMetric({
               endpoint: '/api/broadcasts',
               method: 'GET',
-              duration: isHit ? Math.random() * 40 + 10 : Math.random() * 200 + 100,
+              duration: isCacheHit ? Math.random() * 40 + 10 : Math.random() * 200 + 100,
               statusCode: 200,
               tenantId: 'tenant-1',
               timestamp: new Date().toISOString(),
-              cacheHit: isHit,
+              cacheHit: isCacheHit,
             })
           );
         }
@@ -561,7 +562,7 @@ describe('Performance Tests - Requirement 23.5', () => {
       const cacheHitRate = 0.75; // 75% cache hit rate
 
       for (let i = 0; i < requestCount; i++) {
-        const isCacheHit = Math.random() < cacheHitRate;
+        const isCacheHit = i < Math.floor(requestCount * cacheHitRate);
         const dbQueryTime = isCacheHit ? undefined : Math.random() * 80 + 20;
         const duration = isCacheHit 
           ? Math.random() * 40 + 10      // Cache hit: 10-50ms
@@ -604,7 +605,7 @@ describe('Performance Tests - Requirement 23.5', () => {
 
       for (const tenantId of tenants) {
         for (let i = 0; i < requestsPerTenant; i++) {
-          const isCacheHit = Math.random() < 0.75;
+          const isCacheHit = i < Math.floor(requestsPerTenant * 0.75);
           const duration = isCacheHit
             ? Math.random() * 40 + 10
             : Math.random() * 200 + 100;

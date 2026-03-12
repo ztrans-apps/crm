@@ -34,7 +34,15 @@ describe('Message API Routes Integration Tests', () => {
 
     // For testing, we'll need to set up test data
     testTenantId = process.env.NEXT_PUBLIC_DEFAULT_TENANT_ID || '00000000-0000-0000-0000-000000000001'
-    testUserId = '00000000-0000-0000-0000-000000000001'
+    
+    // Fetch a real user to satisfy foreign key constraints
+    const { data: user } = await supabase
+      .from('profiles')
+      .select('id')
+      .limit(1)
+      .single()
+      
+    testUserId = user?.id || '00000000-0000-0000-0000-000000000001'
     
     // Create a test contact
     const { data: contact } = await supabase
@@ -55,8 +63,7 @@ describe('Message API Routes Integration Tests', () => {
       .insert({
         tenant_id: testTenantId,
         contact_id: testContactId,
-        phone_number: '+1234567890',
-        status: 'active',
+        status: 'open',
       })
       .select()
       .single()

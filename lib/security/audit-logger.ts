@@ -7,7 +7,7 @@ export interface AuditLog {
   action: string
   resource_type: string
   resource_id: string | null
-  changes: Record<string, { old: unknown; new: unknown }>
+  metadata: Record<string, any>
   ip_address: string | null
   user_agent: string | null
   created_at: string
@@ -93,7 +93,7 @@ export class AuditLogger {
           action: sanitizedLog.action,
           resource_type: sanitizedLog.resource_type,
           resource_id: sanitizedLog.resource_id || null,
-          changes: sanitizedLog.changes || {},
+          metadata: sanitizedLog.changes || {},
           ip_address: sanitizedLog.ip_address || null,
           user_agent: sanitizedLog.user_agent || null,
         })
@@ -285,7 +285,7 @@ export class AuditLogger {
       'action',
       'resource_type',
       'resource_id',
-      'changes',
+      'metadata',
       'ip_address',
       'user_agent',
       'created_at',
@@ -299,7 +299,7 @@ export class AuditLogger {
       log.action,
       log.resource_type,
       log.resource_id || '',
-      JSON.stringify(log.changes),
+      JSON.stringify(log.metadata || {}),
       log.ip_address || '',
       log.user_agent || '',
       log.created_at,

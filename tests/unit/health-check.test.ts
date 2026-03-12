@@ -199,7 +199,7 @@ describe('HealthCheckService', () => {
     it('should return degraded status when Redis is not configured', async () => {
       // Mock getRedisClient to return null
       const { getRedisClient } = await import('@/lib/cache/redis')
-      vi.mocked(getRedisClient).mockReturnValue(null)
+      vi.mocked(getRedisClient).mockReturnValueOnce(null)
 
       const result = await service.checkRedis()
 

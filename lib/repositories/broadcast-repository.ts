@@ -26,7 +26,7 @@ export class BroadcastRepository extends BaseRepository<BroadcastModel> {
    * @param tenantId - Tenant ID for multi-tenant isolation
    */
   constructor(supabase: SupabaseClient, tenantId: string) {
-    super(supabase, tenantId, 'broadcasts')
+    super(supabase, tenantId, 'broadcast_campaigns')
   }
 
   /**

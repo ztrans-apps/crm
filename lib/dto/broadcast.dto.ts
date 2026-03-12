@@ -22,7 +22,7 @@ export type BroadcastStatus = 'draft' | 'scheduled' | 'sending' | 'completed' | 
 export interface CreateBroadcastInput {
   name: string
   message_template: string
-  recipient_list_id: string
+  target_filter?: Record<string, unknown>
   scheduled_at?: string
   metadata?: Record<string, unknown>
 }
@@ -63,7 +63,7 @@ export interface BroadcastOutput {
   completed_at: string | null
   created_at: string
   updated_at: string
-  // Excludes: tenant_id, recipient_list_id, internal metadata
+  // Excludes: tenant_id, target data, internal metadata
 }
 
 /**
@@ -75,9 +75,10 @@ export interface BroadcastOutput {
 export interface BroadcastModel {
   id: string
   tenant_id: string
+  created_by: string
   name: string
   message_template: string
-  recipient_list_id: string
+  target_filter?: Record<string, unknown> | null
   status: BroadcastStatus
   total_recipients: number
   sent_count: number
@@ -202,13 +203,15 @@ export function toBroadcastOutput(model: BroadcastModel): BroadcastOutput {
  */
 export function fromCreateBroadcastInput(
   input: CreateBroadcastInput,
-  tenantId: string
+  tenantId: string,
+  userId: string
 ): Partial<BroadcastModel> {
   return {
     tenant_id: tenantId,
+    created_by: userId,
     name: input.name,
     message_template: input.message_template,
-    recipient_list_id: input.recipient_list_id,
+    target_filter: input.target_filter || null,
     status: 'draft',
     total_recipients: 0,
     sent_count: 0,

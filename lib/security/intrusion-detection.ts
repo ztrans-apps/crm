@@ -104,9 +104,18 @@ if (typeof setInterval !== 'undefined') {
  */
 export class IntrusionDetectionSystem {
   private redis: ReturnType<typeof getRedisClient>
+  private supabaseClient: any
   
-  constructor() {
+  constructor(supabaseClient?: any) {
     this.redis = getRedisClient()
+    this.supabaseClient = supabaseClient
+  }
+  
+  private async getSupabase() {
+    if (this.supabaseClient) {
+      return this.supabaseClient
+    }
+    return await createClient()
   }
   
   /**
@@ -262,7 +271,7 @@ export class IntrusionDetectionSystem {
    */
   async blockIP(ip: string, durationSeconds: number, reason: string): Promise<void> {
     try {
-      const supabase = await createClient()
+      const supabase = await this.getSupabase()
       const expiresAt = new Date(Date.now() + durationSeconds * 1000).toISOString()
       
       await supabase.from('blocked_entities').insert({
@@ -293,7 +302,7 @@ export class IntrusionDetectionSystem {
    */
   async blockUser(userId: string, durationSeconds: number, reason: string): Promise<void> {
     try {
-      const supabase = await createClient()
+      const supabase = await this.getSupabase()
       const expiresAt = new Date(Date.now() + durationSeconds * 1000).toISOString()
       
       await supabase.from('blocked_entities').insert({
@@ -334,7 +343,7 @@ export class IntrusionDetectionSystem {
       }
       
       // Check database
-      const supabase = await createClient()
+      const supabase = await this.getSupabase()
       const { data, error } = await supabase
         .from('blocked_entities')
         .select('*')
@@ -363,7 +372,7 @@ export class IntrusionDetectionSystem {
    */
   async logThreatEvent(event: ThreatEvent): Promise<void> {
     try {
-      const supabase = await createClient()
+      const supabase = await this.getSupabase()
       
       await supabase.from('security_events').insert({
         tenant_id: event.tenantId || null,
@@ -388,7 +397,7 @@ export class IntrusionDetectionSystem {
    */
   async getActiveThreats(): Promise<ThreatEvent[]> {
     try {
-      const supabase = await createClient()
+      const supabase = await this.getSupabase()
       const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
       
       const { data, error } = await supabase

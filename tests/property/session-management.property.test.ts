@@ -1,8 +1,55 @@
 // tests/property/session-management.property.test.ts
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import * as fc from 'fast-check'
 import { SessionManager, SessionData } from '@/lib/security/session-manager'
 import { getRedisClient } from '@/lib/cache/redis'
+
+// Simple in-memory Redis mock to avoid rate limiting on real Upstash DB during property tests
+const mockRedisStore = new Map<string, string>()
+const mockRedisSets = new Map<string, Set<string>>()
+
+vi.mock('@/lib/cache/redis', () => ({
+  getRedisClient: vi.fn(() => ({
+    setex: vi.fn(async (key: string, ttl: number, value: string) => {
+      mockRedisStore.set(key, value)
+    }),
+    get: vi.fn(async <T>(key: string) => {
+      const val = mockRedisStore.get(key)
+      return val ? val as any as T : null
+    }),
+    del: vi.fn(async (...keys: string[]) => {
+      keys.forEach((k) => mockRedisStore.delete(k))
+    }),
+    sadd: vi.fn(async (key: string, member: string) => {
+      if (!mockRedisSets.has(key)) mockRedisSets.set(key, new Set())
+      mockRedisSets.get(key)!.add(member)
+    }),
+    srem: vi.fn(async (key: string, member: string) => {
+      if (mockRedisSets.has(key)) mockRedisSets.get(key)!.delete(member)
+    }),
+    smembers: vi.fn(async <T>(key: string) => {
+      return (mockRedisSets.has(key) ? Array.from(mockRedisSets.get(key)! as Set<T>) : []) as any as T
+    }),
+    expire: vi.fn(async (key: string, ttl: number) => {}),
+    keys: vi.fn(async (pattern: string) => {
+      const keys: string[] = []
+      const regex = new RegExp('^' + pattern.replace('*', '.*') + '$')
+      for (const k of mockRedisStore.keys()) {
+        if (regex.test(k)) keys.push(k)
+      }
+      for (const k of mockRedisSets.keys()) {
+        if (regex.test(k)) keys.push(k)
+      }
+      return keys
+    }),
+    exists: vi.fn(async (key: string) => {
+      return mockRedisStore.has(key) ? 1 : 0
+    }),
+    scard: vi.fn(async (key: string) => {
+      return mockRedisSets.has(key) ? mockRedisSets.get(key)!.size : 0
+    })
+  }))
+}))
 
 /**
  * Property-Based Tests for Session Management
@@ -26,20 +73,9 @@ describe('Session Management Properties', () => {
   })
 
   afterEach(async () => {
-    // Cleanup: Clear all test sessions from Redis
-    const redis = getRedisClient()
-    if (redis) {
-      try {
-        const sessionKeys = await redis.keys('session:*')
-        const userSessionKeys = await redis.keys('user_sessions:*')
-        const allKeys = [...sessionKeys, ...userSessionKeys]
-        if (allKeys.length > 0) {
-          await redis.del(...allKeys)
-        }
-      } catch (error) {
-        // Ignore cleanup errors
-      }
-    }
+    // Cleanup: Clear all test sessions from Redis mock
+    mockRedisStore.clear()
+    mockRedisSets.clear()
   })
 
   /**

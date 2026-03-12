@@ -80,7 +80,7 @@ export class BroadcastService extends BaseService {
     }
 
     // Transform input to model
-    const broadcastData = fromCreateBroadcastInput(input, this.tenantId)
+    const broadcastData = fromCreateBroadcastInput(input, this.tenantId, userId)
 
     // Create broadcast
     const created = await this.repository.create(broadcastData)

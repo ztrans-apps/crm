@@ -3,6 +3,10 @@ import fc from 'fast-check'
 import { RateLimiter } from '@/lib/middleware/rate-limiter'
 import type { RateLimitOptions } from '@/lib/middleware/rate-limiter'
 
+vi.mock('@/lib/cache/redis', () => ({
+  getRedisClient: vi.fn(() => null)
+}))
+
 /**
  * Property-Based Tests for Rate Limiting Enforcement
  * 

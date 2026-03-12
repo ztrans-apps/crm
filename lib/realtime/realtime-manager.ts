@@ -64,11 +64,13 @@ export class RealtimeManager {
       onReconnect,
     } = config
 
-    // Initialize connection status
-    this.connectionStatus.set(channelName, {
-      isConnected: false,
-      reconnectAttempts: 0,
-    })
+    // Initialize connection status if it doesn't exist
+    if (!this.connectionStatus.has(channelName)) {
+      this.connectionStatus.set(channelName, {
+        isConnected: false,
+        reconnectAttempts: 0,
+      })
+    }
 
     // Create channel
     const channel = this.supabase.channel(channelName)

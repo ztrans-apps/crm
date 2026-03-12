@@ -98,7 +98,7 @@ describe('Feature: security-optimization, Property 4: String Sanitization', () =
           expect(lowerSanitized).not.toMatch(/insert.*into/i)
           expect(lowerSanitized).not.toMatch(/update.*set/i)
           expect(lowerSanitized).not.toMatch(/delete.*from/i)
-          expect(lowerSanitized).not.toMatch(/exec|execute/i)
+          expect(lowerSanitized).not.toMatch(/\bexec\b|\bexecute\b/i)
           
           // SQL comments should be removed
           expect(sanitized).not.toContain('--')

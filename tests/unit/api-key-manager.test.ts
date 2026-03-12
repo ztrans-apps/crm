@@ -170,7 +170,9 @@ describe('APIKeyManager', () => {
       }))
       
       // Mock updateLastUsed chain
-      mockSupabase.eq.mockReturnValueOnce(Promise.resolve({ error: null }))
+      mockSupabase.update.mockReturnValueOnce({
+        eq: vi.fn().mockResolvedValue({ error: null })
+      })
 
       const result = await apiKeyManager.validateAPIKey(testKey)
 
@@ -239,7 +241,9 @@ describe('APIKeyManager', () => {
       }))
       
       // Mock updateLastUsed chain
-      mockSupabase.eq.mockReturnValueOnce(Promise.resolve({ error: null }))
+      mockSupabase.update.mockReturnValueOnce({
+        eq: vi.fn().mockResolvedValue({ error: null })
+      })
 
       await apiKeyManager.validateAPIKey(testKey)
 
@@ -250,9 +254,9 @@ describe('APIKeyManager', () => {
 
   describe('revokeAPIKey', () => {
     it('should revoke an API key', async () => {
-      mockSupabase.eq.mockReturnValueOnce(Promise.resolve({
-        error: null,
-      }))
+      mockSupabase.update.mockReturnValueOnce({
+        eq: vi.fn().mockResolvedValue({ error: null })
+      })
 
       await apiKeyManager.revokeAPIKey('key-123')
 
@@ -262,9 +266,9 @@ describe('APIKeyManager', () => {
     })
 
     it('should throw error if revocation fails', async () => {
-      mockSupabase.eq.mockReturnValueOnce(Promise.resolve({
-        error: { message: 'Database error' },
-      }))
+      mockSupabase.update.mockReturnValueOnce({
+        eq: vi.fn().mockResolvedValue({ error: { message: 'Database error' } })
+      })
 
       await expect(apiKeyManager.revokeAPIKey('key-123')).rejects.toThrow(
         'Failed to revoke API key'
@@ -302,9 +306,9 @@ describe('APIKeyManager', () => {
       })
 
       // Mock revoking old key
-      mockSupabase.eq.mockReturnValueOnce(Promise.resolve({
-        error: null,
-      }))
+      mockSupabase.update.mockReturnValueOnce({
+        eq: vi.fn().mockResolvedValue({ error: null })
+      })
 
       // Mock creating new key
       mockSupabase.single.mockResolvedValueOnce({

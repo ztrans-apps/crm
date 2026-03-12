@@ -24,22 +24,19 @@ describe('Broadcast API Routes Integration', () => {
     // Initialize Supabase client
     supabase = createClient(supabaseUrl, supabaseServiceKey)
 
-    // Use a test tenant ID
     testTenantId = process.env.NEXT_PUBLIC_DEFAULT_TENANT_ID || '00000000-0000-0000-0000-000000000001'
-    testUserId = '00000000-0000-0000-0000-000000000001'
-
-    // Create a test recipient list
-    const { data: recipientList } = await supabase
-      .from('recipient_lists')
-      .insert({
-        tenant_id: testTenantId,
-        name: 'Test Recipient List',
-        description: 'Test list for integration tests',
-      })
-      .select()
+    
+    // Fetch a real user to satisfy foreign key constraints
+    const { data: user } = await supabase
+      .from('profiles')
+      .select('id')
+      .limit(1)
       .single()
+      
+    testUserId = user?.id || '00000000-0000-0000-0000-000000000001'
 
-    testRecipientListId = recipientList?.id || '00000000-0000-0000-0000-000000000002'
+    // Not using recipient_lists table anymore due to schema change
+    testRecipientListId = '00000000-0000-0000-0000-000000000002'
   })
 
   afterAll(async () => {
@@ -51,12 +48,7 @@ describe('Broadcast API Routes Integration', () => {
         .eq('id', testBroadcastId)
     }
 
-    if (testRecipientListId) {
-      await supabase
-        .from('recipient_lists')
-        .delete()
-        .eq('id', testRecipientListId)
-    }
+    // Recipient list no longer needed
   })
 
   it('should create a broadcast using BroadcastService', async () => {
@@ -66,7 +58,7 @@ describe('Broadcast API Routes Integration', () => {
     const input = {
       name: 'Test Broadcast',
       message_template: 'Hello {{name}}, this is a test message!',
-      recipient_list_id: testRecipientListId,
+      target_filter: { type: 'all' },
     }
 
     const broadcast = await broadcastService.createBroadcast(input, testUserId)
@@ -118,7 +110,7 @@ describe('Broadcast API Routes Integration', () => {
     })
 
     expect(result).toBeDefined()
-    expect(result.data).toBeInstanceOf(Array)
+    expect(result.data.length).toBeGreaterThan(0)
     expect(result.data.every(b => b.status === 'draft')).toBe(true)
   })
 
@@ -150,7 +142,8 @@ describe('Broadcast API Routes Integration', () => {
 
     expect(broadcast).toBeDefined()
     expect(broadcast.status).toBe('scheduled')
-    expect(broadcast.scheduled_at).toBe(scheduledAt)
+    // Check Date equivalence to avoid string format mismatches (like missing 'Z')
+    expect(new Date(broadcast.scheduled_at!).getTime()).toBe(new Date(scheduledAt).getTime())
   })
 
   it('should get broadcast statistics using BroadcastService', async () => {
@@ -203,7 +196,7 @@ describe('Broadcast API Routes Integration', () => {
     const input = {
       name: 'Test Broadcast',
       message_template: 'a'.repeat(5000), // Exceeds 4096 character limit
-      recipient_list_id: testRecipientListId,
+      target_filter: { type: 'all' },
     }
 
     await expect(
@@ -218,7 +211,7 @@ describe('Broadcast API Routes Integration', () => {
     const input = {
       name: 'Test Broadcast',
       message_template: 'Test message',
-      recipient_list_id: testRecipientListId,
+      target_filter: { type: 'all' },
       scheduled_at: new Date(Date.now() - 60 * 1000).toISOString(), // 1 minute in the past
     }
 
@@ -235,7 +228,7 @@ describe('Broadcast API Routes Integration', () => {
     const input = {
       name: 'Test Broadcast',
       message_template: 'Test message',
-      recipient_list_id: testRecipientListId,
+      target_filter: { type: 'all' },
     }
 
     const broadcast = await broadcastService.createBroadcast(input, testUserId)
@@ -267,7 +260,7 @@ describe('Broadcast API Routes Integration', () => {
     const input = {
       name: 'Test Broadcast',
       message_template: 'Test message',
-      recipient_list_id: testRecipientListId,
+      target_filter: { type: 'all' },
     }
 
     const broadcast = await broadcastService.createBroadcast(input, testUserId)

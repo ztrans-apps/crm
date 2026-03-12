@@ -66,11 +66,11 @@ vi.mock('@/lib/monitoring/performance-monitor', () => ({
 }))
 
 vi.mock('@/lib/security/api-key-manager', () => ({
-  APIKeyManager: vi.fn().mockImplementation(() => ({
-    validateAPIKey: vi.fn(),
-    isIPWhitelisted: vi.fn(),
-    hasScope: vi.fn(),
-  })),
+  APIKeyManager: class {
+    validateAPIKey = vi.fn()
+    isIPWhitelisted = vi.fn()
+    hasScope = vi.fn()
+  }
 }))
 
 describe('withAuth middleware', () => {

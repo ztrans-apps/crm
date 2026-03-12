@@ -128,8 +128,8 @@ vi.mock('@/lib/cache/redis', () => ({
   })),
 }))
 
-// Mock fetch globally
-global.fetch = vi.fn()
+// Mock fetch globally - Removed to allow native fetch for Supabase
+// global.fetch = vi.fn()
 
 beforeAll(() => {
   console.log('🧪 Test suite starting...')

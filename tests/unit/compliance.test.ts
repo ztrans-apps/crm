@@ -156,26 +156,30 @@ describe('Compliance Features', () => {
     it('should grant consent', async () => {
       const consentManager = new ConsentManager(mockSupabase)
 
+      const mockChain: any = {
+        eq: vi.fn(() => mockChain),
+        is: vi.fn(() => mockChain),
+        single: vi.fn(() => Promise.resolve({ data: null, error: null })),
+        select: vi.fn(() => mockChain),
+      }
+      
+      const insertChain: any = {
+        select: vi.fn(() => insertChain),
+        single: vi.fn(() =>
+          Promise.resolve({
+            data: {
+              id: 'consent-123',
+              consent_type: 'privacy_policy',
+              granted: true,
+            },
+            error: null,
+          })
+        ),
+      }
+
       mockSupabase.from = vi.fn(() => ({
-        select: vi.fn(() => ({
-          eq: vi.fn(() => ({
-            single: vi.fn(() => Promise.resolve({ data: null, error: null })),
-          })),
-        })),
-        insert: vi.fn(() => ({
-          select: vi.fn(() => ({
-            single: vi.fn(() =>
-              Promise.resolve({
-                data: {
-                  id: 'consent-123',
-                  consent_type: 'privacy_policy',
-                  granted: true,
-                },
-                error: null,
-              })
-            ),
-          })),
-        })),
+        select: vi.fn(() => mockChain),
+        insert: vi.fn(() => insertChain),
       }))
 
       const result = await consentManager.grantConsent('user-123', 'tenant-123', {
@@ -191,23 +195,23 @@ describe('Compliance Features', () => {
     it('should revoke consent', async () => {
       const consentManager = new ConsentManager(mockSupabase)
 
+      const mockChain: any = {
+        eq: vi.fn(() => mockChain),
+        select: vi.fn(() => mockChain),
+        single: vi.fn(() =>
+          Promise.resolve({
+            data: {
+              id: 'consent-123',
+              consent_type: 'marketing',
+              granted: false,
+            },
+            error: null,
+          })
+        ),
+      }
+
       mockSupabase.from = vi.fn(() => ({
-        update: vi.fn(() => ({
-          eq: vi.fn(() => ({
-            select: vi.fn(() => ({
-              single: vi.fn(() =>
-                Promise.resolve({
-                  data: {
-                    id: 'consent-123',
-                    consent_type: 'marketing',
-                    granted: false,
-                  },
-                  error: null,
-                })
-              ),
-            })),
-          })),
-        })),
+        update: vi.fn(() => mockChain),
       }))
 
       const result = await consentManager.revokeConsent('user-123', 'tenant-123', {
@@ -221,19 +225,19 @@ describe('Compliance Features', () => {
     it('should check if user has consent', async () => {
       const consentManager = new ConsentManager(mockSupabase)
 
+      const mockChain: any = {
+        eq: vi.fn(() => mockChain),
+        is: vi.fn(() => mockChain),
+        single: vi.fn(() =>
+          Promise.resolve({
+            data: { granted: true },
+            error: null,
+          })
+        ),
+      }
+
       mockSupabase.from = vi.fn(() => ({
-        select: vi.fn(() => ({
-          eq: vi.fn(() => ({
-            is: vi.fn(() => ({
-              single: vi.fn(() =>
-                Promise.resolve({
-                  data: { granted: true },
-                  error: null,
-                })
-              ),
-            })),
-          })),
-        })),
+        select: vi.fn(() => mockChain),
       }))
 
       const hasConsent = await consentManager.hasConsent(

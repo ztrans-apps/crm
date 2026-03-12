@@ -330,12 +330,6 @@ describe('RealtimeManager', () => {
       // Subscribe count should not increase after unsubscribe
       expect(subscribeCount).toBe(countBeforeUnsubscribe)
 
-      vi.useRealTimers()
-    })
-
-      expect(channelCallsAfter).toBe(channelCallsBefore)
-
-      vi.useRealTimers()
     })
   })
 

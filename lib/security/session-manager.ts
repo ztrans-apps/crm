@@ -60,8 +60,8 @@ export class SessionManager {
     const sessionData: SessionData = {
       ...data,
       userId,
-      createdAt: now,
-      lastActivity: now,
+      createdAt: data.createdAt || now,
+      lastActivity: data.lastActivity || now,
     }
     
     // Store session in Redis with absolute timeout
@@ -104,7 +104,7 @@ export class SessionManager {
         return null
       }
       
-      const sessionData: SessionData = JSON.parse(data)
+      const sessionData: SessionData = typeof data === 'string' ? JSON.parse(data) : data
       
       // Check inactivity timeout
       const now = Date.now()
@@ -238,7 +238,7 @@ export class SessionManager {
       const userSessionKeys = await redis.keys(`${SESSION_CONFIG.USER_SESSIONS_PREFIX}:*`)
       
       for (const userSessionsKey of userSessionKeys) {
-        const sessionIds = await redis.smembers<string>(userSessionsKey)
+        const sessionIds = await redis.smembers<string[]>(userSessionsKey)
         
         // Check each session and remove if it doesn't exist
         for (const sessionId of sessionIds) {
@@ -343,7 +343,7 @@ export class SessionManager {
     
     try {
       const userSessionsKey = this.getUserSessionsKey(userId)
-      return await redis.smembers<string>(userSessionsKey)
+      return await redis.smembers<string[]>(userSessionsKey)
     } catch (error) {
       console.error('Failed to get user sessions:', error)
       return []
