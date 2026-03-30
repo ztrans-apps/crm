@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation'
 import DynamicSidebar from '@/components/layout/DynamicSidebar'
 import Header from '@/components/layout/Header'
 import AgentStatusManager from '@/components/layout/AgentStatusManager'
+import { PermissionProvider } from '@/lib/rbac/providers/PermissionProvider'
 
 export default async function AppLayout({
   children,
@@ -52,21 +53,23 @@ export default async function AppLayout({
   const isAgent = userPermissions.has('chat.send')
 
   return (
-    <div className="flex h-screen bg-background">
-      {/* Agent Status Manager - for users with chat.send permission */}
-      {isAgent && (
-        <AgentStatusManager userId={user.id} role={(profile as any)?.role} />
-      )}
-      
-      {/* Dynamic Sidebar based on permissions */}
-      <DynamicSidebar userRole={(profile as any)?.role} />
-      
-      <div className="flex-1 flex flex-col overflow-hidden min-w-0">
-        <Header user={{ ...user, ...(profile || {}) }} />
-        <main className="flex-1 overflow-y-auto bg-vx-surface-elevated">
-          {children}
-        </main>
+    <PermissionProvider>
+      <div className="flex h-screen bg-background">
+        {/* Agent Status Manager - for users with chat.send permission */}
+        {isAgent && (
+          <AgentStatusManager userId={user.id} role={(profile as any)?.role} />
+        )}
+        
+        {/* Dynamic Sidebar based on permissions */}
+        <DynamicSidebar userRole={(profile as any)?.role} />
+        
+        <div className="flex-1 flex flex-col overflow-hidden min-w-0">
+          <Header user={{ ...user, ...(profile || {}) }} />
+          <main className="flex-1 overflow-y-auto bg-vx-surface-elevated">
+            {children}
+          </main>
+        </div>
       </div>
-    </div>
+    </PermissionProvider>
   )
 }
