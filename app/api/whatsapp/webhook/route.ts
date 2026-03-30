@@ -44,7 +44,11 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
+    console.log('[Webhook] ===== WEBHOOK RECEIVED =====')
+    console.log('[Webhook] Timestamp:', new Date().toISOString())
+    
     const body = await request.json()
+    console.log('[Webhook] Body:', JSON.stringify(body, null, 2))
 
     // Validate webhook payload
     if (!body.object || body.object !== 'whatsapp_business_account') {
@@ -52,18 +56,25 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid webhook object' }, { status: 400 })
     }
 
+    console.log('[Webhook] Valid webhook object, processing entries...')
+
     // Process each entry
     for (const entry of body.entry || []) {
+      console.log('[Webhook] Processing entry:', entry.id)
       for (const change of entry.changes || []) {
+        console.log('[Webhook] Processing change field:', change.field)
         if (change.field === 'messages') {
+          console.log('[Webhook] Handling messages change...')
           await handleMessagesChange(change.value)
         }
       }
     }
 
+    console.log('[Webhook] ===== WEBHOOK PROCESSED SUCCESSFULLY =====')
     return NextResponse.json({ success: true }, { status: 200 })
   } catch (error) {
-    console.error('[Webhook] Error processing webhook:', error)
+    console.error('[Webhook] ===== ERROR PROCESSING WEBHOOK =====')
+    console.error('[Webhook] Error:', error)
     return NextResponse.json({ success: true }, { status: 200 })
   }
 }
@@ -72,10 +83,15 @@ export async function POST(request: NextRequest) {
  * Handle messages change event
  */
 async function handleMessagesChange(value: any) {
+  console.log('[Webhook] handleMessagesChange called')
+  console.log('[Webhook] Value:', JSON.stringify(value, null, 2))
+  
   const supabase = await createClient()
+  console.log('[Webhook] Supabase client created')
 
   // Handle incoming messages
   if (value.messages && value.messages.length > 0) {
+    console.log('[Webhook] Processing', value.messages.length, 'messages')
     for (const message of value.messages) {
       await handleIncomingMessage(message, value.metadata, supabase, value.contacts)
     }
@@ -83,10 +99,13 @@ async function handleMessagesChange(value: any) {
 
   // Handle message status updates
   if (value.statuses && value.statuses.length > 0) {
+    console.log('[Webhook] Processing', value.statuses.length, 'status updates')
     for (const status of value.statuses) {
       await handleStatusUpdate(status, supabase)
     }
   }
+  
+  console.log('[Webhook] handleMessagesChange completed')
 }
 
 /**
@@ -99,6 +118,10 @@ async function handleIncomingMessage(
   contacts?: any[]
 ) {
   try {
+    console.log('[Webhook] handleIncomingMessage - Start')
+    console.log('[Webhook] Message ID:', message.id)
+    console.log('[Webhook] From:', message.from)
+    
     const from = message.from
     const messageId = message.id
     const timestamp = message.timestamp
@@ -107,9 +130,12 @@ async function handleIncomingMessage(
     const contactProfile = contacts?.find(c => c.wa_id === from)
     const contactName = contactProfile?.profile?.name || from
 
+    console.log('[Webhook] Contact name:', contactName)
+
     const DEFAULT_TENANT_ID = '00000000-0000-0000-0000-000000000001'
 
     // Get or create contact
+    console.log('[Webhook] Looking up contact...')
     let { data: contact } = await supabase
       .from('contacts')
       .select('id, tenant_id, name')
@@ -117,6 +143,7 @@ async function handleIncomingMessage(
       .single()
 
     if (!contact) {
+      console.log('[Webhook] Contact not found, creating new contact...')
       const { data: newContact, error: contactError } = await supabase
         .from('contacts')
         .insert({
@@ -134,12 +161,17 @@ async function handleIncomingMessage(
       }
 
       contact = newContact
-    } else if (contact.name === from || contact.name === contact.id) {
-      // Update contact name if it's still using phone number or ID
-      await supabase
-        .from('contacts')
-        .update({ name: contactName })
-        .eq('id', contact.id)
+      console.log('[Webhook] New contact created:', contact.id)
+    } else {
+      console.log('[Webhook] Contact found:', contact.id)
+      if (contact.name === from || contact.name === contact.id) {
+        // Update contact name if it's still using phone number or ID
+        await supabase
+          .from('contacts')
+          .update({ name: contactName })
+          .eq('id', contact.id)
+        console.log('[Webhook] Contact name updated')
+      }
     }
 
     // Get or create conversation

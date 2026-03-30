@@ -198,8 +198,13 @@ export async function middleware(request: NextRequest) {
   const origin = request.headers.get('origin')
   const pathname = request.nextUrl.pathname
   
+  // Skip CORS checks for webhook endpoints (external services don't send Origin header)
+  const isWebhook = pathname.startsWith('/api/whatsapp/webhook') || 
+                    pathname.startsWith('/api/cron') ||
+                    pathname.startsWith('/api/health')
+  
   // Handle preflight OPTIONS requests for CORS
-  if (request.method === 'OPTIONS') {
+  if (request.method === 'OPTIONS' && !isWebhook) {
     // Check if origin is allowed
     if (origin && isOriginAllowed(origin)) {
       const response = new NextResponse(null, { status: 200 })
@@ -233,8 +238,8 @@ export async function middleware(request: NextRequest) {
     modifiedResponse.cookies.set(cookie)
   })
 
-  // 3. Add CORS headers to response if origin is present
-  if (origin) {
+  // 3. Add CORS headers to response if origin is present (skip for webhooks)
+  if (origin && !isWebhook) {
     if (isOriginAllowed(origin)) {
       addCorsHeaders(modifiedResponse, origin, false)
     } else {
