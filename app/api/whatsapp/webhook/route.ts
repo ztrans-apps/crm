@@ -6,7 +6,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createClient } from '@supabase/supabase-js'
 import type { WebhookMessage, WebhookStatus } from '@/lib/whatsapp/providers/base-provider'
 
 // Ensure Meta always receives 200 OK to prevent webhook retries
@@ -15,6 +15,23 @@ const OK_RESPONSE = NextResponse.json({ success: true }, { status: 200 })
 const WEBHOOK_VERIFY_TOKEN = process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN
 if (!WEBHOOK_VERIFY_TOKEN) {
   console.warn('[Webhook] WHATSAPP_WEBHOOK_VERIFY_TOKEN is not set — webhook verification will reject all requests')
+}
+
+// Create Supabase Service Role client for webhook (bypasses RLS)
+function createServiceRoleClient() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+  
+  if (!supabaseUrl || !supabaseServiceKey) {
+    throw new Error('[Webhook] Missing Supabase credentials')
+  }
+  
+  return createClient(supabaseUrl, supabaseServiceKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false
+    }
+  })
 }
 
 /**
@@ -86,8 +103,8 @@ async function handleMessagesChange(value: any) {
   console.log('[Webhook] handleMessagesChange called')
   console.log('[Webhook] Value:', JSON.stringify(value, null, 2))
   
-  const supabase = await createClient()
-  console.log('[Webhook] Supabase client created')
+  const supabase = createServiceRoleClient()
+  console.log('[Webhook] Supabase service role client created')
 
   // Handle incoming messages
   if (value.messages && value.messages.length > 0) {
