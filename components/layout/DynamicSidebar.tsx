@@ -21,7 +21,8 @@ import {
   Zap,
   PanelLeftClose,
   PanelLeftOpen,
-  X
+  X,
+  BookOpen
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { usePermissions } from '@/lib/rbac'

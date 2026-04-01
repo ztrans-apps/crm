@@ -573,9 +573,9 @@ export function getMetaCloudAPIForPhoneNumberId(phoneNumberId: string): MetaClou
 }
 
 /**
- * Look up the Meta Phone Number ID for a session from the database,
- * and return the correct MetaCloudAPI instance.
- * Falls back to default env if session has no meta_phone_number_id.
+ * Look up the Meta configuration for a session from the database,
+ * and return the correct MetaCloudAPI instance with session-specific credentials.
+ * Falls back to default env if session has no meta configuration.
  */
 export async function getMetaCloudAPIForSession(
   sessionId: string | undefined,
@@ -588,12 +588,18 @@ export async function getMetaCloudAPIForSession(
   try {
     const { data: session } = await supabase
       .from('whatsapp_sessions')
-      .select('meta_phone_number_id')
+      .select('meta_phone_number_id, meta_api_token, meta_business_account_id, meta_api_version')
       .eq('id', sessionId)
       .single()
 
     if (session?.meta_phone_number_id) {
-      return getMetaCloudAPIForPhoneNumberId(session.meta_phone_number_id)
+      // Use session-specific configuration from database
+      return new MetaCloudAPI({
+        phoneNumberId: session.meta_phone_number_id,
+        apiToken: session.meta_api_token || process.env.WHATSAPP_API_TOKEN,
+        businessAccountId: session.meta_business_account_id || process.env.WHATSAPP_BUSINESS_ACCOUNT_ID,
+        apiVersion: session.meta_api_version || process.env.WHATSAPP_API_VERSION || 'v21.0',
+      })
     }
   } catch (e) {
     console.warn('[Meta Cloud API] Could not look up session, using default:', e)

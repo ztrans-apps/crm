@@ -14,7 +14,7 @@ const OK_RESPONSE = NextResponse.json({ success: true }, { status: 200 })
 
 const WEBHOOK_VERIFY_TOKEN = process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN
 if (!WEBHOOK_VERIFY_TOKEN) {
-  console.warn('[Webhook] WHATSAPP_WEBHOOK_VERIFY_TOKEN is not set — webhook verification will reject all requests')
+  console.warn('[Webhook] WHATSAPP_WEBHOOK_VERIFY_TOKEN is not set — will check database for session-specific tokens')
 }
 
 // Create Supabase Service Role client for webhook (bypasses RLS)
@@ -35,8 +35,44 @@ function createServiceRoleClient() {
 }
 
 /**
+ * Verify webhook token against ENV or database
+ * Checks both global ENV token and session-specific tokens from database
+ */
+async function verifyWebhookToken(token: string): Promise<boolean> {
+  // First check global ENV token (backward compatible)
+  if (WEBHOOK_VERIFY_TOKEN && token === WEBHOOK_VERIFY_TOKEN) {
+    console.log('[Webhook] Verified with global ENV token')
+    return true
+  }
+
+  // Check database for session-specific tokens
+  try {
+    const supabase = createServiceRoleClient()
+    const { data: sessions } = await supabase
+      .from('whatsapp_sessions')
+      .select('meta_webhook_verify_token')
+      .eq('is_active', true)
+      .not('meta_webhook_verify_token', 'is', null)
+
+    if (sessions) {
+      for (const session of sessions) {
+        if (session.meta_webhook_verify_token === token) {
+          console.log('[Webhook] Verified with session-specific token')
+          return true
+        }
+      }
+    }
+  } catch (error) {
+    console.error('[Webhook] Error checking database tokens:', error)
+  }
+
+  return false
+}
+
+/**
  * GET - Webhook verification
  * Meta will call this endpoint to verify the webhook
+ * Supports both global ENV token and session-specific tokens from database
  */
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams
@@ -46,9 +82,12 @@ export async function GET(request: NextRequest) {
   const challenge = searchParams.get('hub.challenge')
 
   // Verify the webhook
-  if (mode === 'subscribe' && token === WEBHOOK_VERIFY_TOKEN) {
-    console.log('[Webhook] Verification successful')
-    return new NextResponse(challenge, { status: 200 })
+  if (mode === 'subscribe' && token) {
+    const isValid = await verifyWebhookToken(token)
+    if (isValid) {
+      console.log('[Webhook] Verification successful')
+      return new NextResponse(challenge, { status: 200 })
+    }
   }
 
   console.error('[Webhook] Verification failed')

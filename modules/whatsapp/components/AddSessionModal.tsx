@@ -5,7 +5,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Loader2, ExternalLink } from 'lucide-react';
+import { Loader2, ExternalLink, Eye, EyeOff } from 'lucide-react';
 
 interface AddNumberModalProps {
   open: boolean;
@@ -17,6 +17,14 @@ export function AddNumberModal({ open, onOpenChange, onSuccess }: AddNumberModal
   const [phoneNumber, setPhoneNumber] = useState('');
   const [label, setLabel] = useState('');
   const [metaPhoneNumberId, setMetaPhoneNumberId] = useState('');
+  const [metaApiToken, setMetaApiToken] = useState('');
+  const [metaBusinessAccountId, setMetaBusinessAccountId] = useState('');
+  const [metaApiVersion, setMetaApiVersion] = useState('v21.0');
+  const [metaWebhookVerifyToken, setMetaWebhookVerifyToken] = useState('');
+  const [metaAppId, setMetaAppId] = useState('');
+  const [metaAppSecret, setMetaAppSecret] = useState('');
+  const [showApiToken, setShowApiToken] = useState(false);
+  const [showAppSecret, setShowAppSecret] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -35,13 +43,19 @@ export function AddNumberModal({ open, onOpenChange, onSuccess }: AddNumberModal
       setError(null);
       setLoading(true);
 
-      const response = await fetch('/api/whatsapp/init', {
+      const response = await fetch('/api/whatsapp/sessions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          phoneNumber: phoneNumber.trim(),
-          name: label.trim(),
-          metaPhoneNumberId: metaPhoneNumberId.trim() || undefined,
+          phone_number: phoneNumber.trim(),
+          session_name: label.trim(),
+          meta_phone_number_id: metaPhoneNumberId.trim() || undefined,
+          meta_api_token: metaApiToken.trim() || undefined,
+          meta_business_account_id: metaBusinessAccountId.trim() || undefined,
+          meta_api_version: metaApiVersion.trim() || 'v21.0',
+          meta_webhook_verify_token: metaWebhookVerifyToken.trim() || undefined,
+          meta_app_id: metaAppId.trim() || undefined,
+          meta_app_secret: metaAppSecret.trim() || undefined,
         }),
       });
 
@@ -49,6 +63,12 @@ export function AddNumberModal({ open, onOpenChange, onSuccess }: AddNumberModal
         setPhoneNumber('');
         setLabel('');
         setMetaPhoneNumberId('');
+        setMetaApiToken('');
+        setMetaBusinessAccountId('');
+        setMetaApiVersion('v21.0');
+        setMetaWebhookVerifyToken('');
+        setMetaAppId('');
+        setMetaAppSecret('');
         onOpenChange(false);
         onSuccess?.();
       } else {
@@ -64,7 +84,7 @@ export function AddNumberModal({ open, onOpenChange, onSuccess }: AddNumberModal
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Register WhatsApp Number</DialogTitle>
           <DialogDescription>
@@ -87,49 +107,167 @@ export function AddNumberModal({ open, onOpenChange, onSuccess }: AddNumberModal
             </p>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="label">Label</Label>
-            <Input
-              id="label"
-              placeholder="e.g., Customer Service, Sales Team"
-              value={label}
-              onChange={(e) => setLabel(e.target.value)}
-              disabled={loading}
-            />
-            <p className="text-xs text-gray-500">
-              A friendly name to identify this number in the CRM
-            </p>
+          {/* Basic Information */}
+          <div className="space-y-4 border-b pb-4">
+            <h3 className="font-semibold text-sm">Basic Information</h3>
+            
+            <div className="space-y-2">
+              <Label htmlFor="label">Label <span className="text-red-500">*</span></Label>
+              <Input
+                id="label"
+                placeholder="e.g., Customer Service, Sales Team"
+                value={label}
+                onChange={(e) => setLabel(e.target.value)}
+                disabled={loading}
+              />
+              <p className="text-xs text-gray-500">
+                A friendly name to identify this number in the CRM
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="phone">Phone Number <span className="text-red-500">*</span></Label>
+              <Input
+                id="phone"
+                placeholder="+6285777078921"
+                value={phoneNumber}
+                onChange={(e) => setPhoneNumber(e.target.value)}
+                disabled={loading}
+              />
+              <p className="text-xs text-gray-500">
+                The WhatsApp Business number with country code
+              </p>
+            </div>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="phone">Phone Number</Label>
-            <Input
-              id="phone"
-              placeholder="+6285777078921"
-              value={phoneNumber}
-              onChange={(e) => setPhoneNumber(e.target.value)}
-              disabled={loading}
-            />
-            <p className="text-xs text-gray-500">
-              The WhatsApp Business number with country code
-            </p>
+          {/* Meta Configuration */}
+          <div className="space-y-4 border-b pb-4">
+            <h3 className="font-semibold text-sm">Meta Cloud API Configuration</h3>
+            
+            <div className="space-y-2">
+              <Label htmlFor="metaId">Meta Phone Number ID</Label>
+              <Input
+                id="metaId"
+                placeholder="e.g., 123456789012345"
+                value={metaPhoneNumberId}
+                onChange={(e) => setMetaPhoneNumberId(e.target.value)}
+                disabled={loading}
+              />
+              <p className="text-xs text-gray-500">
+                Found in Meta Developer Console → WhatsApp → API Setup
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="apiToken">API Access Token</Label>
+              <div className="relative">
+                <Input
+                  id="apiToken"
+                  type={showApiToken ? "text" : "password"}
+                  placeholder="EAAxxxxxxxxxx..."
+                  value={metaApiToken}
+                  onChange={(e) => setMetaApiToken(e.target.value)}
+                  disabled={loading}
+                  className="pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowApiToken(!showApiToken)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                >
+                  {showApiToken ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+              <p className="text-xs text-gray-500">
+                System User Access Token from Meta Business Settings
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="businessAccountId">Business Account ID</Label>
+              <Input
+                id="businessAccountId"
+                placeholder="e.g., 123456789012345"
+                value={metaBusinessAccountId}
+                onChange={(e) => setMetaBusinessAccountId(e.target.value)}
+                disabled={loading}
+              />
+              <p className="text-xs text-gray-500">
+                WhatsApp Business Account ID from Meta Business Manager
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="apiVersion">API Version</Label>
+              <Input
+                id="apiVersion"
+                placeholder="v21.0"
+                value={metaApiVersion}
+                onChange={(e) => setMetaApiVersion(e.target.value)}
+                disabled={loading}
+              />
+              <p className="text-xs text-gray-500">
+                Meta Graph API version (default: v21.0)
+              </p>
+            </div>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="metaId">Meta Phone Number ID <span className="text-gray-400">(optional)</span></Label>
-            <Input
-              id="metaId"
-              placeholder="e.g., 123456789012345"
-              value={metaPhoneNumberId}
-              onChange={(e) => setMetaPhoneNumberId(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') handleSubmit();
-              }}
-              disabled={loading}
-            />
-            <p className="text-xs text-gray-500">
-              Found in Meta Developer Console → WhatsApp → API Setup
-            </p>
+          {/* Advanced Configuration */}
+          <div className="space-y-4">
+            <h3 className="font-semibold text-sm">Advanced Configuration (Optional)</h3>
+            
+            <div className="space-y-2">
+              <Label htmlFor="webhookToken">Webhook Verify Token</Label>
+              <Input
+                id="webhookToken"
+                placeholder="your-verify-token"
+                value={metaWebhookVerifyToken}
+                onChange={(e) => setMetaWebhookVerifyToken(e.target.value)}
+                disabled={loading}
+              />
+              <p className="text-xs text-gray-500">
+                Token for webhook verification
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="appId">App ID</Label>
+              <Input
+                id="appId"
+                placeholder="e.g., 123456789012345"
+                value={metaAppId}
+                onChange={(e) => setMetaAppId(e.target.value)}
+                disabled={loading}
+              />
+              <p className="text-xs text-gray-500">
+                Meta App ID from Developer Console
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="appSecret">App Secret</Label>
+              <div className="relative">
+                <Input
+                  id="appSecret"
+                  type={showAppSecret ? "text" : "password"}
+                  placeholder="xxxxxxxxxxxxxxxx"
+                  value={metaAppSecret}
+                  onChange={(e) => setMetaAppSecret(e.target.value)}
+                  disabled={loading}
+                  className="pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowAppSecret(!showAppSecret)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                >
+                  {showAppSecret ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+              <p className="text-xs text-gray-500">
+                Meta App Secret from Developer Console
+              </p>
+            </div>
           </div>
 
           {error && (
