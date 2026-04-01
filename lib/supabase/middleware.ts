@@ -39,8 +39,22 @@ export async function updateSession(request: NextRequest) {
   } = await supabase.auth.getUser()
 
   // Protected routes - redirect to login if not authenticated
-  const publicRoutes = ['/login', '/', '/privacy-policy', '/terms-of-service']
-  const isPublicRoute = publicRoutes.includes(request.nextUrl.pathname)
+  // Public routes that don't require authentication
+  const publicRoutes = [
+    '/login',
+    '/',
+    '/about',
+    '/privacy-policy',
+    '/terms-of-service',
+  ]
+  
+  // Also allow public API routes (webhooks, health checks, etc.)
+  const isPublicApiRoute = request.nextUrl.pathname.startsWith('/api/whatsapp/webhook') ||
+                          request.nextUrl.pathname.startsWith('/api/health') ||
+                          request.nextUrl.pathname.startsWith('/api/cron') ||
+                          request.nextUrl.pathname.startsWith('/api/docs')
+  
+  const isPublicRoute = publicRoutes.includes(request.nextUrl.pathname) || isPublicApiRoute
 
   if (!isPublicRoute && !user) {
     const url = request.nextUrl.clone()

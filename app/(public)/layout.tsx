@@ -1,5 +1,5 @@
 // Public layout with company branding
-// Updated: March 9, 2026 - Enhanced footer and navigation
+// Updated with Voxentra theme
 
 export default function PublicLayout({
   children,
@@ -7,28 +7,31 @@ export default function PublicLayout({
   children: React.ReactNode
 }) {
   return (
-    <div className="min-h-screen">
-      {/* Simple header */}
-      <header className="bg-white border-b">
+    <div className="min-h-screen bg-vx-surface">
+      {/* Header with Voxentra theme */}
+      <header className="sticky top-0 z-50 bg-vx-surface/80 backdrop-blur-lg border-b border-vx-border">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex justify-between items-center">
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">
+            <a href="/" className="group">
+              <h1 className="text-2xl font-bold vx-gradient-text">
                 BANGUN JAYA TRANSINDO
               </h1>
-              <p className="text-sm text-gray-600">WhatsApp Business CRM</p>
-            </div>
-            <nav className="flex space-x-6">
-              <a href="/about" className="text-gray-600 hover:text-gray-900">
-                About
+              <p className="text-sm text-vx-text-secondary">WhatsApp Business CRM</p>
+            </a>
+            <nav className="flex items-center space-x-6">
+              <a href="/about" className="text-vx-text-secondary hover:text-vx-purple transition-colors font-medium">
+                Tentang
               </a>
-              <a href="/privacy-policy" className="text-gray-600 hover:text-gray-900">
+              <a href="/privacy-policy" className="text-vx-text-secondary hover:text-vx-purple transition-colors font-medium">
                 Privacy
               </a>
-              <a href="/terms-of-service" className="text-gray-600 hover:text-gray-900">
+              <a href="/terms-of-service" className="text-vx-text-secondary hover:text-vx-purple transition-colors font-medium">
                 Terms
               </a>
-              <a href="/dashboard" className="text-blue-600 hover:text-blue-800 font-medium">
+              <a 
+                href="/dashboard" 
+                className="px-6 py-2 bg-vx-purple text-white rounded-lg font-medium hover:bg-vx-purple-dark transition-all shadow-md hover:shadow-lg"
+              >
                 Login
               </a>
             </nav>
@@ -39,16 +42,18 @@ export default function PublicLayout({
       {/* Main content */}
       <main>{children}</main>
 
-      {/* Footer with company information */}
-      <footer className="bg-gray-900 text-white mt-12">
+      {/* Footer with Voxentra theme */}
+      <footer className="bg-vx-text text-white mt-12">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
           <div className="grid md:grid-cols-3 gap-8">
             {/* Company Info */}
             <div>
-              <h3 className="text-xl font-bold mb-4">BANGUN JAYA TRANSINDO</h3>
-              <p className="text-gray-300 text-sm leading-relaxed">
-                Professional WhatsApp Business CRM solution for modern businesses. 
-                Manage conversations, contacts, and customer relationships efficiently.
+              <h3 className="text-xl font-bold mb-4 vx-gradient-text">
+                BANGUN JAYA TRANSINDO
+              </h3>
+              <p className="text-white/70 text-sm leading-relaxed">
+                Professional WhatsApp Business CRM solution untuk bisnis modern. 
+                Kelola percakapan, kontak, dan hubungan pelanggan dengan efisien.
               </p>
             </div>
 
@@ -57,17 +62,17 @@ export default function PublicLayout({
               <h4 className="text-lg font-semibold mb-4">Quick Links</h4>
               <ul className="space-y-2">
                 <li>
-                  <a href="/" className="text-gray-300 hover:text-white text-sm">
+                  <a href="/" className="text-white/70 hover:text-white text-sm transition-colors">
                     Home
                   </a>
                 </li>
                 <li>
-                  <a href="/about" className="text-gray-300 hover:text-white text-sm">
-                    About Us
+                  <a href="/about" className="text-white/70 hover:text-white text-sm transition-colors">
+                    Tentang Kami
                   </a>
                 </li>
                 <li>
-                  <a href="/dashboard" className="text-gray-300 hover:text-white text-sm">
+                  <a href="/dashboard" className="text-white/70 hover:text-white text-sm transition-colors">
                     Dashboard
                   </a>
                 </li>
@@ -79,12 +84,12 @@ export default function PublicLayout({
               <h4 className="text-lg font-semibold mb-4">Legal</h4>
               <ul className="space-y-2">
                 <li>
-                  <a href="/privacy-policy" className="text-gray-300 hover:text-white text-sm">
+                  <a href="/privacy-policy" className="text-white/70 hover:text-white text-sm transition-colors">
                     Privacy Policy
                   </a>
                 </li>
                 <li>
-                  <a href="/terms-of-service" className="text-gray-300 hover:text-white text-sm">
+                  <a href="/terms-of-service" className="text-white/70 hover:text-white text-sm transition-colors">
                     Terms of Service
                   </a>
                 </li>
@@ -93,11 +98,11 @@ export default function PublicLayout({
           </div>
 
           {/* Bottom Bar */}
-          <div className="border-t border-gray-700 mt-8 pt-8 text-center">
-            <p className="text-gray-300 text-sm">
-              © {new Date().getFullYear()} <strong>BANGUN JAYA TRANSINDO</strong>. All rights reserved.
+          <div className="border-t border-white/10 mt-8 pt-8 text-center">
+            <p className="text-white/70 text-sm">
+              © {new Date().getFullYear()} <strong className="text-white">BANGUN JAYA TRANSINDO</strong>. All rights reserved.
             </p>
-            <p className="text-gray-400 text-xs mt-2">
+            <p className="text-white/50 text-xs mt-2">
               WhatsApp Business CRM Platform | Powered by Meta WhatsApp Business API
             </p>
           </div>
