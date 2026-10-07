@@ -60,41 +60,50 @@ export function QRCode({ sessionId, onClose, onConnected }: QRCodeProps) {
     const interval = setInterval(async () => {
       try {
         const response = await fetch(`/api/whatsapp/qr/${sessionId}`);
+        const data = await response.json().catch(() => ({}));
 
-        if (response.ok) {
-          const data = await response.json();
+        if (!response.ok) {
+          clearInterval(interval);
+          setError(
+            data.message ||
+              data.error ||
+              'Failed to generate QR. Start whatsapp-service on a VPS and set WHATSAPP_SERVICE_URL.'
+          );
+          return;
+        }
 
-          if (data.qr && data.qr !== lastQrCode) {
-            setQrCode(data.qr);
-            lastQrCode = data.qr;
-            qrReceived = true;
-            setQrExpiryTime(Date.now() + 40000);
-            setError(null);
-            connectionDetected = false;
-          } else if (qrReceived && !data.qr && data.status !== 'connected') {
-            qrExpiredCount++;
+        if (data.qr && data.qr !== lastQrCode) {
+          setQrCode(data.qr);
+          lastQrCode = data.qr;
+          qrReceived = true;
+          setQrExpiryTime(Date.now() + 40000);
+          setError(null);
+          connectionDetected = false;
+        } else if (qrReceived && !data.qr && data.status !== 'connected') {
+          qrExpiredCount++;
 
-            if (qrExpiredCount >= MAX_QR_EXPIRED) {
-              clearInterval(interval);
-              setError('QR code expired multiple times. Please try reconnecting again.');
-              return;
-            }
-
-            setError('QR code expired. Waiting for new QR code...');
-            setQrCode(null);
-          }
-
-          if (data.status === 'connected' && qrReceived && !connectionDetected) {
-            connectionDetected = true;
+          if (qrExpiredCount >= MAX_QR_EXPIRED) {
             clearInterval(interval);
-
-            setTimeout(() => {
-              onConnected?.();
-            }, 2000);
+            setError('QR code expired multiple times. Please try reconnecting again.');
+            return;
           }
+
+          setError('QR code expired. Waiting for new QR code...');
+          setQrCode(null);
+        }
+
+        if (data.status === 'connected' && qrReceived && !connectionDetected) {
+          connectionDetected = true;
+          clearInterval(interval);
+
+          setTimeout(() => {
+            onConnected?.();
+          }, 2000);
         }
       } catch (error) {
         console.error('Failed to fetch QR:', error);
+        clearInterval(interval);
+        setError('Failed to reach QR endpoint. Check WhatsApp service connection.');
       }
     }, 2000);
 
@@ -134,6 +143,16 @@ export function QRCode({ sessionId, onClose, onConnected }: QRCodeProps) {
               </div>
               {qrExpiryTime && <QRExpiryTimer expiryTime={qrExpiryTime} />}
             </>
+          ) : error ? (
+            <div className="w-full max-w-md p-4 bg-red-50 border border-red-200 rounded-xl">
+              <p className="text-sm font-medium text-red-800 mb-2">QR tidak bisa digenerate</p>
+              <p className="text-sm text-red-700">{error}</p>
+              <p className="text-xs text-red-600 mt-3">
+                Baileys harus jalan di VPS (bukan di Vercel). Set env{' '}
+                <code className="bg-red-100 px-1 rounded">WHATSAPP_SERVICE_URL</code> ke URL
+                service tersebut, lalu Redeploy.
+              </p>
+            </div>
           ) : (
             <div className="w-72 h-72 border-2 border-dashed border-gray-300 rounded-xl flex items-center justify-center bg-gray-50">
               <div className="text-center">
@@ -141,12 +160,6 @@ export function QRCode({ sessionId, onClose, onConnected }: QRCodeProps) {
                 <p className="text-gray-600">Generating QR Code...</p>
                 <p className="text-sm text-gray-500 mt-2">This may take a few seconds</p>
               </div>
-            </div>
-          )}
-
-          {error && (
-            <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
-              <p className="text-sm text-red-700">{error}</p>
             </div>
           )}
 
