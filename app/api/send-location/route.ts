@@ -62,7 +62,7 @@ export async function POST(request: NextRequest) {
     const recipient = normalizeWhatsAppRecipient(to)
     const sendResult = await sendLocationViaBaileys({
       sessionId,
-      to: recipient.isLid ? recipient.jid : recipient.legacyJid,
+      to: recipient.jid,
       latitude,
       longitude,
       address,

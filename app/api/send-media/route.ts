@@ -72,7 +72,7 @@ export async function POST(request: NextRequest) {
 
     const buffer = Buffer.from(await media.arrayBuffer())
     const recipient = normalizeWhatsAppRecipient(to)
-    const recipientJid = recipient.isLid ? recipient.jid : recipient.legacyJid
+    const recipientJid = recipient.jid
     const quotedContext = quotedMessageId
       ? await resolveQuotedContextForBaileys(supabase, quotedMessageId, recipientJid)
       : null

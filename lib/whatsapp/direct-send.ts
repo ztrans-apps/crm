@@ -4,7 +4,8 @@ import type { QuotedContextPayload } from '@/lib/whatsapp/quote-context'
 
 function resolveToJid(to: string) {
   const recipient = normalizeWhatsAppRecipient(to)
-  return recipient.isLid ? recipient.jid : recipient.legacyJid
+  // Always prefer Baileys JID (@s.whatsapp.net / @lid), not legacy @c.us
+  return recipient.jid
 }
 
 /**
