@@ -51,6 +51,8 @@ export async function POST(request: NextRequest) {
       messageId,
       messageTimestamp,
       fromLid,
+      chatLid,
+      senderPn,
       rawMessage,
       media,
       location,
@@ -84,72 +86,57 @@ export async function POST(request: NextRequest) {
       tenantId || session.tenant_id || process.env.DEFAULT_TENANT_ID || FALLBACK_TENANT_ID
     const userId = session.user_id
 
-    const { normalizeWhatsAppRecipient } = await import('@/lib/whatsapp/phone')
-    const recipient = normalizeWhatsAppRecipient(
-      fromLid ? `lid:${String(phoneNumber).replace(/^lid:/i, '')}` : String(phoneNumber)
+    const { resolveContactForWhatsAppPeer, buildContactPhoneAliases } = await import(
+      '@/lib/whatsapp/resolve-contact'
     )
-    let formattedPhone = recipient.displayPhone
 
-    let contact: { id: string; name: string | null } | null = null
-
-    if (!recipient.isLid) {
-      const lidMistaken = `lid:${recipient.user}`
-      const { data: mistaken } = await supabase
-        .from('contacts')
-        .select('id, name')
-        .eq('phone_number', lidMistaken)
-        .eq('user_id', userId)
-        .maybeSingle()
-
-      if (mistaken) {
-        await supabase
-          .from('contacts')
-          .update({ phone_number: formattedPhone, name: pushName || mistaken.name })
-          .eq('id', mistaken.id)
-        contact = { id: mistaken.id, name: pushName || mistaken.name }
-      }
+    let contact: { id: string; name: string | null; phone_number?: string }
+    try {
+      const resolved = await resolveContactForWhatsAppPeer(supabase, {
+        userId,
+        tenantId: resolvedTenant,
+        phoneNumber: String(phoneNumber),
+        fromLid: !!fromLid,
+        chatLid: (chatLid as string) || null,
+        senderPn: (senderPn as string) || null,
+        pushName: pushName || null,
+      })
+      contact = resolved.contact
+    } catch (contactError) {
+      console.error('[baileys-incoming] contact resolve failed', contactError)
+      return NextResponse.json({ error: 'Failed to resolve contact' }, { status: 500 })
     }
 
-    if (!contact) {
-      const { data: existing } = await supabase
-        .from('contacts')
-        .select('id, name')
-        .eq('phone_number', formattedPhone)
-        .eq('user_id', userId)
-        .maybeSingle()
-      contact = existing
-    }
-
-    if (!contact) {
-      const { data: newContact, error: contactError } = await supabase
-        .from('contacts')
-        .insert({
-          user_id: userId,
-          phone_number: formattedPhone,
-          name: pushName || null,
-          tenant_id: resolvedTenant,
-        })
-        .select('id, name')
-        .single()
-
-      if (contactError || !newContact) {
-        console.error('[baileys-incoming] contact create failed', contactError)
-        return NextResponse.json({ error: 'Failed to create contact' }, { status: 500 })
-      }
-      contact = newContact
-    } else if (pushName && contact.name !== pushName) {
-      await supabase.from('contacts').update({ name: pushName }).eq('id', contact.id)
-    }
+    // Prefer an open conversation on this contact; also reclaim open threads on alias contacts
+    const aliases = buildContactPhoneAliases({
+      phoneNumber: String(phoneNumber),
+      fromLid: !!fromLid,
+      chatLid: (chatLid as string) || null,
+      senderPn: (senderPn as string) || null,
+    })
+    const { data: aliasContacts } = await supabase
+      .from('contacts')
+      .select('id')
+      .eq('user_id', userId)
+      .in('phone_number', aliases)
+    const aliasIds = [...new Set([contact.id, ...(aliasContacts || []).map((c) => c.id)])]
 
     let { data: conversations } = await supabase
       .from('conversations')
-      .select('id, status, workflow_status, whatsapp_session_id, unread_count')
-      .eq('contact_id', contact.id)
+      .select('id, status, workflow_status, whatsapp_session_id, unread_count, contact_id')
+      .in('contact_id', aliasIds)
       .eq('status', 'open')
-      .order('created_at', { ascending: false })
-      .limit(1)
+      .order('last_message_at', { ascending: false })
+      .limit(5)
 
     let conversation = conversations?.[0]
+    if (conversation && conversation.contact_id !== contact.id) {
+      await supabase
+        .from('conversations')
+        .update({ contact_id: contact.id })
+        .eq('id', conversation.id)
+      conversation.contact_id = contact.id
+    }
     const lastAt = messageTimestamp
       ? new Date(Number(messageTimestamp) * 1000).toISOString()
       : new Date().toISOString()

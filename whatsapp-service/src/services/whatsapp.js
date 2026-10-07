@@ -1472,6 +1472,11 @@ class BaileysWhatsAppService {
         ? extractLocationFromContent(analysis.unwrapped)
         : null
 
+    const chatLid =
+      typeof msg.key.remoteJid === 'string' && msg.key.remoteJid.endsWith('@lid')
+        ? msg.key.remoteJid
+        : null
+
     const payload = {
       sessionId,
       tenantId,
@@ -1483,7 +1488,10 @@ class BaileysWhatsAppService {
       quotedWhatsappId: analysis.quotedWhatsappId,
       messageId: msg.key.id,
       messageTimestamp: msg.messageTimestamp,
+      // only true when we could NOT map LID → phone (avoid lid:628… contacts)
       fromLid: unresolvedLid,
+      chatLid,
+      senderPn: msg.key.senderPn || phoneJid || null,
       isFromMe: !!msg.key.fromMe,
       location,
       rawMessage: {
