@@ -8,7 +8,7 @@ const router = express.Router()
 // Initialize new session (simplified endpoint)
 router.post('/init', async (req, res) => {
   try {
-    const { sessionId, forceNew = true } = req.body
+    const { sessionId, forceNew = false, tenantId = null } = req.body
 
     if (!sessionId) {
       return res.status(400).json({
@@ -19,8 +19,8 @@ router.post('/init', async (req, res) => {
 
     console.log(`📱 Init request for session: ${sessionId}, forceNew: ${forceNew}`)
 
-    // Initialize WhatsApp client (force new to generate QR)
-    await whatsappService.initializeClient(sessionId, forceNew)
+    // Default forceNew=false so reconnect keeps existing credentials / does not log out
+    await whatsappService.initializeClient(sessionId, forceNew, tenantId)
     
     res.json({ 
       success: true,

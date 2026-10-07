@@ -165,32 +165,45 @@ async function autoSyncMessageStatus() {
 
 // Auto-load and reconnect active sessions on startup
 async function loadActiveSessions() {
-  if (!supabase) {
-    console.log('⚠️ Supabase not configured, skipping session load')
-    return
-  }
+  const defaultTenantId = process.env.DEFAULT_TENANT_ID || '00000000-0000-0000-0000-000000000001'
+  let sessions = []
 
   try {
-    console.log('🔄 Loading sessions from database...')
-    
-    // Load ALL sessions that have credentials (not just active/connected)
-    // This allows auto-reconnect even if status was not properly updated
-    const { data: sessions, error } = await supabase
-      .from('whatsapp_sessions')
-      .select('id, session_name, phone_number, status, tenant_id')
-      .order('updated_at', { ascending: false })
+    if (supabase) {
+      console.log('🔄 Loading sessions from database...')
+      const { data, error } = await supabase
+        .from('whatsapp_sessions')
+        .select('id, session_name, phone_number, status, tenant_id')
+        .order('updated_at', { ascending: false })
 
-    if (error) {
-      console.error('❌ Error loading sessions:', error)
-      return
+      if (error) {
+        console.error('❌ Error loading sessions:', error)
+      } else {
+        sessions = data || []
+      }
+    } else {
+      // No SERVICE_KEY on VPS — still restore any auth folders so WhatsApp stays linked after restart
+      console.log('⚠️ Supabase not configured — loading sessions from auth directories...')
+      if (fs.existsSync(whatsappService.authDir)) {
+        const dirs = fs.readdirSync(whatsappService.authDir, { withFileTypes: true })
+          .filter((d) => d.isDirectory())
+          .map((d) => d.name)
+        sessions = dirs.map((id) => ({
+          id,
+          session_name: id,
+          phone_number: null,
+          status: 'unknown',
+          tenant_id: defaultTenantId,
+        }))
+      }
     }
 
     if (!sessions || sessions.length === 0) {
-      console.log('ℹ️ No sessions found in database')
+      console.log('ℹ️ No sessions found to restore')
       return
     }
 
-    console.log(`📱 Found ${sessions.length} session(s) in database, checking for valid credentials...`)
+    console.log(`📱 Found ${sessions.length} session(s), checking for valid credentials...`)
 
     let reconnected = 0
     let failed = 0
@@ -234,7 +247,7 @@ async function loadActiveSessions() {
         console.log(`🔌 Auto-reconnecting session: ${session.id} (${session.session_name})`)
         
         // Try to initialize the client (will auto-reconnect if credentials are valid)
-        await whatsappService.initializeClient(session.id, false, session.tenant_id)
+        await whatsappService.initializeClient(session.id, false, session.tenant_id || defaultTenantId)
         
         // Wait a bit to see if connection succeeds
         await new Promise(resolve => setTimeout(resolve, 3000))
