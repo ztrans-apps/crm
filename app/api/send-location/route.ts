@@ -59,10 +59,11 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const recipient = normalizeWhatsAppRecipient(to)
+    const { resolveWhatsAppChatJid } = await import('@/lib/whatsapp/chat-jid')
+    const chat = await resolveWhatsAppChatJid(supabase, conversationId, to)
     const sendResult = await sendLocationViaBaileys({
       sessionId,
-      to: recipient.jid,
+      to: chat.jid,
       latitude,
       longitude,
       address,

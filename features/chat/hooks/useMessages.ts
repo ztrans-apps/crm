@@ -141,7 +141,8 @@ export function useMessages({
           .eq('id', conversation.contact.id)
       }
 
-      const whatsappNumber = recipient.isLid ? recipient.jid : recipient.legacyJid
+      // Prefer Baileys JID; send-message will further resolve @lid chat JID from history
+      const whatsappNumber = recipient.jid
 
       // Handle media upload if present
       let mediaUrl = null

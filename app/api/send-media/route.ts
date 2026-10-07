@@ -71,8 +71,9 @@ export async function POST(request: NextRequest) {
     }
 
     const buffer = Buffer.from(await media.arrayBuffer())
-    const recipient = normalizeWhatsAppRecipient(to)
-    const recipientJid = recipient.jid
+    const { resolveWhatsAppChatJid } = await import('@/lib/whatsapp/chat-jid')
+    const chat = await resolveWhatsAppChatJid(supabase, conversationId, to)
+    const recipientJid = chat.jid
     const quotedContext = quotedMessageId
       ? await resolveQuotedContextForBaileys(supabase, quotedMessageId, recipientJid)
       : null

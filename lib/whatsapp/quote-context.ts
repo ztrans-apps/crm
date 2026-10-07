@@ -87,7 +87,13 @@ export async function resolveQuotedContextForBaileys(
   }
 
   const stanzaId = quotedMsg.whatsapp_message_id
-  if (stanzaId && !stanzaId.includes('-')) {
+  // Real WA stanza ids are long alphanumeric (e.g. 3EB0…); reject UUIDs / probe ids
+  const looksLikeWaId =
+    !!stanzaId &&
+    !stanzaId.includes('-') &&
+    /^[A-Za-z0-9]{16,}$/.test(stanzaId)
+
+  if (looksLikeWaId) {
     const fromMe = !!quotedMsg.is_from_me
     return {
       stanzaId,

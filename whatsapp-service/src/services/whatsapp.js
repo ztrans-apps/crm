@@ -1285,10 +1285,20 @@ class BaileysWhatsAppService {
       message = message.message
     }
 
+    // Strip empty / unknown wrappers so Baileys getContentType works
+    if (message && typeof message === 'object') {
+      const copy = { ...message }
+      delete copy.messageContextInfo
+      message = copy
+    }
+
     const fromMe = !!quotedContext.fromMe
+    // Always align quoted.key.remoteJid with the JID we send to (LID vs PN).
+    // Mismatch is the usual reason WhatsApp drops the reply bubble.
+    const remoteJid = fallbackJid
     return {
       key: {
-        remoteJid: quotedContext.remoteJid || fallbackJid,
+        remoteJid,
         fromMe,
         id: quotedContext.stanzaId,
         ...(fromMe
@@ -1297,7 +1307,7 @@ class BaileysWhatsAppService {
               participant:
                 quotedContext.participant ||
                 quotedContext.remoteJid ||
-                fallbackJid,
+                remoteJid,
             }),
       },
       message,

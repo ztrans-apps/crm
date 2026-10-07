@@ -153,9 +153,10 @@ export async function POST(request: NextRequest) {
 
     try {
       // Send directly to Baileys VPS (Vercel has no BullMQ workers)
-      const recipient = normalizeWhatsAppRecipient(to)
-      // Prefer @s.whatsapp.net (Baileys); @c.us is legacy and can break quote remoteJid matching
-      const recipientJid = recipient.jid
+      const { resolveWhatsAppChatJid } = await import('@/lib/whatsapp/chat-jid')
+      const chat = await resolveWhatsAppChatJid(supabase, conversationId, to)
+      const recipientJid = chat.jid
+
       const quotedContext = quotedMessageId
         ? await resolveQuotedContextForBaileys(supabase, quotedMessageId, recipientJid)
         : null
@@ -164,6 +165,14 @@ export async function POST(request: NextRequest) {
         console.warn('[send-message] quotedMessageId provided but quote context unresolved', {
           quotedMessageId,
           recipientJid,
+          chatSource: chat.source,
+        })
+      } else {
+        console.log('[send-message] baileys target', {
+          recipientJid,
+          chatSource: chat.source,
+          hasQuote: !!quotedContext,
+          quotedStanzaId: quotedContext?.stanzaId || null,
         })
       }
 
