@@ -91,6 +91,7 @@ export async function POST(request: NextRequest) {
     )
 
     let contact: { id: string; name: string | null; phone_number?: string }
+    let effectiveSenderPn = (senderPn as string) || null
     try {
       const resolved = await resolveContactForWhatsAppPeer(supabase, {
         userId,
@@ -98,10 +99,11 @@ export async function POST(request: NextRequest) {
         phoneNumber: String(phoneNumber),
         fromLid: !!fromLid,
         chatLid: (chatLid as string) || null,
-        senderPn: (senderPn as string) || null,
+        senderPn: effectiveSenderPn,
         pushName: pushName || null,
       })
       contact = resolved.contact
+      effectiveSenderPn = resolved.recoveredSenderPn || effectiveSenderPn
     } catch (contactError) {
       console.error('[baileys-incoming] contact resolve failed', contactError)
       return NextResponse.json({ error: 'Failed to resolve contact' }, { status: 500 })
@@ -112,7 +114,7 @@ export async function POST(request: NextRequest) {
       phoneNumber: String(phoneNumber),
       fromLid: !!fromLid,
       chatLid: (chatLid as string) || null,
-      senderPn: (senderPn as string) || null,
+      senderPn: effectiveSenderPn,
     })
     const { data: aliasContacts } = await supabase
       .from('contacts')

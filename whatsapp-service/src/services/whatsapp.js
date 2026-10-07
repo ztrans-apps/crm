@@ -34,6 +34,8 @@ const __dirname = dirname(__filename)
 class BaileysWhatsAppService {
   constructor() {
     this.sessions = new Map() // sessionKey (tenantId:sessionId) -> { sock, store, state, tenantId }
+    /** @type {Map<string, string>} LID jid → phone jid (@s.whatsapp.net) */
+    this.lidToPn = new Map()
     this.qrCodes = new Map() // sessionKey -> qrCode
     
     // Use dedicated folder for auth sessions
@@ -1239,6 +1241,10 @@ class BaileysWhatsAppService {
 
     if (!lid) return null
 
+    if (this.lidToPn.has(lid)) {
+      return this.lidToPn.get(lid)
+    }
+
     try {
       const sessionKey = tenantId ? `${tenantId}:${sessionId}` : sessionId
       const session =
@@ -1248,13 +1254,27 @@ class BaileysWhatsAppService {
       const sock = session?.sock
       const pn = await sock?.signalRepository?.lidMapping?.getPNForLID?.(lid)
       if (pn && typeof pn === 'string' && pn.includes('@')) {
-        return pn.endsWith('@s.whatsapp.net') ? pn : `${pn.split('@')[0]}@s.whatsapp.net`
+        const normalized = pn.endsWith('@s.whatsapp.net') ? pn : `${pn.split('@')[0]}@s.whatsapp.net`
+        this.lidToPn.set(lid, normalized)
+        return normalized
       }
     } catch (error) {
       console.warn('[Baileys] lidMapping.getPNForLID failed:', error?.message || error)
     }
 
     return null
+  }
+
+  rememberLidPhoneMapping(msg, phoneJid) {
+    const remote = msg?.key?.remoteJid
+    const senderPn = msg?.key?.senderPn
+    if (typeof remote === 'string' && remote.endsWith('@lid')) {
+      if (typeof senderPn === 'string' && senderPn.endsWith('@s.whatsapp.net')) {
+        this.lidToPn.set(remote, senderPn)
+      } else if (typeof phoneJid === 'string' && phoneJid.endsWith('@s.whatsapp.net')) {
+        this.lidToPn.set(remote, phoneJid)
+      }
+    }
   }
 
   formatRecipientJid(to) {
@@ -1557,18 +1577,23 @@ class BaileysWhatsAppService {
         fromLid = true
         phoneJid = await this.resolvePhoneJid(sessionId, msg, tenantId)
         if (phoneJid) {
+          this.rememberLidPhoneMapping(msg, phoneJid)
           console.log('[Baileys] resolved @lid →', phoneJid)
         } else {
           console.warn('[Baileys] @lid without phone mapping — saving with lid: prefix', {
             remoteJid: msg.key.remoteJid,
+            fromMe: !!msg.key.fromMe,
             senderPn: msg.key.senderPn || null,
             remoteJidAlt: msg.key.remoteJidAlt || null,
             messageId: msg.key.id,
+            cached: this.lidToPn.has(msg.key.remoteJid),
           })
         }
       } else {
         return null
       }
+
+      this.rememberLidPhoneMapping(msg, phoneJid)
 
       // No direct Supabase on VPS → forward to Next.js (service role lives there)
       if (!supabase) {
