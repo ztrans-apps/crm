@@ -153,9 +153,11 @@ export async function POST(request: NextRequest) {
 
     try {
       // Send directly to Baileys VPS (Vercel has no BullMQ workers)
+      const recipient = normalizeWhatsAppRecipient(to)
       const { resolveWhatsAppChatJid } = await import('@/lib/whatsapp/chat-jid')
       const chat = await resolveWhatsAppChatJid(supabase, conversationId, to)
-      const recipientJid = chat.jid
+      // Prefer real chat JID (@lid) when history has it; else normalized phone JID
+      const recipientJid = chat.jid || recipient.jid
 
       const quotedContext = quotedMessageId
         ? await resolveQuotedContextForBaileys(supabase, quotedMessageId, recipientJid)
