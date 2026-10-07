@@ -36,35 +36,57 @@ export async function POST(
 
     if (updateError) throw updateError;
 
-    // Reconnect in WhatsApp service
+    // Reconnect / start Baileys session (required for QR)
+    const { getWhatsAppServiceUrl, isLocalWhatsAppServiceUrl } = await import(
+      '@/lib/whatsapp/service-url'
+    )
+    const whatsappServiceUrl = getWhatsAppServiceUrl()
+
+    if (isLocalWhatsAppServiceUrl(whatsappServiceUrl) && process.env.VERCEL) {
+      return NextResponse.json(
+        {
+          error:
+            'WHATSAPP_SERVICE_URL still points to localhost on Vercel. Set it to your VPS URL and redeploy.',
+        },
+        { status: 503 }
+      )
+    }
+
+    const serviceUrl = `${whatsappServiceUrl}/api/whatsapp/reconnect/${sessionId}${forceNew ? '?forceNew=true' : ''}`
+    console.log('[WhatsApp Reconnect] Calling service:', serviceUrl)
+
     try {
-      const whatsappServiceUrl = process.env.WHATSAPP_SERVICE_URL || 'http://localhost:3001'
-      const serviceUrl = `${whatsappServiceUrl}/api/whatsapp/reconnect/${sessionId}${forceNew ? '?forceNew=true' : ''}`
-      
-      console.log('[WhatsApp Reconnect] Calling service:', serviceUrl);
-      
       const response = await fetch(serviceUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-      });
+        signal: AbortSignal.timeout(30000),
+      })
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}))
         console.error('[WhatsApp Reconnect] Service response:', errorData)
         throw new Error(errorData.error || 'Failed to reconnect WhatsApp service')
       }
-      
+
       const data = await response.json()
       console.log('[WhatsApp Reconnect] Service response:', data)
+
+      return NextResponse.json({
+        success: true,
+        sessionId,
+        ...data,
+      })
     } catch (serviceError: any) {
       console.error('[WhatsApp Reconnect] Service error:', serviceError)
-      // Continue anyway - user can retry
+      return NextResponse.json(
+        {
+          error:
+            serviceError.message ||
+            'Failed to reach Baileys whatsapp-service. Check WHATSAPP_SERVICE_URL and VPS.',
+        },
+        { status: 503 }
+      )
     }
-
-    return NextResponse.json({ 
-      success: true, 
-      sessionId 
-    });
   } catch (error: any) {
     console.error('[WhatsApp Reconnect] Error:', error);
     return NextResponse.json(

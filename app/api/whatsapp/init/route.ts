@@ -78,11 +78,22 @@ export async function POST(request: Request) {
 
     if (error) throw error;
 
-    // Initialize session in Baileys WhatsApp service
-    const whatsappServiceUrl =
-      process.env.WHATSAPP_SERVICE_URL ||
-      process.env.NEXT_PUBLIC_WHATSAPP_SERVICE_URL ||
-      'http://localhost:3001';
+    // Initialize session in Baileys WhatsApp service (required for QR)
+    const { getWhatsAppServiceUrl, isLocalWhatsAppServiceUrl } = await import(
+      '@/lib/whatsapp/service-url'
+    )
+    const whatsappServiceUrl = getWhatsAppServiceUrl()
+
+    if (isLocalWhatsAppServiceUrl(whatsappServiceUrl) && process.env.VERCEL) {
+      return NextResponse.json(
+        {
+          error:
+            'WHATSAPP_SERVICE_URL still points to localhost on Vercel. Set it to your VPS URL (e.g. http://129.226.81.114:3001) and redeploy.',
+          sessionId: session.id,
+        },
+        { status: 503 }
+      )
+    }
 
     try {
       const response = await fetch(
@@ -90,25 +101,35 @@ export async function POST(request: Request) {
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 
+          body: JSON.stringify({
             sessionId,
-            forceNew: true // Always force new session to generate QR
+            forceNew: true,
           }),
+          signal: AbortSignal.timeout(30000),
         }
-      );
+      )
 
       if (!response.ok) {
-        throw new Error('Failed to initialize WhatsApp service');
+        const errBody = await response.json().catch(() => ({}))
+        throw new Error(errBody.error || 'Failed to initialize WhatsApp service')
       }
-    } catch (serviceError) {
-      console.error('[WhatsApp Init] Service error:', serviceError);
-      // Continue anyway - user can retry
+    } catch (serviceError: any) {
+      console.error('[WhatsApp Init] Service error:', serviceError)
+      return NextResponse.json(
+        {
+          error:
+            serviceError.message ||
+            'Failed to reach Baileys whatsapp-service. Check WHATSAPP_SERVICE_URL and VPS.',
+          sessionId: session.id,
+        },
+        { status: 503 }
+      )
     }
 
-    return NextResponse.json({ 
-      success: true, 
-      sessionId: session.id 
-    });
+    return NextResponse.json({
+      success: true,
+      sessionId: session.id,
+    })
   } catch (error: any) {
     console.error('[WhatsApp Init] Error:', error);
     return NextResponse.json(

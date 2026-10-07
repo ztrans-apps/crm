@@ -1,12 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-
-function getWhatsAppServiceUrl() {
-  return (
-    process.env.WHATSAPP_SERVICE_URL ||
-    process.env.NEXT_PUBLIC_WHATSAPP_SERVICE_URL ||
-    'http://localhost:3001'
-  )
-}
+import { getWhatsAppServiceUrl } from '@/lib/whatsapp/service-url'
 
 export async function GET(
   request: NextRequest,
