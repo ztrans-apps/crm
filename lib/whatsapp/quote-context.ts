@@ -2,12 +2,39 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 
 export type QuotedContextPayload = {
   stanzaId: string
+  fromMe?: boolean
+  /** Chat JID of the original message (usually the 1:1 peer) */
+  remoteJid?: string
   participant?: string
   quotedMessage: Record<string, unknown>
 }
 
+function normalizeQuotedMessageContent(
+  message: Record<string, unknown> | null | undefined,
+  fallbackText?: string | null
+): Record<string, unknown> | null {
+  if (!message || typeof message !== 'object') {
+    return fallbackText != null ? { conversation: String(fallbackText) } : null
+  }
+
+  // Prefer a single concrete content type (Baileys strips nested wrappers when quoting)
+  if (message.conversation || message.extendedTextMessage || message.imageMessage ||
+      message.videoMessage || message.audioMessage || message.documentMessage ||
+      message.locationMessage || message.stickerMessage) {
+    return message
+  }
+
+  // Some rows store WAMessage envelope { key, message }
+  const nested = (message as { message?: Record<string, unknown> }).message
+  if (nested && typeof nested === 'object') {
+    return normalizeQuotedMessageContent(nested, fallbackText)
+  }
+
+  return fallbackText != null ? { conversation: String(fallbackText) } : null
+}
+
 /**
- * Resolve CRM quoted_message_id (UUID or WA id) into Baileys contextInfo payload.
+ * Resolve CRM quoted_message_id (UUID or WA id) into Baileys `options.quoted` payload.
  */
 export async function resolveQuotedContextForBaileys(
   supabase: SupabaseClient,
@@ -15,7 +42,12 @@ export async function resolveQuotedContextForBaileys(
   recipientJid: string
 ): Promise<QuotedContextPayload | null> {
   let quotedMsg: {
-    metadata?: { raw_message?: { key?: { id?: string; fromMe?: boolean; remoteJid?: string }; message?: Record<string, unknown> } }
+    metadata?: {
+      raw_message?: {
+        key?: { id?: string; fromMe?: boolean; remoteJid?: string; participant?: string }
+        message?: Record<string, unknown>
+      }
+    }
     content?: string | null
     is_from_me?: boolean
     whatsapp_message_id?: string | null
@@ -40,19 +72,28 @@ export async function resolveQuotedContextForBaileys(
   if (!quotedMsg) return null
 
   const raw = quotedMsg.metadata?.raw_message
-  if (raw?.key?.id && raw.message) {
-    return {
-      stanzaId: raw.key.id,
-      participant: raw.key.fromMe ? undefined : raw.key.remoteJid,
-      quotedMessage: raw.message,
+  if (raw?.key?.id) {
+    const quotedMessage = normalizeQuotedMessageContent(raw.message, quotedMsg.content)
+    if (quotedMessage) {
+      const fromMe = !!raw.key.fromMe || !!quotedMsg.is_from_me
+      return {
+        stanzaId: raw.key.id,
+        fromMe,
+        remoteJid: raw.key.remoteJid || recipientJid,
+        participant: fromMe ? undefined : raw.key.participant || raw.key.remoteJid || recipientJid,
+        quotedMessage,
+      }
     }
   }
 
   const stanzaId = quotedMsg.whatsapp_message_id
   if (stanzaId && !stanzaId.includes('-')) {
+    const fromMe = !!quotedMsg.is_from_me
     return {
       stanzaId,
-      participant: quotedMsg.is_from_me ? undefined : recipientJid,
+      fromMe,
+      remoteJid: recipientJid,
+      participant: fromMe ? undefined : recipientJid,
       quotedMessage: { conversation: quotedMsg.content || '' },
     }
   }

@@ -154,10 +154,18 @@ export async function POST(request: NextRequest) {
     try {
       // Send directly to Baileys VPS (Vercel has no BullMQ workers)
       const recipient = normalizeWhatsAppRecipient(to)
-      const recipientJid = recipient.isLid ? recipient.jid : recipient.legacyJid
+      // Prefer @s.whatsapp.net (Baileys); @c.us is legacy and can break quote remoteJid matching
+      const recipientJid = recipient.jid
       const quotedContext = quotedMessageId
         ? await resolveQuotedContextForBaileys(supabase, quotedMessageId, recipientJid)
         : null
+
+      if (quotedMessageId && !quotedContext) {
+        console.warn('[send-message] quotedMessageId provided but quote context unresolved', {
+          quotedMessageId,
+          recipientJid,
+        })
+      }
 
       const sendResult = await sendTextViaBaileys({
         sessionId,

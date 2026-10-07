@@ -595,125 +595,32 @@ class BaileysWhatsAppService {
     const { sock } = session
 
     try {
+      const jid = this.formatRecipientJid(to)
+
+      let quoted =
+        this.buildQuotedOption(quotedContext, jid) ||
+        (quotedMessageId && supabase
+          ? await this.resolveQuotedOptionFromDb(quotedMessageId, jid)
+          : null)
+
       console.log('[Baileys] sendMessage', {
         sessionId,
         to,
+        jid,
         messageLength: message?.length,
-        hasQuoted: !!quotedMessageId,
+        hasQuotedId: !!quotedMessageId,
+        hasQuotedOption: !!quoted,
+        quotedStanzaId: quoted?.key?.id || null,
+        quotedFromMe: quoted?.key?.fromMe ?? null,
         tenantId,
       })
 
-      const jid = this.formatRecipientJid(to)
-
-      // Prepare message content
-      const messageContent = { text: message }
-
-      if (quotedContext?.stanzaId && quotedContext?.quotedMessage) {
-        messageContent.contextInfo = {
-          stanzaId: quotedContext.stanzaId,
-          participant: quotedContext.participant,
-          quotedMessage: quotedContext.quotedMessage,
-        }
-      } else if (quotedMessageId && supabase) {
-        try {
-          // Try to get the original message from database
-          // Strategy:
-          // 1. Try by whatsapp_message_id (for messages from WhatsApp)
-          // 2. Try by id (for CRM messages using database ID)
-          // 3. Try by raw_message.key.id in metadata (for CRM messages using WhatsApp ID)
-          
-          let quotedMsg = null
-          
-          // Try 1: by whatsapp_message_id
-          let { data } = await supabase
-            .from('messages')
-            .select('metadata, content, is_from_me, whatsapp_message_id, message_type, id')
-            .eq('whatsapp_message_id', quotedMessageId)
-            .maybeSingle()
-          
-          if (data) {
-            quotedMsg = data
-          }
-          
-          // Try 2: by id (if quotedMessageId is a UUID)
-          if (!quotedMsg && quotedMessageId.includes('-')) {
-            const result = await supabase
-              .from('messages')
-              .select('metadata, content, is_from_me, whatsapp_message_id, message_type, id')
-              .eq('id', quotedMessageId)
-              .maybeSingle()
-            
-            quotedMsg = result.data
-          }
-          
-          // Try 3: by raw_message.key.id in metadata (for CRM messages)
-          if (!quotedMsg) {
-            // Search in metadata->raw_message->key->id
-            const { data: messages } = await supabase
-              .from('messages')
-              .select('metadata, content, is_from_me, whatsapp_message_id, message_type, id')
-              .not('metadata', 'is', null)
-              .limit(100) // Limit to avoid performance issues
-            
-            if (messages) {
-              quotedMsg = messages.find(msg => {
-                try {
-                  return msg.metadata?.raw_message?.key?.id === quotedMessageId
-                } catch {
-                  return false
-                }
-              })
-            }
-          }
-          
-          if (quotedMsg && quotedMsg.metadata?.raw_message) {
-            // Use the stored raw message for proper quoting
-            const rawMsg = quotedMsg.metadata.raw_message
-            
-            // For Baileys, we need to pass the message as contextInfo
-            // This is the proper way to quote messages in Baileys
-            messageContent.contextInfo = {
-              stanzaId: rawMsg.key.id,
-              participant: rawMsg.key.fromMe ? undefined : rawMsg.key.remoteJid,
-              quotedMessage: rawMsg.message
-            }
-
-            console.log('[Baileys] quoting message', {
-              stanzaId: rawMsg.key.id,
-              fromMe: rawMsg.key.fromMe,
-              hasQuotedMessage: !!rawMsg.message,
-            })
-          } else if (quotedMsg) {
-            // Fallback: only use if whatsapp_message_id is a valid WhatsApp ID (not UUID)
-            // WhatsApp message IDs are alphanumeric without dashes
-            const stanzaId = quotedMsg.whatsapp_message_id
-            const isValidWhatsAppId = stanzaId && !stanzaId.includes('-')
-            
-            if (isValidWhatsAppId) {
-              console.log('[Baileys] quote fallback', {
-                stanzaId,
-                hasWhatsappId: !!quotedMsg.whatsapp_message_id,
-              })
-              
-              messageContent.contextInfo = {
-                stanzaId: stanzaId,
-                participant: quotedMsg.is_from_me ? undefined : jid,
-                quotedMessage: {
-                  conversation: quotedMsg.content || ''
-                }
-              }
-            } else {
-            }
-          } else {
-          }
-        } catch (err) {
-          console.error('  ❌ Error getting quoted message:', err)
-          // Silent fail - just send without quote if error
-        }
-      }
-
-      // Send message
-      const result = await sock.sendMessage(jid, messageContent)
+      // Baileys 6: quotes must use options.quoted (not manual contextInfo on text)
+      const result = await sock.sendMessage(
+        jid,
+        { text: message },
+        quoted ? { quoted } : {}
+      )
 
       return {
         success: true,
@@ -798,15 +705,19 @@ class BaileysWhatsAppService {
         }
       }
 
-      if (quotedContext?.stanzaId && quotedContext?.quotedMessage) {
-        messageContent.contextInfo = {
-          stanzaId: quotedContext.stanzaId,
-          participant: quotedContext.participant,
-          quotedMessage: quotedContext.quotedMessage,
-        }
+      const quoted = this.buildQuotedOption(quotedContext, jid)
+      if (quotedContext && !quoted) {
+        console.warn('[Baileys] sendMedia: quotedContext present but invalid', {
+          hasStanzaId: !!quotedContext?.stanzaId,
+          hasQuotedMessage: !!quotedContext?.quotedMessage,
+        })
       }
 
-      const result = await sock.sendMessage(jid, messageContent)
+      const result = await sock.sendMessage(
+        jid,
+        messageContent,
+        quoted ? { quoted } : {}
+      )
 
       // If it's a document and has caption, send caption as separate message
       if (!mimetype.startsWith('image/') && 
@@ -1361,6 +1272,91 @@ class BaileysWhatsAppService {
       throw new Error(`Invalid phone number: ${phoneNumber}`)
     }
     return `${phoneNumber}@s.whatsapp.net`
+  }
+
+  /**
+   * Build Baileys sendMessage options.quoted from CRM bridge payload.
+   */
+  buildQuotedOption(quotedContext, fallbackJid) {
+    if (!quotedContext?.stanzaId || !quotedContext?.quotedMessage) return null
+
+    let message = quotedContext.quotedMessage
+    if (message?.message && typeof message.message === 'object') {
+      message = message.message
+    }
+
+    const fromMe = !!quotedContext.fromMe
+    return {
+      key: {
+        remoteJid: quotedContext.remoteJid || fallbackJid,
+        fromMe,
+        id: quotedContext.stanzaId,
+        ...(fromMe
+          ? {}
+          : {
+              participant:
+                quotedContext.participant ||
+                quotedContext.remoteJid ||
+                fallbackJid,
+            }),
+      },
+      message,
+    }
+  }
+
+  async resolveQuotedOptionFromDb(quotedMessageId, jid) {
+    try {
+      let quotedMsg = null
+
+      let { data } = await supabase
+        .from('messages')
+        .select('metadata, content, is_from_me, whatsapp_message_id, message_type, id')
+        .eq('whatsapp_message_id', quotedMessageId)
+        .maybeSingle()
+      if (data) quotedMsg = data
+
+      if (!quotedMsg && quotedMessageId.includes('-')) {
+        const result = await supabase
+          .from('messages')
+          .select('metadata, content, is_from_me, whatsapp_message_id, message_type, id')
+          .eq('id', quotedMessageId)
+          .maybeSingle()
+        quotedMsg = result.data
+      }
+
+      if (!quotedMsg) return null
+
+      const rawMsg = quotedMsg.metadata?.raw_message
+      if (rawMsg?.key?.id && rawMsg.message) {
+        return this.buildQuotedOption(
+          {
+            stanzaId: rawMsg.key.id,
+            fromMe: !!rawMsg.key.fromMe || !!quotedMsg.is_from_me,
+            remoteJid: rawMsg.key.remoteJid || jid,
+            participant: rawMsg.key.participant || rawMsg.key.remoteJid,
+            quotedMessage: rawMsg.message,
+          },
+          jid
+        )
+      }
+
+      const stanzaId = quotedMsg.whatsapp_message_id
+      if (stanzaId && !stanzaId.includes('-')) {
+        return this.buildQuotedOption(
+          {
+            stanzaId,
+            fromMe: !!quotedMsg.is_from_me,
+            remoteJid: jid,
+            participant: quotedMsg.is_from_me ? undefined : jid,
+            quotedMessage: { conversation: quotedMsg.content || '' },
+          },
+          jid
+        )
+      }
+    } catch (err) {
+      console.error('[Baileys] resolve quote from DB failed:', err?.message || err)
+    }
+    return null
   }
 
   analyzeInboundMessage(msg) {
