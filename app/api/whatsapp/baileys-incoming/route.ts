@@ -12,6 +12,13 @@ type BridgeMedia = {
   messageType?: string
 }
 
+type BridgeLocation = {
+  latitude: number
+  longitude: number
+  name?: string | null
+  address?: string | null
+}
+
 /**
  * Receives inbound WhatsApp messages from the VPS Baileys service.
  */
@@ -46,6 +53,7 @@ export async function POST(request: NextRequest) {
       fromLid,
       rawMessage,
       media,
+      location,
     } = body || {}
 
     if (!sessionId || !phoneNumber || !messageId) {
@@ -222,6 +230,23 @@ export async function POST(request: NextRequest) {
     let mediaMimeType: string | null = bridgeMedia?.mimetype || null
     let dbMessageType = resolvedType === 'unknown' ? 'text' : resolvedType
 
+    const bridgeLocation = location as BridgeLocation | null
+    let contentText = messageText || null
+
+    if (
+      resolvedType === 'location' &&
+      bridgeLocation?.latitude != null &&
+      bridgeLocation?.longitude != null
+    ) {
+      dbMessageType = 'location'
+      contentText = `${bridgeLocation.latitude},${bridgeLocation.longitude}`
+      if (!mediaUrl) {
+        mediaUrl = `https://www.google.com/maps?q=${bridgeLocation.latitude},${bridgeLocation.longitude}`
+        mediaFilename =
+          bridgeLocation.address || bridgeLocation.name || mediaFilename
+      }
+    }
+
     if (bridgeMedia?.base64 && bridgeMedia.mimetype) {
       const buffer = Buffer.from(bridgeMedia.base64, 'base64')
       const ext = bridgeMedia.mimetype.split('/')[1]?.split(';')[0] || 'bin'
@@ -251,7 +276,7 @@ export async function POST(request: NextRequest) {
     const { error: msgError } = await supabase.from('messages').insert({
       conversation_id: conversation.id,
       whatsapp_message_id: messageId,
-      content: messageText || null,
+      content: contentText,
       message_type: dbMessageType,
       status: 'delivered',
       sender_type: 'customer',
@@ -259,7 +284,8 @@ export async function POST(request: NextRequest) {
       tenant_id: resolvedTenant,
       quoted_message_id: quotedMessageId,
       media_url: mediaUrl,
-      media_type: mediaUrl ? dbMessageType : null,
+      media_type:
+        dbMessageType === 'location' ? 'location' : mediaUrl ? dbMessageType : null,
       media_filename: mediaFilename,
       media_size: mediaSize,
       media_mime_type: mediaMimeType,

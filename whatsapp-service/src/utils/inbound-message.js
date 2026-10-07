@@ -98,6 +98,18 @@ export function extractQuotedStanzaId(unwrapped) {
   return parts.find(Boolean) || null
 }
 
+export function extractLocationFromContent(unwrapped) {
+  if (!unwrapped) return null
+  const loc = unwrapped.locationMessage || unwrapped.liveLocationMessage
+  if (!loc) return null
+  return {
+    latitude: loc.degreesLatitude,
+    longitude: loc.degreesLongitude,
+    name: loc.name || null,
+    address: loc.address || null,
+  }
+}
+
 export function getMediaMetaFromContent(unwrapped) {
   if (!unwrapped) return null
   if (unwrapped.imageMessage) {

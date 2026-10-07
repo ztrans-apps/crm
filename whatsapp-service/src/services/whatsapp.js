@@ -25,6 +25,7 @@ import {
   getInboundPreview,
   extractQuotedStanzaId,
   getMediaMetaFromContent,
+  extractLocationFromContent,
 } from '../utils/inbound-message.js'
 
 const __filename = fileURLToPath(import.meta.url)
@@ -493,12 +494,13 @@ class BaileysWhatsAppService {
           if (update.update.status) {
             const status = this.mapBaileysStatus(update.update.status)
             
-            // Update in database
             if (supabase) {
               await supabase
                 .from('messages')
                 .update({ status })
                 .eq('whatsapp_message_id', update.key.id)
+            } else {
+              await this.forwardMessageStatusToCrm(sessionId, update.key.id, status)
             }
 
             // Emit via Socket.IO
@@ -1247,8 +1249,19 @@ class BaileysWhatsAppService {
    * Map Baileys message status to our status
    */
   mapBaileysStatus(baileysStatus) {
+    if (typeof baileysStatus === 'string') {
+      const s = baileysStatus.toLowerCase()
+      if (s.includes('read') || s === 'played') return 'read'
+      if (s.includes('delivery') || s === 'delivery_ack') return 'delivered'
+      if (s === 'server_ack') return 'sent'
+      if (s === 'pending') return 'sending'
+      if (s === 'error' || s === 'failed') return 'failed'
+      return 'sent'
+    }
     // Baileys status: PENDING, SERVER_ACK, DELIVERY_ACK, READ, PLAYED
     switch (baileysStatus) {
+      case 0:
+        return 'sending'
       case 1: // PENDING
         return 'sending'
       case 2: // SERVER_ACK
@@ -1260,6 +1273,26 @@ class BaileysWhatsAppService {
         return 'read'
       default:
         return 'sent'
+    }
+  }
+
+  async forwardMessageStatusToCrm(sessionId, whatsappMessageId, status) {
+    const baseUrl = (process.env.CRM_APP_URL || process.env.FRONTEND_URL || '').replace(/\/$/, '')
+    if (!baseUrl) return
+
+    const headers = { 'Content-Type': 'application/json' }
+    if (process.env.WHATSAPP_BRIDGE_SECRET) {
+      headers['x-bridge-secret'] = process.env.WHATSAPP_BRIDGE_SECRET
+    }
+
+    try {
+      await fetch(`${baseUrl}/api/whatsapp/baileys-status`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ sessionId, whatsappMessageId, status }),
+      })
+    } catch (error) {
+      console.warn('[Baileys] forward status failed:', error?.message || error)
     }
   }
 
@@ -1425,6 +1458,11 @@ class BaileysWhatsAppService {
       )
     }
 
+    const location =
+      analysis.messageType === 'location'
+        ? extractLocationFromContent(analysis.unwrapped)
+        : null
+
     const payload = {
       sessionId,
       tenantId,
@@ -1437,6 +1475,7 @@ class BaileysWhatsAppService {
       messageId: msg.key.id,
       messageTimestamp: msg.messageTimestamp,
       fromLid: unresolvedLid,
+      location,
       rawMessage: {
         key: msg.key,
         message: analysis.unwrapped || msg.message,
