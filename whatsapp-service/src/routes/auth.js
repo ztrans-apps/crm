@@ -177,8 +177,9 @@ router.post('/reconnect/:sessionId', async (req, res) => {
     
     console.log(`🔄 Reconnect requested for session: ${sessionId}, forceNew: ${forceNew}`)
     
-    // Check if valid credentials exist
-    const authPath = path.join('.baileys_auth', sessionId)
+    // Use the same auth directory as Baileys service (not cwd-relative)
+    const authDir = whatsappService.authDir || path.join(process.cwd(), '.baileys_auth')
+    const authPath = path.join(authDir, sessionId)
     const credsPath = path.join(authPath, 'creds.json')
     
     let hasValidCreds = false
@@ -187,7 +188,7 @@ router.post('/reconnect/:sessionId', async (req, res) => {
         const credsData = JSON.parse(fs.readFileSync(credsPath, 'utf-8'))
         // registrationId can be 0, so check for undefined/null explicitly
         hasValidCreds = !!(credsData.me?.id && credsData.registrationId !== undefined && credsData.registrationId !== null)
-        console.log(`🔐 Credentials check: ${hasValidCreds ? 'VALID' : 'INVALID'}`)
+        console.log(`🔐 Credentials check: ${hasValidCreds ? 'VALID' : 'INVALID'} @ ${credsPath}`)
         console.log(`📱 Phone: ${credsData.me?.id || 'none'}`)
         console.log(`🔑 Registration ID: ${credsData.registrationId}`)
       } catch (err) {
