@@ -588,16 +588,22 @@ class BaileysWhatsAppService {
         tenantId,
       })
 
-      // Format phone number (remove @c.us if present)
-      let phoneNumber = to.replace('@c.us', '').replace(/\D/g, '')
-      
-      // Validate
-      if (phoneNumber.length < 10 || phoneNumber.length > 15) {
-        throw new Error(`Invalid phone number: ${phoneNumber}`)
+      // Format recipient: support @lid, lid: prefix, @c.us, raw phone
+      const rawTo = String(to || '').trim()
+      let jid
+      if (rawTo.endsWith('@lid') || rawTo.endsWith('@s.whatsapp.net')) {
+        jid = rawTo
+      } else if (rawTo.toLowerCase().startsWith('lid:')) {
+        const lidUser = rawTo.slice(4).replace(/\D/g, '')
+        const looksLikePhone = /^62\d{8,13}$/.test(lidUser)
+        jid = looksLikePhone ? `${lidUser}@s.whatsapp.net` : `${lidUser}@lid`
+      } else {
+        let phoneNumber = rawTo.replace('@c.us', '').replace(/\D/g, '')
+        if (phoneNumber.length < 10 || phoneNumber.length > 15) {
+          throw new Error(`Invalid phone number: ${phoneNumber}`)
+        }
+        jid = `${phoneNumber}@s.whatsapp.net`
       }
-
-      // Baileys format: number@s.whatsapp.net
-      const jid = `${phoneNumber}@s.whatsapp.net`
 
       // Prepare message content
       const messageContent = { text: message }
@@ -1321,7 +1327,8 @@ class BaileysWhatsAppService {
       return null
     }
 
-    const phoneNumber = fromLid && !phoneJid
+    const unresolvedLid = fromLid && !phoneJid
+    const phoneNumber = unresolvedLid
       ? msg.key.remoteJid.split('@')[0]
       : phoneJid.split('@')[0]
 
@@ -1333,7 +1340,8 @@ class BaileysWhatsAppService {
       messageText: this.extractInboundText(msg),
       messageId: msg.key.id,
       messageTimestamp: msg.messageTimestamp,
-      fromLid: !!fromLid,
+      // Only mark LID fallback when we do NOT have a phone JID
+      fromLid: unresolvedLid,
     }
 
     const headers = { 'Content-Type': 'application/json' }

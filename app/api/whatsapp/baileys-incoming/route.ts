@@ -60,26 +60,43 @@ export async function POST(request: NextRequest) {
       tenantId || session.tenant_id || process.env.DEFAULT_TENANT_ID || FALLBACK_TENANT_ID
     const userId = session.user_id
 
-    let formattedPhone = String(phoneNumber).trim()
-    if (fromLid && !formattedPhone.startsWith('lid:') && !formattedPhone.startsWith('+')) {
-      formattedPhone = `lid:${formattedPhone.replace(/\D/g, '')}`
-    } else if (!formattedPhone.startsWith('+') && !formattedPhone.startsWith('lid:')) {
-      const digits = formattedPhone.replace(/\D/g, '')
-      if (digits.startsWith('62')) {
-        formattedPhone = `+${digits}`
-      } else if (digits.startsWith('0')) {
-        formattedPhone = `+62${digits.slice(1)}`
-      } else {
-        formattedPhone = `+62${digits}`
+    const { normalizeWhatsAppRecipient } = await import('@/lib/whatsapp/phone')
+    // fromLid=true only when PN could not be resolved — otherwise save as real +62...
+    const recipient = normalizeWhatsAppRecipient(
+      fromLid ? `lid:${String(phoneNumber).replace(/^lid:/i, '')}` : String(phoneNumber)
+    )
+    let formattedPhone = recipient.displayPhone
+
+    let contact: { id: string; name: string | null } | null = null
+
+    // Heal contacts mistakenly saved as lid:628...
+    if (!recipient.isLid) {
+      const lidMistaken = `lid:${recipient.user}`
+      const { data: mistaken } = await supabase
+        .from('contacts')
+        .select('id, name')
+        .eq('phone_number', lidMistaken)
+        .eq('user_id', userId)
+        .maybeSingle()
+
+      if (mistaken) {
+        await supabase
+          .from('contacts')
+          .update({ phone_number: formattedPhone, name: pushName || mistaken.name })
+          .eq('id', mistaken.id)
+        contact = { id: mistaken.id, name: pushName || mistaken.name }
       }
     }
 
-    let { data: contact } = await supabase
-      .from('contacts')
-      .select('id, name')
-      .eq('phone_number', formattedPhone)
-      .eq('user_id', userId)
-      .maybeSingle()
+    if (!contact) {
+      const { data: existing } = await supabase
+        .from('contacts')
+        .select('id, name')
+        .eq('phone_number', formattedPhone)
+        .eq('user_id', userId)
+        .maybeSingle()
+      contact = existing
+    }
 
     if (!contact) {
       const { data: newContact, error: contactError } = await supabase

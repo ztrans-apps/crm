@@ -119,18 +119,29 @@ export function useMessages({
     try {
       setSending(true)
 
-      // Format phone number properly
-      const rawPhone = conversation.contact.phone_number
-      
-      // Remove + and any spaces
-      const phoneNumber = rawPhone.replace(/[\s+]/g, '')
-      
-      // Validate phone number
-      if (phoneNumber.length < 10 || phoneNumber.length > 15) {
-        throw new Error(`Invalid phone number: ${phoneNumber} (length: ${phoneNumber.length})`)
+      // Format phone number properly (strip mistaken lid: prefix on real numbers)
+      const { normalizeWhatsAppRecipient } = await import('@/lib/whatsapp/phone')
+      const recipient = normalizeWhatsAppRecipient(conversation.contact.phone_number)
+
+      if (!recipient.user || recipient.user.length < 10 || recipient.user.length > 18) {
+        throw new Error(
+          `Invalid phone number: ${conversation.contact.phone_number} (length: ${String(conversation.contact.phone_number || '').length})`
+        )
       }
-      
-      const whatsappNumber = `${phoneNumber}@c.us`
+
+      // Heal contacts saved as lid:628... after LID mapping resolved a real phone
+      if (
+        !recipient.isLid &&
+        conversation.contact.phone_number?.startsWith('lid:') &&
+        conversation.contact.id
+      ) {
+        void supabase
+          .from('contacts')
+          .update({ phone_number: recipient.displayPhone })
+          .eq('id', conversation.contact.id)
+      }
+
+      const whatsappNumber = recipient.isLid ? recipient.jid : recipient.legacyJid
 
       // Handle media upload if present
       let mediaUrl = null
