@@ -169,13 +169,13 @@ class BaileysWhatsAppService {
         },
         printQRInTerminal: false,
         logger: pino({ level: 'silent' }),
-        browser: Browsers.ubuntu('Chrome'),
+        browser: Browsers.macOS('Chrome'),
         connectTimeoutMs: 60000,
         defaultQueryTimeoutMs: 60000,
-        retryRequestDelayMs: 250,
+        retryRequestDelayMs: 500,
         maxMsgRetryCount: 3,
-        keepAliveIntervalMs: 10000, // Keep alive every 10s (more aggressive)
-        markOnlineOnConnect: true, // Mark as online when connecting
+        keepAliveIntervalMs: 25000,
+        markOnlineOnConnect: false,
       })
 
 
@@ -243,35 +243,40 @@ class BaileysWhatsAppService {
 
         // Handle connection state
         if (connection === 'close') {
-          const shouldReconnect = (lastDisconnect?.error instanceof Boom)
-            ? lastDisconnect.error.output.statusCode !== DisconnectReason.loggedOut
-            : true
-
-          const statusCode = lastDisconnect?.error instanceof Boom 
-            ? lastDisconnect.error.output.statusCode 
+          const statusCode = lastDisconnect?.error instanceof Boom
+            ? lastDisconnect.error.output.statusCode
             : null
+          const disconnectError = lastDisconnect?.error?.message || lastDisconnect?.error || null
 
+          console.log(`[Baileys] connection closed ${sessionKey}`, {
+            statusCode,
+            disconnectError,
+            reasonName: Object.keys(DisconnectReason).find(
+              (k) => DisconnectReason[k] === statusCode
+            ),
+          })
+
+          // Do NOT auto-reconnect on loggedOut / intentional close while pairing.
+          // Auto re-init mid-scan invalidates the QR and causes "couldn't link device".
+          const shouldReconnect = (lastDisconnect?.error instanceof Boom)
+            ? (
+                statusCode !== DisconnectReason.loggedOut &&
+                statusCode !== DisconnectReason.badSession &&
+                statusCode !== DisconnectReason.multideviceMismatch
+              )
+            : true
 
           // Update state registry based on disconnect reason
           if (statusCode === DisconnectReason.loggedOut) {
             sessionStateRegistry.setState(sessionId, 'LOGGED_OUT')
-            
-            // Auto-generate new QR code for re-authentication
-            
-            // Delete old auth files
+            reconnectManager.cancelReconnect(sessionId)
+
+            // Clear auth so next manual "Generate QR" starts clean,
+            // but do not auto-initialize here.
             const authPath = path.join(this.authDir, sessionId)
             if (fs.existsSync(authPath)) {
               fs.rmSync(authPath, { recursive: true, force: true })
             }
-            
-            // Initialize new session with QR
-            setTimeout(async () => {
-              try {
-                await this.initializeClient(sessionId, true, tenantId)
-              } catch (error) {
-                console.error(`❌ Failed to re-initialize session:`, error.message)
-              }
-            }, 2000) // Wait 2 seconds before re-initializing
           } else if (shouldReconnect) {
             sessionStateRegistry.setState(sessionId, 'DISCONNECTED')
           } else {

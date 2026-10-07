@@ -114,10 +114,7 @@ export function QRCode({ sessionId, onClose, onConnected }: QRCodeProps) {
         } else if (!data.qr && !qrReceived) {
           emptyPolls += 1;
           setStatusText(`Waiting for QR code... (${emptyPolls})`);
-          // Retry start once if still empty after ~10s
-          if (emptyPolls === 5) {
-            void triggerSessionStart();
-          }
+          // Do not force restart here — restarting mid-wait invalidates QR pairing.
         } else if (qrReceived && !data.qr && data.status !== 'connected') {
           qrExpiredCount++;
 
