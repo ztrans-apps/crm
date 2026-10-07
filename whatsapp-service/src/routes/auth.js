@@ -260,7 +260,8 @@ router.post('/clean-reconnect/:sessionId', async (req, res) => {
     }
     
     // Step 2: Delete auth files manually (don't delete from database)
-    const authPath = path.join('.baileys_auth', sessionId)
+    const authDir = whatsappService.authDir || path.join(process.cwd(), '.baileys_auth')
+    const authPath = path.join(authDir, sessionId)
     
     if (fs.existsSync(authPath)) {
       fs.rmSync(authPath, { recursive: true, force: true })
