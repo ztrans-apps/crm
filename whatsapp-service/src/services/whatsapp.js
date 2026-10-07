@@ -428,9 +428,10 @@ class BaileysWhatsAppService {
           // Skip if message is from me or status broadcast
           if (msg.key.fromMe || msg.key.remoteJid === 'status@broadcast') continue
 
+          console.log('[Baileys] incoming message', {
             from: msg.key.remoteJid,
             messageId: msg.key.id,
-            hasMessage: !!msg.message
+            hasMessage: !!msg.message,
           })
 
           // Update session activity
@@ -571,11 +572,12 @@ class BaileysWhatsAppService {
     const { sock } = session
 
     try {
+      console.log('[Baileys] sendMessage', {
         sessionId,
         to,
         messageLength: message?.length,
         hasQuoted: !!quotedMessageId,
-        tenantId
+        tenantId,
       })
 
       // Format phone number (remove @c.us if present)
@@ -656,10 +658,11 @@ class BaileysWhatsAppService {
               participant: rawMsg.key.fromMe ? undefined : rawMsg.key.remoteJid,
               quotedMessage: rawMsg.message
             }
-            
+
+            console.log('[Baileys] quoting message', {
               stanzaId: rawMsg.key.id,
               fromMe: rawMsg.key.fromMe,
-              hasQuotedMessage: !!rawMsg.message
+              hasQuotedMessage: !!rawMsg.message,
             })
           } else if (quotedMsg) {
             // Fallback: only use if whatsapp_message_id is a valid WhatsApp ID (not UUID)
@@ -668,8 +671,9 @@ class BaileysWhatsAppService {
             const isValidWhatsAppId = stanzaId && !stanzaId.includes('-')
             
             if (isValidWhatsAppId) {
+              console.log('[Baileys] quote fallback', {
                 stanzaId,
-                hasWhatsappId: !!quotedMsg.whatsapp_message_id
+                hasWhatsappId: !!quotedMsg.whatsapp_message_id,
               })
               
               messageContent.contextInfo = {
@@ -1154,14 +1158,15 @@ class BaileysWhatsAppService {
 
     // Try with sessionKey first, then fallback to sessionId
     const sessionKey = tenantId ? this.getSessionKey(tenantId, sessionId) : null
-    
+
+    console.log('[Baileys] getQRCode', {
       sessionId,
       tenantId,
       sessionKey,
       hasQRWithKey: sessionKey ? this.qrCodes.has(sessionKey) : false,
       hasQRWithId: this.qrCodes.has(sessionId),
       totalQRs: this.qrCodes.size,
-      allKeys: Array.from(this.qrCodes.keys())
+      allKeys: Array.from(this.qrCodes.keys()),
     })
     
     if (sessionKey && this.qrCodes.has(sessionKey)) {
@@ -1725,12 +1730,13 @@ class BaileysWhatsAppService {
       await supabase
         .from('messages')
         .insert(messageData)
-      
+
+      console.log('[Baileys] message saved', {
         id: messageData.whatsapp_message_id,
         type: messageType,
         hasMedia: !!mediaUrl,
         content: messageText || '[no text]',
-        quoted_message_id: quotedMessageId
+        quoted_message_id: quotedMessageId,
       })
 
       // Return conversation ID for chatbot trigger
