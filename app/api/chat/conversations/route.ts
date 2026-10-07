@@ -1,7 +1,6 @@
 // Example API route using middleware pattern
 import { withAuth, withRole } from '@/core/auth/middleware'
-import { requirePermission } from '@/core/permissions/middleware'
-import { requireTenantIdFromHeaders } from '@core/tenant'
+import { requireTenantIdFromHeaders } from '@/core/tenant'
 import { chatService } from '@/features/chat/services'
 
 /**
@@ -13,9 +12,6 @@ export const GET = withAuth(async (req: Request, context) => {
   try {
     // Get tenant ID
     const tenantId = requireTenantIdFromHeaders(req.headers)
-    
-    // Check permission
-    requirePermission(context, 'canViewAllConversations')
 
     // Get query params
     const { searchParams } = new URL(req.url)

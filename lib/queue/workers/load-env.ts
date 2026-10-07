@@ -26,7 +26,7 @@ if (missingVars.length > 0) {
   console.error('❌ Missing required environment variables:');
   missingVars.forEach(varName => console.error(`   - ${varName}`));
   console.error('\nPlease check your .env.local or .env file');
-  process.exit(1);
+  // Never exit here — Next.js imports this module during build/page collection.
+} else {
+  console.log('✅ Environment variables loaded successfully');
 }
-
-console.log('✅ Environment variables loaded successfully');

@@ -3,7 +3,6 @@
  * Handle outgoing messages with queue and rate limiting
  */
 
-import { sessionManager } from '../core/session-manager';
 import { rateLimiter } from '../core/rate-limiter';
 import { queueManager, QUEUE_NAMES } from '@/lib/queue/queue-manager';
 import type { SendMessageInput } from '../types';
@@ -139,27 +138,9 @@ export class WhatsAppSendService {
   /**
    * Send direct (bypass queue) - Use with caution!
    */
-  async sendDirect(input: SendMessageInput): Promise<{ messageId: string }> {
-    const { tenantId, sessionId, to, message } = input;
-
-    // Get session
-    const client = sessionManager.getSession(tenantId, sessionId);
-    if (!client) {
-      throw new Error('WhatsApp session not ready');
-    }
-
-    // Check rate limit
-    if (rateLimiter.isRateLimited(tenantId, sessionId)) {
-      throw new Error('Rate limit exceeded');
-    }
-
-    // Send message
-    const chatId = to.includes('@') ? to : `${to}@c.us`;
-    const result = await client.sendMessage(chatId, message);
-
-    // Increment rate limit
-    rateLimiter.increment(tenantId, sessionId);
-
-    return { messageId: result.id.id };
+  async sendDirect(_input: SendMessageInput): Promise<{ messageId: string }> {
+    throw new Error(
+      'Direct send via in-app session is disabled. Messages go through Baileys whatsapp-service / queue.'
+    );
   }
 }

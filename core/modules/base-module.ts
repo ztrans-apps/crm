@@ -1,5 +1,5 @@
 import type { Module, ModuleContext, RouteDefinition, ComponentRegistry } from './types';
-import { BillingService } from '@/core/billing';
+import { BillingService } from '@/core/billing/service';
 
 /**
  * Base class for all modules

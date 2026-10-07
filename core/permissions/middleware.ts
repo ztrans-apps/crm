@@ -2,6 +2,33 @@
 import type { AuthContext } from '../auth/middleware'
 import { canSendMessageToConversation, canViewConversation } from '@/lib/rbac/chat-permissions'
 
+type RolePermissionFlag =
+  | 'canViewAllConversations'
+  | 'canAssignConversations'
+  | 'canManageUsers'
+
+/**
+ * Role-based permission flags used by chat API routes.
+ * Throws if the current user role does not have the flag.
+ */
+export function requirePermission(
+  context: AuthContext,
+  permission: RolePermissionFlag
+): void {
+  const role = context.user.role
+  const isOwnerOrSupervisor = role === 'owner' || role === 'supervisor'
+
+  const allowed: Record<RolePermissionFlag, boolean> = {
+    canViewAllConversations: isOwnerOrSupervisor,
+    canAssignConversations: isOwnerOrSupervisor,
+    canManageUsers: role === 'owner',
+  }
+
+  if (!allowed[permission]) {
+    throw new Error(`Permission denied: ${permission}`)
+  }
+}
+
 /**
  * Check conversation access
  */

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { BillingService } from '@/core/billing';
+import { BillingService } from '@/core/billing/service';
 import { getCurrentTenant } from '@/core/tenant';
 
 /**

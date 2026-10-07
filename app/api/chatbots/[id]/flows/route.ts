@@ -1,10 +1,14 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+function getServiceClient(): SupabaseClient {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) {
+    throw new Error('Supabase service credentials are not configured');
+  }
+  return createClient(url, key);
+}
 
 export async function GET(
   request: Request,
@@ -12,7 +16,8 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    
+    const supabase = getServiceClient();
+
     const { data: flows, error } = await supabase
       .from('chatbot_flows')
       .select('*')
@@ -34,6 +39,7 @@ export async function POST(
   try {
     const { id } = await params;
     const body = await request.json();
+    const supabase = getServiceClient();
 
     // Delete existing flows for this chatbot (simple approach)
     await supabase
@@ -51,7 +57,7 @@ export async function POST(
         content: body.content,
         options: body.options || [],
         conditions: body.conditions || {},
-        actions: body.actions || {}
+        actions: body.actions || {},
       })
       .select()
       .single();
