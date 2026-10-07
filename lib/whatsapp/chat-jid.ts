@@ -2,19 +2,19 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { normalizeWhatsAppRecipient } from '@/lib/whatsapp/phone'
 
 export type ResolvedChatJid = {
-  /** JID used for sock.sendMessage — prefer phone PN for delivery */
+  /** JID used for sock.sendMessage */
   jid: string
-  /** Peer @lid when known (for quote contextInfo.remoteJid) */
+  /** Peer @lid when known (for quote metadata) */
   chatLid: string | null
   source: string
 }
 
 /**
- * Resolve where to send, and the LID chat identity for quotes.
+ * Resolve WhatsApp send target.
  *
- * Inbound often uses `145…@lid` with `senderPn: 628…@s.whatsapp.net`.
- * Sending to the LID-as-@s.whatsapp.net is wrong and messages never arrive.
- * Prefer senderPn / phone for delivery; keep @lid for quote metadata.
+ * LID chats must be addressed as `…@lid` for reply/quote bubbles to render.
+ * Phone PN (`senderPn`) still delivers plain text but WhatsApp often drops quotes.
+ * Prefer @lid when history has it; fall back to senderPn / phone.
  */
 export async function resolveWhatsAppChatJid(
   supabase: SupabaseClient,
@@ -57,6 +57,10 @@ export async function resolveWhatsAppChatJid(
     }
   }
 
+  // Prefer true @lid for send (quotes + delivery in LID-linked chats)
+  if (chatLid) {
+    return { jid: chatLid, chatLid, source: 'message_raw_lid' }
+  }
   if (senderPn) {
     return { jid: senderPn, chatLid, source: 'message_sender_pn' }
   }
@@ -65,10 +69,6 @@ export async function resolveWhatsAppChatJid(
   }
   if (!fallback.isLid && fallback.jid.endsWith('@s.whatsapp.net')) {
     return { jid: fallback.jid, chatLid, source: 'fallback_phone' }
-  }
-  if (chatLid) {
-    // No phone mapping — must address LID directly
-    return { jid: chatLid, chatLid, source: 'message_raw_lid_only' }
   }
 
   return { jid: fallback.jid, chatLid, source: 'fallback' }

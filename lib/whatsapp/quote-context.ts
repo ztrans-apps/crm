@@ -95,12 +95,14 @@ export async function resolveQuotedContextForBaileys(
 
   if (looksLikeWaId) {
     const fromMe = !!quotedMsg.is_from_me
+    const text = quotedMsg.content || ''
     return {
       stanzaId,
       fromMe,
       remoteJid: recipientJid,
       participant: fromMe ? undefined : recipientJid,
-      quotedMessage: { conversation: quotedMsg.content || '' },
+      // Baileys text sends as extendedTextMessage; match that for quote previews
+      quotedMessage: { extendedTextMessage: { text } },
     }
   }
 
