@@ -7,6 +7,35 @@ import { createClient } from '@/lib/supabase/server';
 import { NextResponse } from 'next/server';
 import { randomUUID } from 'crypto';
 
+const FALLBACK_TENANT_ID = '00000000-0000-0000-0000-000000000001';
+
+async function resolveTenantId(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  userId: string
+): Promise<string> {
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('tenant_id')
+    .eq('id', userId)
+    .maybeSingle();
+
+  if (profile?.tenant_id) {
+    return profile.tenant_id;
+  }
+
+  if (process.env.DEFAULT_TENANT_ID) {
+    return process.env.DEFAULT_TENANT_ID;
+  }
+
+  const { data: tenant } = await supabase
+    .from('tenants')
+    .select('id')
+    .limit(1)
+    .maybeSingle();
+
+  return tenant?.id || FALLBACK_TENANT_ID;
+}
+
 export async function POST(request: Request) {
   try {
     const supabase = await createClient();
@@ -19,6 +48,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    const tenantId = await resolveTenantId(supabase, user.id);
+
     // Generate proper UUID for session ID
     const sessionId = randomUUID();
 
@@ -28,20 +59,15 @@ export async function POST(request: Request) {
       ? `${phoneNumber}-${timestamp}` 
       : `session-${timestamp}`;
 
-    // Prepare session data
+    // Prepare session data (tenant_id is NOT NULL)
     const sessionData: any = {
       id: sessionId,
       user_id: user.id,
+      tenant_id: tenantId,
       phone_number: phoneNumber || 'Connecting...',
-      session_name: name || sessionName, // Use name if provided, otherwise use auto-generated
+      session_name: name || sessionName,
       status: 'connecting',
     };
-
-    // Add tenant_id if available (for multi-tenant support)
-    const defaultTenantId = process.env.DEFAULT_TENANT_ID;
-    if (defaultTenantId) {
-      sessionData.tenant_id = defaultTenantId;
-    }
 
     // Create session in database
     const { data: session, error } = await supabase
