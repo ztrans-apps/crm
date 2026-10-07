@@ -54,7 +54,10 @@ export async function POST(request: NextRequest) {
       rawMessage,
       media,
       location,
+      isFromMe,
     } = body || {}
+
+    const fromMe = !!isFromMe
 
     if (!sessionId || !phoneNumber || !messageId) {
       return NextResponse.json(
@@ -164,9 +167,10 @@ export async function POST(request: NextRequest) {
           contact_id: contact.id,
           tenant_id: resolvedTenant,
           status: 'open',
-          workflow_status: 'incoming',
-          read_status: 'unread',
-          unread_count: 1,
+          workflow_status: fromMe ? 'in_progress' : 'incoming',
+          // Sales reply on WhatsApp device should not bump unread for marketing inbox
+          read_status: fromMe ? 'read' : 'unread',
+          unread_count: fromMe ? 0 : 1,
           last_message: preview,
           last_message_at: lastAt,
         })
@@ -186,17 +190,18 @@ export async function POST(request: NextRequest) {
           .eq('id', conversation.id)
       }
 
-      await supabase
-        .from('conversations')
-        .update({
-          last_message: preview,
-          last_message_at: lastAt,
-          read_status: 'unread',
-          unread_count: (conversation.unread_count || 0) + 1,
-          status: 'open',
-          workflow_status: 'incoming',
-        })
-        .eq('id', conversation.id)
+      const convUpdate: Record<string, unknown> = {
+        last_message: preview,
+        last_message_at: lastAt,
+      }
+      if (!fromMe) {
+        convUpdate.read_status = 'unread'
+        convUpdate.unread_count = (conversation.unread_count || 0) + 1
+        convUpdate.status = 'open'
+        convUpdate.workflow_status = 'incoming'
+      }
+
+      await supabase.from('conversations').update(convUpdate).eq('id', conversation.id)
     }
 
     const { data: existing } = await supabase
@@ -278,9 +283,9 @@ export async function POST(request: NextRequest) {
       whatsapp_message_id: messageId,
       content: contentText,
       message_type: dbMessageType,
-      status: 'delivered',
-      sender_type: 'customer',
-      is_from_me: false,
+      status: fromMe ? 'sent' : 'delivered',
+      sender_type: fromMe ? 'agent' : 'customer',
+      is_from_me: fromMe,
       tenant_id: resolvedTenant,
       quoted_message_id: quotedMessageId,
       media_url: mediaUrl,
@@ -289,11 +294,10 @@ export async function POST(request: NextRequest) {
       media_filename: mediaFilename,
       media_size: mediaSize,
       media_mime_type: mediaMimeType,
-      metadata: rawMessage
-        ? {
-            raw_message: rawMessage,
-          }
-        : null,
+      metadata: {
+        source: fromMe ? 'whatsapp_device' : 'whatsapp_inbound',
+        ...(rawMessage ? { raw_message: rawMessage } : {}),
+      },
       created_at: lastAt,
     })
 

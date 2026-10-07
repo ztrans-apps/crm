@@ -435,16 +435,18 @@ class BaileysWhatsAppService {
       // Handle credentials update
       sock.ev.on('creds.update', saveCreds)
 
-      // Handle incoming messages
+      // Handle incoming messages (+ outbound from phone / CRM echo via fromMe)
       sock.ev.on('messages.upsert', async ({ messages, type }) => {
         if (type !== 'notify') return
 
         for (const msg of messages) {
-          // Skip if message is from me or status broadcast
-          if (msg.key.fromMe || msg.key.remoteJid === 'status@broadcast') continue
+          if (msg.key.remoteJid === 'status@broadcast') continue
           if (isReactionOrProtocol(msg.message)) continue
 
-          console.log('[Baileys] incoming message', {
+          const isFromMe = !!msg.key.fromMe
+
+          console.log('[Baileys] message upsert', {
+            fromMe: isFromMe,
             from: msg.key.remoteJid,
             senderPn: msg.key.senderPn || null,
             remoteJidAlt: msg.key.remoteJidAlt || null,
@@ -456,7 +458,7 @@ class BaileysWhatsAppService {
           // Update session activity
           sessionManager.updateActivity(tenantId, sessionId, 'message')
 
-          // Save to database
+          // Save to database (fromMe = sales reply on phone / CRM send echo; deduped by whatsapp_message_id)
           let savedConversationId = null
           try {
             savedConversationId = await this.saveIncomingMessage(sessionId, msg, tenantId)
@@ -465,8 +467,8 @@ class BaileysWhatsAppService {
             sessionManager.updateActivity(tenantId, sessionId, 'error')
           }
 
-          // Trigger chatbot if message was saved successfully
-          if (savedConversationId) {
+          // Chatbot only for customer messages
+          if (savedConversationId && !isFromMe) {
             try {
               await this.triggerChatbot(sessionId, msg, savedConversationId, tenantId)
             } catch (error) {
@@ -482,6 +484,7 @@ class BaileysWhatsAppService {
               sessionId,
               tenantId,
               from: msg.key.remoteJid,
+              fromMe: isFromMe,
               message: msg
             })
           }
@@ -1475,6 +1478,7 @@ class BaileysWhatsAppService {
       messageId: msg.key.id,
       messageTimestamp: msg.messageTimestamp,
       fromLid: unresolvedLid,
+      isFromMe: !!msg.key.fromMe,
       location,
       rawMessage: {
         key: msg.key,
@@ -1592,6 +1596,20 @@ class BaileysWhatsAppService {
    */
   async processDirectMessage(sessionId, msg, tenantId) {
     try {
+      const isFromMe = !!msg.key.fromMe
+
+      // Deduplicate CRM-sent echoes / phone sync by WhatsApp stanza id
+      if (msg.key?.id) {
+        const { data: existingMsg } = await supabase
+          .from('messages')
+          .select('id, conversation_id')
+          .eq('whatsapp_message_id', msg.key.id)
+          .maybeSingle()
+        if (existingMsg) {
+          return existingMsg.conversation_id || true
+        }
+      }
+
       // Get session user_id
       const { data: session, error: sessionError } = await supabase
         .from('whatsapp_sessions')
@@ -1745,8 +1763,9 @@ class BaileysWhatsAppService {
             contact_id: contact.id,
             tenant_id: defaultTenantId,
             status: 'open',
-            read_status: 'unread',
-            unread_count: 1,
+            // Outbound-from-phone should not mark inbox unread
+            read_status: isFromMe ? 'read' : 'unread',
+            unread_count: isFromMe ? 0 : 1,
             last_message: lastMessagePreview,
             last_message_at: new Date(msg.messageTimestamp * 1000).toISOString()
           })
@@ -1771,15 +1790,17 @@ class BaileysWhatsAppService {
         const updateData = {
           last_message: lastMessagePreview,
           last_message_at: new Date(msg.messageTimestamp * 1000).toISOString(),
-          read_status: 'unread',
-          unread_count: (currentConv?.unread_count || 0) + 1
         }
 
-        if (isClosed) {
-          updateData.status = 'open'
-          updateData.workflow_status = 'incoming'
-          updateData.closed_at = null
-          updateData.assigned_to = null
+        if (!isFromMe) {
+          updateData.read_status = 'unread'
+          updateData.unread_count = (currentConv?.unread_count || 0) + 1
+          if (isClosed) {
+            updateData.status = 'open'
+            updateData.workflow_status = 'incoming'
+            updateData.closed_at = null
+            updateData.assigned_to = null
+          }
         }
 
         await supabase
@@ -2010,10 +2031,10 @@ class BaileysWhatsAppService {
       
       const messageData = {
         conversation_id: conversation.id,
-        sender_type: 'customer',
+        sender_type: isFromMe ? 'agent' : 'customer',
         content: messageType === 'location' ? locationContent : messageText,
-        is_from_me: false,
-        status: 'delivered',
+        is_from_me: isFromMe,
+        status: isFromMe ? 'sent' : 'delivered',
         message_type: messageType,
         media_url: mediaUrl,
         media_type: mediaType,
@@ -2026,6 +2047,7 @@ class BaileysWhatsAppService {
         created_at: new Date(msg.messageTimestamp * 1000).toISOString(),
         // Store the raw message object in metadata for quoting later
         metadata: {
+          source: isFromMe ? 'whatsapp_device' : 'whatsapp_inbound',
           raw_message: {
             key: msg.key,
             message: msg.message,

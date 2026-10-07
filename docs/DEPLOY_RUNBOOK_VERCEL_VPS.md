@@ -139,6 +139,7 @@ Expect: process **online**, health `{"success":true,"status":"healthy",...}`.
 |---|------|----------------|
 | 1 | CRM → WA text | Message appears on phone; DB `status` → `sent` then `delivered` / `read` |
 | 2 | WA → CRM text | Appears in chat list/realtime; not stuck as `[Media]` for plain text |
+| 2b | Sales reply on phone WA | Appears in CRM as outbound (`is_from_me`), no unread bump; no duplicate if also sent from CRM |
 | 3 | CRM → WA image | Received on phone |
 | 4 | WA → CRM image | Bubble + storage URL in CRM |
 | 5 | CRM → WA location | Pin on phone |
