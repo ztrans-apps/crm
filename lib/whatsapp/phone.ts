@@ -15,17 +15,41 @@ export function normalizeWhatsAppRecipient(raw: string): {
   legacyJid: string
 } {
   const trimmed = String(raw || '').trim()
+
+  // Already a Baileys JID — never re-parse digits (LID ids look like long numbers)
+  if (trimmed.endsWith('@lid')) {
+    const user = trimmed.split('@')[0].replace(/\D/g, '')
+    return {
+      user,
+      displayPhone: `lid:${user}`,
+      isLid: true,
+      jid: `${user}@lid`,
+      legacyJid: `${user}@lid`,
+    }
+  }
+  if (trimmed.endsWith('@s.whatsapp.net') || trimmed.endsWith('@c.us')) {
+    const user = trimmed.split('@')[0].replace(/\D/g, '')
+    let e164 = user
+    if (e164.startsWith('0')) e164 = `62${e164.slice(1)}`
+    else if (!e164.startsWith('62') && e164.length >= 9 && e164.length <= 12) e164 = `62${e164}`
+    return {
+      user: e164,
+      displayPhone: `+${e164}`,
+      isLid: false,
+      jid: `${e164}@s.whatsapp.net`,
+      legacyJid: `${e164}@c.us`,
+    }
+  }
+
   const hadLidPrefix = trimmed.toLowerCase().startsWith('lid:')
   const core = hadLidPrefix ? trimmed.slice(4) : trimmed
   const digits = core.replace(/\D/g, '')
 
-  // Real phone mistakenly stored as lid:628... (common after LID→PN resolve)
-  const looksLikePhone =
-    /^62\d{8,13}$/.test(digits) ||
-    /^08\d{8,12}$/.test(digits) ||
-    /^\d{10,15}$/.test(digits)
+  // Only treat lid:… as a mistaken phone when it is clearly an Indonesian mobile
+  const looksLikeIndonesianPhone =
+    /^62\d{8,13}$/.test(digits) || /^08\d{8,12}$/.test(digits)
 
-  if (hadLidPrefix && !looksLikePhone && digits.length >= 10) {
+  if (hadLidPrefix && !looksLikeIndonesianPhone && digits.length >= 10) {
     return {
       user: digits,
       displayPhone: `lid:${digits}`,

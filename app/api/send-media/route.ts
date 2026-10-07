@@ -74,9 +74,17 @@ export async function POST(request: NextRequest) {
     const { resolveWhatsAppChatJid } = await import('@/lib/whatsapp/chat-jid')
     const chat = await resolveWhatsAppChatJid(supabase, conversationId, to)
     const recipientJid = chat.jid
-    const quotedContext = quotedMessageId
+    let quotedContext = quotedMessageId
       ? await resolveQuotedContextForBaileys(supabase, quotedMessageId, recipientJid)
       : null
+
+    if (quotedContext && chat.chatLid) {
+      quotedContext = {
+        ...quotedContext,
+        remoteJid: quotedContext.fromMe ? recipientJid : chat.chatLid,
+        participant: quotedContext.fromMe ? undefined : chat.chatLid,
+      }
+    }
 
     const sendResult = await sendMediaViaBaileys({
       sessionId,

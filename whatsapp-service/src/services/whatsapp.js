@@ -1293,9 +1293,9 @@ class BaileysWhatsAppService {
     }
 
     const fromMe = !!quotedContext.fromMe
-    // Always align quoted.key.remoteJid with the JID we send to (LID vs PN).
-    // Mismatch is the usual reason WhatsApp drops the reply bubble.
-    const remoteJid = fallbackJid
+    // Prefer original chat JID for quotes (often @lid). Baileys will set
+    // contextInfo.remoteJid when send jid !== quoted remoteJid — that is OK.
+    const remoteJid = quotedContext.remoteJid || fallbackJid
     return {
       key: {
         remoteJid,

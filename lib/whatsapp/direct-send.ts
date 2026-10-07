@@ -3,9 +3,12 @@ import { normalizeWhatsAppRecipient } from '@/lib/whatsapp/phone'
 import type { QuotedContextPayload } from '@/lib/whatsapp/quote-context'
 
 function resolveToJid(to: string) {
-  const recipient = normalizeWhatsAppRecipient(to)
-  // Always prefer Baileys JID (@s.whatsapp.net / @lid), not legacy @c.us
-  return recipient.jid
+  const trimmed = String(to || '').trim()
+  // Pass through already-resolved Baileys JIDs (do not re-parse LID digits as phone)
+  if (trimmed.endsWith('@lid') || trimmed.endsWith('@s.whatsapp.net')) {
+    return trimmed
+  }
+  return normalizeWhatsAppRecipient(trimmed).jid
 }
 
 /**

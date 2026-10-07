@@ -156,22 +156,32 @@ export async function POST(request: NextRequest) {
       const recipient = normalizeWhatsAppRecipient(to)
       const { resolveWhatsAppChatJid } = await import('@/lib/whatsapp/chat-jid')
       const chat = await resolveWhatsAppChatJid(supabase, conversationId, to)
-      // Prefer real chat JID (@lid) when history has it; else normalized phone JID
+      // Send to phone PN when known (delivery). Keep @lid on quote metadata.
       const recipientJid = chat.jid || recipient.jid
 
-      const quotedContext = quotedMessageId
+      let quotedContext = quotedMessageId
         ? await resolveQuotedContextForBaileys(supabase, quotedMessageId, recipientJid)
         : null
+
+      if (quotedContext && chat.chatLid) {
+        quotedContext = {
+          ...quotedContext,
+          remoteJid: quotedContext.fromMe ? recipientJid : chat.chatLid,
+          participant: quotedContext.fromMe ? undefined : chat.chatLid,
+        }
+      }
 
       if (quotedMessageId && !quotedContext) {
         console.warn('[send-message] quotedMessageId provided but quote context unresolved', {
           quotedMessageId,
           recipientJid,
+          chatLid: chat.chatLid,
           chatSource: chat.source,
         })
       } else {
         console.log('[send-message] baileys target', {
           recipientJid,
+          chatLid: chat.chatLid,
           chatSource: chat.source,
           hasQuote: !!quotedContext,
           quotedStanzaId: quotedContext?.stanzaId || null,
