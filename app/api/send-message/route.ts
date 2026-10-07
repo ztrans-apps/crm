@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { baileysAdapter } from '@/lib/queue/adapters/baileys-adapter'
+import { sendTextViaBaileys } from '@/lib/whatsapp/direct-send'
+import { normalizeWhatsAppRecipient } from '@/lib/whatsapp/phone'
 
 export async function POST(request: NextRequest) {
   try {
@@ -150,76 +151,83 @@ export async function POST(request: NextRequest) {
     }
 
     try {
-      // Send message via queue
-      const { jobId } = await baileysAdapter.sendMessage(
+      // Send directly to Baileys VPS (Vercel has no BullMQ workers)
+      const recipient = normalizeWhatsAppRecipient(to)
+      const sendResult = await sendTextViaBaileys({
         sessionId,
-        to,
-        messageForWhatsApp, // Use converted message with actual newlines
+        to: recipient.isLid ? recipient.jid : recipient.legacyJid,
+        message: messageForWhatsApp,
         quotedMessageId,
-        defaultTenantId,
-        savedMessage?.id || undefined // Only pass if valid, otherwise undefined
-      )
+        tenantId: defaultTenantId,
+      })
 
-      // Update message status to queued
+      if (!sendResult.success) {
+        throw new Error(sendResult.error || 'Baileys send failed')
+      }
+
       if (savedMessage) {
         await supabase
           .from('messages')
           .update({
-            status: 'sent', // Will be updated by worker when actually sent
-            metadata: { queueJobId: jobId },
+            status: 'sent',
+            whatsapp_message_id: sendResult.messageId || null,
+            metadata: {
+              sentVia: 'baileys-direct',
+              baileys: sendResult.raw,
+            },
             updated_at: new Date().toISOString(),
           })
           .eq('id', savedMessage.id)
 
-        // Update conversation last_message and first_response_at
-        const updateData: any = {
+        const updateData: Record<string, unknown> = {
           last_message: message,
           last_message_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         }
-        
-        // Check if this is the first agent response
+
         const { data: conv } = await supabase
           .from('conversations')
-          .select('first_response_at, workflow_status')
+          .select('first_response_at, workflow_status, contact_id')
           .eq('id', conversationId)
           .single()
-        
+
         if (conv && !conv.first_response_at) {
-          // This is the first agent response - set first_response_at
           updateData.first_response_at = new Date().toISOString()
-          
-          // Auto-change workflow status from 'waiting' to 'in_progress'
           if (conv.workflow_status === 'waiting' || conv.workflow_status === 'incoming') {
             updateData.workflow_status = 'in_progress'
             updateData.workflow_started_at = new Date().toISOString()
           }
         }
-        
-        await supabase
-          .from('conversations')
-          .update(updateData)
-          .eq('id', conversationId)
+
+        await supabase.from('conversations').update(updateData).eq('id', conversationId)
+
+        // Heal lid:62... contact phones so UI / future sends use +62...
+        if (conv?.contact_id && !recipient.isLid) {
+          await supabase
+            .from('contacts')
+            .update({ phone_number: recipient.displayPhone })
+            .eq('id', conv.contact_id)
+            .like('phone_number', 'lid:%')
+        }
       }
 
       return NextResponse.json({
         success: true,
-        jobId,
         messageId: savedMessage?.id,
-        message: 'Message queued for sending'
+        whatsappMessageId: sendResult.messageId,
+        message: 'Message sent',
       })
-    } catch (queueError: any) {
-      console.error('Queue error:', queueError)
-      
-      // Update message status to failed if we saved it
+    } catch (sendError: any) {
+      console.error('Baileys send error:', sendError)
+
       if (savedMessage) {
         await supabase
           .from('messages')
-          .update({ status: 'failed', metadata: { error: queueError.message } })
+          .update({ status: 'failed', metadata: { error: sendError.message } })
           .eq('id', savedMessage.id)
       }
-      
-      throw queueError
+
+      throw sendError
     }
   } catch (error: any) {
     console.error('Error sending message:', error)
