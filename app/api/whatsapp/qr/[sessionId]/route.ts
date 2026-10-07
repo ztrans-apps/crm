@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@/lib/supabase/server'
 import { getWhatsAppServiceUrl } from '@/lib/whatsapp/service-url'
 
 export async function GET(
@@ -40,6 +41,26 @@ export async function GET(
     }
 
     const data = await response.json()
+
+    // Sync connected status into Supabase (VPS often lacks SERVICE_KEY)
+    if (data.status === 'connected') {
+      try {
+        const supabase = await createClient()
+        const { data: { user } } = await supabase.auth.getUser()
+        if (user) {
+          await supabase
+            .from('whatsapp_sessions')
+            .update({
+              status: 'connected',
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', sessionId)
+        }
+      } catch (syncError) {
+        console.error('[WhatsApp QR] Failed to sync connected status:', syncError)
+      }
+    }
+
     return NextResponse.json(data)
   } catch (error: any) {
     console.error('[WhatsApp QR] Error:', error)

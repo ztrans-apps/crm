@@ -111,7 +111,7 @@ router.get('/sessions', async (req, res) => {
 router.get('/status/:sessionId', async (req, res) => {
   try {
     const { sessionId } = req.params
-    const status = whatsappService.getSessionStatus(sessionId)
+    const status = await whatsappService.getSessionStatus(sessionId)
     
     res.json({ 
       success: true, 

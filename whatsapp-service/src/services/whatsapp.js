@@ -1094,8 +1094,12 @@ class BaileysWhatsAppService {
    * Get session status
    */
   async getSessionStatus(sessionId) {
-    // IMPORTANT: Always get status from database first
-    // Memory status might be stale or from old session
+    // Prefer live memory / session manager — DB may lag when SERVICE_KEY is missing
+    const live = this.getLiveSessionStatus(sessionId)
+    if (live === 'connected') {
+      return 'connected'
+    }
+
     if (supabase) {
       try {
         const { data, error } = await supabase
@@ -1103,8 +1107,8 @@ class BaileysWhatsAppService {
           .select('status, tenant_id')
           .eq('id', sessionId)
           .single()
-        
-        if (!error && data) {
+
+        if (!error && data?.status) {
           return data.status
         }
       } catch (error) {
@@ -1112,31 +1116,51 @@ class BaileysWhatsAppService {
       }
     }
 
-    // Fallback: check memory (only if DB query failed)
-    let tenantId = null
-    try {
-      const { data, error } = await supabase
-        .from('whatsapp_sessions')
-        .select('tenant_id')
-        .eq('id', sessionId)
-        .single()
-      
-      if (!error && data) {
-        tenantId = data.tenant_id
-      }
-    } catch (error) {
-      // Ignore error
-    }
+    return live
+  }
 
-    // Try with sessionKey first
-    const sessionKey = tenantId ? this.getSessionKey(tenantId, sessionId) : null
-    
-    if (sessionKey && this.sessions.has(sessionKey)) {
+  /**
+   * Resolve live in-memory status for a sessionId
+   */
+  getLiveSessionStatus(sessionId) {
+    if (this.sessions.has(sessionId)) {
       return 'connected'
     }
-    
-    // Fallback: try with sessionId only
-    return this.sessions.has(sessionId) ? 'connected' : 'disconnected'
+
+    for (const [key, value] of this.sessions.entries()) {
+      if (key === sessionId || key.endsWith(`:${sessionId}`)) {
+        const sock = value?.sock
+        if (sock?.user?.id) return 'connected'
+        return 'connecting'
+      }
+    }
+
+    try {
+      const managed = sessionManager.getSession(
+        process.env.DEFAULT_TENANT_ID || '00000000-0000-0000-0000-000000000001',
+        sessionId
+      )
+      if (managed?.status === 'active' || managed?.sock?.user?.id) {
+        return 'connected'
+      }
+      if (managed) return 'connecting'
+    } catch {
+      // ignore
+    }
+
+    // Scan all managed sessions for this sessionId
+    try {
+      for (const session of sessionManager.getAllSessions?.() || []) {
+        if (session.sessionId === sessionId) {
+          if (session.status === 'active' || session.sock?.user?.id) return 'connected'
+          return session.status === 'connecting' ? 'connecting' : 'disconnected'
+        }
+      }
+    } catch {
+      // ignore
+    }
+
+    return 'disconnected'
   }
 
   /**

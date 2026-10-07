@@ -59,7 +59,46 @@ export async function GET() {
 
     console.log('[WhatsApp Sessions] Found sessions:', sessions?.length || 0);
 
-    return NextResponse.json({ sessions: sessions || [] });
+    // Merge live Baileys status so UI is not stuck on "connecting"
+    const whatsappServiceUrl =
+      process.env.WHATSAPP_SERVICE_URL ||
+      process.env.NEXT_PUBLIC_WHATSAPP_SERVICE_URL ||
+      'http://localhost:3001'
+
+    const enriched = await Promise.all(
+      (sessions || []).map(async (session: any) => {
+        try {
+          const liveRes = await fetch(
+            `${whatsappServiceUrl}/api/whatsapp/status/${session.id}`,
+            { cache: 'no-store', signal: AbortSignal.timeout(4000) }
+          )
+          if (!liveRes.ok) return session
+          const live = await liveRes.json()
+          const liveStatus = live?.status
+
+          if (liveStatus === 'connected' && session.status !== 'connected') {
+            await supabase
+              .from('whatsapp_sessions')
+              .update({
+                status: 'connected',
+                updated_at: new Date().toISOString(),
+              })
+              .eq('id', session.id)
+
+            return { ...session, status: 'connected' }
+          }
+
+          if (typeof liveStatus === 'string' && liveStatus.length > 0) {
+            return { ...session, status: liveStatus }
+          }
+        } catch {
+          // keep DB status if live check fails
+        }
+        return session
+      })
+    )
+
+    return NextResponse.json({ sessions: enriched });
   } catch (error: any) {
     console.error('[WhatsApp Sessions] Unexpected error:', error);
     console.error('[WhatsApp Sessions] Error stack:', error.stack);
