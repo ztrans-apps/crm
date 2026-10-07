@@ -5,6 +5,18 @@ import { UserRole, canViewConversation, getUserRole } from '@/lib/rbac/chat-perm
 import { chatService } from '../services'
 import { createClient } from '@/lib/supabase/client'
 
+function isSecurePage(): boolean {
+  return typeof window !== 'undefined' && window.location.protocol === 'https:'
+}
+
+function canUseBrowserSocket(serviceUrl: string): boolean {
+  // Browsers block HTTP (and ws://) from HTTPS pages (Mixed Content).
+  if (isSecurePage() && serviceUrl.startsWith('http://')) {
+    return false
+  }
+  return true
+}
+
 export function useChat() {
   const supabase = createClient()
   const socketRef = useRef<Socket | null>(null)
@@ -92,34 +104,37 @@ export function useChat() {
   useEffect(() => {
     let debounceTimer: NodeJS.Timeout
     
-    // Socket.IO for WhatsApp messages
+    // Health via Next.js proxy (avoids Mixed Content). Socket.IO only when URL is browser-safe.
     const checkServiceAndConnect = async () => {
       try {
-        const response = await fetch(`${serviceUrl}/health`, { 
+        await fetch('/api/whatsapp/service-health', {
           method: 'GET',
-          signal: AbortSignal.timeout(2000)
+          signal: AbortSignal.timeout(5000),
         })
-        
-        if (response.ok) {
-          socketRef.current = io(serviceUrl, {
-            reconnection: true,
-            reconnectionDelay: 1000,
-            reconnectionAttempts: 3,
-            timeout: 5000,
-          })
 
-          socketRef.current.on('message', () => {
-            clearTimeout(debounceTimer)
-            debounceTimer = setTimeout(() => loadConversations(), 500)
-          })
-
-          socketRef.current.on('message_status', () => {
-            clearTimeout(debounceTimer)
-            debounceTimer = setTimeout(() => loadConversations(), 500)
-          })
+        if (!canUseBrowserSocket(serviceUrl)) {
+          // Supabase Realtime below keeps the chat list fresh without Socket.IO.
+          return
         }
-      } catch (error) {
-        // Silent fail
+
+        socketRef.current = io(serviceUrl, {
+          reconnection: true,
+          reconnectionDelay: 1000,
+          reconnectionAttempts: 3,
+          timeout: 5000,
+        })
+
+        socketRef.current.on('message', () => {
+          clearTimeout(debounceTimer)
+          debounceTimer = setTimeout(() => loadConversations(), 500)
+        })
+
+        socketRef.current.on('message_status', () => {
+          clearTimeout(debounceTimer)
+          debounceTimer = setTimeout(() => loadConversations(), 500)
+        })
+      } catch {
+        // Silent fail — Realtime still handles DB updates
       }
     }
 

@@ -435,8 +435,11 @@ class BaileysWhatsAppService {
 
           console.log('[Baileys] incoming message', {
             from: msg.key.remoteJid,
+            senderPn: msg.key.senderPn || null,
+            remoteJidAlt: msg.key.remoteJidAlt || null,
             messageId: msg.key.id,
             hasMessage: !!msg.message,
+            supabase: !!supabase,
           })
 
           // Update session activity
@@ -1249,11 +1252,121 @@ class BaileysWhatsAppService {
   }
 
   /**
+   * Resolve a phone-number JID (@s.whatsapp.net) from LID / alt fields.
+   * WhatsApp increasingly sends @lid for 1:1 chats; phone must be recovered
+   * via senderPn / remoteJidAlt / Baileys lidMapping cache.
+   */
+  async resolvePhoneJid(sessionId, msg, tenantId) {
+    const key = msg.key || {}
+    const candidates = [
+      key.senderPn,
+      key.remoteJidAlt,
+      key.participantPn,
+      key.participantAlt,
+      key.participant,
+      key.remoteJid,
+    ].filter(Boolean)
+
+    for (const jid of candidates) {
+      if (typeof jid === 'string' && jid.endsWith('@s.whatsapp.net')) {
+        return jid
+      }
+    }
+
+    const lid =
+      (typeof key.remoteJid === 'string' && key.remoteJid.endsWith('@lid') && key.remoteJid) ||
+      (typeof key.participant === 'string' && key.participant.endsWith('@lid') && key.participant) ||
+      null
+
+    if (!lid) return null
+
+    try {
+      const sessionKey = tenantId ? `${tenantId}:${sessionId}` : sessionId
+      const session =
+        this.sessions.get(sessionKey) ||
+        this.sessions.get(sessionId) ||
+        null
+      const sock = session?.sock
+      const pn = await sock?.signalRepository?.lidMapping?.getPNForLID?.(lid)
+      if (pn && typeof pn === 'string' && pn.includes('@')) {
+        return pn.endsWith('@s.whatsapp.net') ? pn : `${pn.split('@')[0]}@s.whatsapp.net`
+      }
+    } catch (error) {
+      console.warn('[Baileys] lidMapping.getPNForLID failed:', error?.message || error)
+    }
+
+    return null
+  }
+
+  extractInboundText(msg) {
+    return (
+      msg.message?.conversation ||
+      msg.message?.extendedTextMessage?.text ||
+      msg.message?.imageMessage?.caption ||
+      msg.message?.videoMessage?.caption ||
+      msg.message?.documentMessage?.caption ||
+      msg.message?.documentWithCaptionMessage?.message?.documentMessage?.caption ||
+      null
+    )
+  }
+
+  /**
+   * When VPS has no SUPABASE_SERVICE_KEY, forward inbound text to the Next.js app
+   * (which already has SUPABASE_SERVICE_ROLE_KEY on Vercel).
+   */
+  async forwardIncomingToCrm(sessionId, msg, tenantId, phoneJid, fromLid = false) {
+    const baseUrl = (process.env.CRM_APP_URL || process.env.FRONTEND_URL || '').replace(/\/$/, '')
+    if (!baseUrl) {
+      console.warn('[Baileys] cannot forward inbound: CRM_APP_URL/FRONTEND_URL not set')
+      return null
+    }
+
+    const phoneNumber = fromLid && !phoneJid
+      ? msg.key.remoteJid.split('@')[0]
+      : phoneJid.split('@')[0]
+
+    const payload = {
+      sessionId,
+      tenantId,
+      phoneNumber,
+      pushName: msg.pushName || null,
+      messageText: this.extractInboundText(msg),
+      messageId: msg.key.id,
+      messageTimestamp: msg.messageTimestamp,
+      fromLid: !!fromLid,
+    }
+
+    const headers = { 'Content-Type': 'application/json' }
+    if (process.env.WHATSAPP_BRIDGE_SECRET) {
+      headers['x-bridge-secret'] = process.env.WHATSAPP_BRIDGE_SECRET
+    }
+
+    try {
+      const res = await fetch(`${baseUrl}/api/whatsapp/baileys-incoming`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(payload),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        console.error('[Baileys] forward inbound failed', res.status, data)
+        return null
+      }
+      console.log('[Baileys] forwarded inbound → CRM', {
+        conversationId: data.conversationId,
+        phone: data.phone,
+      })
+      return data.conversationId || true
+    } catch (error) {
+      console.error('[Baileys] forward inbound error:', error?.message || error)
+      return null
+    }
+  }
+
+  /**
    * Save incoming message to database
    */
   async saveIncomingMessage(sessionId, msg, tenantId) {
-    if (!supabase) return null
-
     try {
       // Skip group messages - CRM only handles 1-on-1 chats
       if (msg.key.remoteJid.endsWith('@g.us')) {
@@ -1264,43 +1377,61 @@ class BaileysWhatsAppService {
       if (msg.key.remoteJid === 'status@broadcast') {
         return
       }
-      
-      // Handle @lid (can be channel OR direct message with participant/senderPn)
-      if (msg.key.remoteJid.endsWith('@lid')) {
-        // Check if this is a direct message within a channel
-        // Can have either 'participant' or 'senderPn' field
-        const senderJid = msg.key.participant || msg.key.senderPn
-        
-        if (senderJid) {
-          // Extract phone from sender JID instead of remoteJid
-          const modifiedMsg = {
-            ...msg,
-            key: {
-              ...msg.key,
-              remoteJid: senderJid
-            }
-          }
-          
-          // Process as direct message
-          return await this.processDirectMessage(sessionId, modifiedMsg, tenantId)
-        } else {
-          // Pure channel message without sender - skip
-          return
-        }
-      }
-      
+
       // Skip WhatsApp Communities/Broadcast
       if (msg.key.remoteJid.endsWith('@broadcast')) {
         return
       }
-      
-      // Only process direct messages (@s.whatsapp.net)
-      if (!msg.key.remoteJid.endsWith('@s.whatsapp.net')) {
-        return
+
+      let phoneJid = null
+      let fromLid = false
+      if (msg.key.remoteJid.endsWith('@s.whatsapp.net')) {
+        phoneJid = msg.key.remoteJid
+      } else if (msg.key.remoteJid.endsWith('@lid')) {
+        fromLid = true
+        phoneJid = await this.resolvePhoneJid(sessionId, msg, tenantId)
+        if (phoneJid) {
+          console.log('[Baileys] resolved @lid →', phoneJid)
+        } else {
+          console.warn('[Baileys] @lid without phone mapping — saving with lid: prefix', {
+            remoteJid: msg.key.remoteJid,
+            senderPn: msg.key.senderPn || null,
+            remoteJidAlt: msg.key.remoteJidAlt || null,
+            messageId: msg.key.id,
+          })
+        }
+      } else {
+        return null
       }
-      
-      // Process direct message
-      return await this.processDirectMessage(sessionId, msg, tenantId)
+
+      // No direct Supabase on VPS → forward to Next.js (service role lives there)
+      if (!supabase) {
+        return await this.forwardIncomingToCrm(sessionId, msg, tenantId, phoneJid, fromLid)
+      }
+
+      if (fromLid && !phoneJid) {
+        // Persist with synthetic lid: phone so chat still appears in CRM
+        const lidUser = msg.key.remoteJid.split('@')[0]
+        const modifiedMsg = {
+          ...msg,
+          key: { ...msg.key, remoteJid: `${lidUser}@s.whatsapp.net` },
+          __lidFallback: true,
+        }
+        return await this.processDirectMessage(sessionId, modifiedMsg, tenantId)
+      }
+
+      const modifiedMsg =
+        phoneJid === msg.key.remoteJid
+          ? msg
+          : {
+              ...msg,
+              key: {
+                ...msg.key,
+                remoteJid: phoneJid,
+              },
+            }
+
+      return await this.processDirectMessage(sessionId, modifiedMsg, tenantId)
       
     } catch (error) {
       console.error('❌ Error in saveIncomingMessage:', error)
@@ -1330,9 +1461,10 @@ class BaileysWhatsAppService {
       // Extract phone number from JID (direct messages only)
       const rawJid = msg.key.remoteJid
       const phoneNumber = rawJid.split('@')[0]
+      const lidFallback = !!msg.__lidFallback
       
       // Validate phone number length and format
-      if (!phoneNumber || phoneNumber.length < 10 || phoneNumber.length > 15) {
+      if (!phoneNumber || phoneNumber.length < 10 || phoneNumber.length > 18) {
         console.error('  ❌ Invalid phone number length:', phoneNumber, `(${phoneNumber.length} chars)`)
         console.error('  ❌ Raw JID:', rawJid)
         return null
@@ -1347,7 +1479,10 @@ class BaileysWhatsAppService {
       
       // Format phone number properly
       let formattedPhone
-      if (phoneNumber.startsWith('62')) {
+      if (lidFallback) {
+        // WhatsApp LID without PN mapping — keep chat visible until mapping appears
+        formattedPhone = `lid:${phoneNumber}`
+      } else if (phoneNumber.startsWith('62')) {
         // Already has country code
         formattedPhone = `+${phoneNumber}`
       } else if (phoneNumber.startsWith('0')) {
@@ -1358,8 +1493,8 @@ class BaileysWhatsAppService {
         formattedPhone = `+62${phoneNumber}`
       }
       
-      // Final validation - must be valid Indonesian mobile number
-      if (!/^\+628\d{8,11}$/.test(formattedPhone)) {
+      // Final validation - Indonesian mobile, or lid: fallback
+      if (!lidFallback && !/^\+628\d{8,11}$/.test(formattedPhone)) {
         console.error('  ❌ Invalid Indonesian phone format:', formattedPhone)
         return null
       }
