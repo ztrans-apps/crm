@@ -12,7 +12,7 @@ const router = express.Router()
 // Note: Duplicate detection removed - handled by queue layer
 router.post('/send', rateLimiterMiddleware, async (req, res) => {
   try {
-    const { sessionId, to, message, quotedMessageId } = req.body
+    const { sessionId, to, message, quotedMessageId, tenantId } = req.body
 
     if (!sessionId || !to || !message) {
       return res.status(400).json({
@@ -24,7 +24,13 @@ router.post('/send', rateLimiterMiddleware, async (req, res) => {
     // Execute with circuit breaker protection
     const result = await circuitBreakers.whatsapp.execute(
       async () => {
-        const sendResult = await whatsappService.sendMessage(sessionId, to, message, quotedMessageId)
+        const sendResult = await whatsappService.sendMessage(
+          sessionId,
+          to,
+          message,
+          quotedMessageId,
+          tenantId || null
+        )
         
         // Track delivery
         if (sendResult.messageId) {
