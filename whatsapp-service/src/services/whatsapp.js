@@ -208,10 +208,11 @@ class BaileysWhatsAppService {
       // Handle connection updates
       sock.ev.on('connection.update', async (update) => {
         const { connection, lastDisconnect, qr } = update
-        
+
+        console.log(`[Baileys] connection.update ${sessionKey}`, {
           connection,
           hasQR: !!qr,
-          hasLastDisconnect: !!lastDisconnect
+          hasLastDisconnect: !!lastDisconnect,
         })
 
         // Update state registry based on connection status
