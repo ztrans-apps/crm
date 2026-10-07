@@ -12,7 +12,7 @@ const router = express.Router()
 // Note: Duplicate detection removed - handled by queue layer
 router.post('/send', rateLimiterMiddleware, async (req, res) => {
   try {
-    const { sessionId, to, message, quotedMessageId, tenantId } = req.body
+    const { sessionId, to, message, quotedMessageId, tenantId, quotedContext } = req.body
 
     if (!sessionId || !to || !message) {
       return res.status(400).json({
@@ -29,7 +29,8 @@ router.post('/send', rateLimiterMiddleware, async (req, res) => {
           to,
           message,
           quotedMessageId,
-          tenantId || null
+          tenantId || null,
+          quotedContext || null
         )
         
         // Track delivery

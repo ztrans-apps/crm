@@ -6,7 +6,7 @@ const router = express.Router()
 // Send location message
 router.post('/send-location', async (req, res) => {
   try {
-    const { sessionId, to, latitude, longitude, address, name } = req.body
+    const { sessionId, to, latitude, longitude, address, name, tenantId } = req.body
 
     if (!sessionId || !to || !latitude || !longitude) {
       return res.status(400).json({
@@ -23,7 +23,8 @@ router.post('/send-location', async (req, res) => {
       {
         address,
         name
-      }
+      },
+      tenantId || null
     )
     
     res.json({ 

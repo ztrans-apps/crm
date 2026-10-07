@@ -15,7 +15,15 @@ const upload = multer({
 // Send media message
 router.post('/send-media', upload.single('media'), async (req, res) => {
   try {
-    const { sessionId, to, caption, mimetype } = req.body
+    const { sessionId, to, caption, mimetype, tenantId, quotedContext } = req.body
+    let parsedQuotedContext = quotedContext
+    if (typeof quotedContext === 'string') {
+      try {
+        parsedQuotedContext = JSON.parse(quotedContext)
+      } catch {
+        parsedQuotedContext = null
+      }
+    }
     const mediaFile = req.file
 
     if (!sessionId || !to || !mediaFile) {
@@ -32,8 +40,10 @@ router.post('/send-media', upload.single('media'), async (req, res) => {
       {
         mimetype: mimetype || mediaFile.mimetype,
         caption: caption || '',
-        filename: mediaFile.originalname
-      }
+        filename: mediaFile.originalname,
+        quotedContext: parsedQuotedContext || null,
+      },
+      tenantId || null
     )
     
     res.json({ 

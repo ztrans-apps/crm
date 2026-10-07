@@ -17,6 +17,15 @@ import { supabase } from '../config/supabase.js'
 import reconnectManager from './reconnect-manager.js'
 import sessionManager from './session-manager.js'
 import sessionStateRegistry from './session-state-registry.js'
+import {
+  unwrapMessageContent,
+  isReactionOrProtocol,
+  extractInboundTextFromContent,
+  classifyInboundMessageType,
+  getInboundPreview,
+  extractQuotedStanzaId,
+  getMediaMetaFromContent,
+} from '../utils/inbound-message.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
@@ -432,6 +441,7 @@ class BaileysWhatsAppService {
         for (const msg of messages) {
           // Skip if message is from me or status broadcast
           if (msg.key.fromMe || msg.key.remoteJid === 'status@broadcast') continue
+          if (isReactionOrProtocol(msg.message)) continue
 
           console.log('[Baileys] incoming message', {
             from: msg.key.remoteJid,
@@ -516,7 +526,7 @@ class BaileysWhatsAppService {
   /**
    * Send text message
    */
-  async sendMessage(sessionId, to, message, quotedMessageId = null, tenantId = null) {
+  async sendMessage(sessionId, to, message, quotedMessageId = null, tenantId = null, quotedContext = null) {
     // Get tenant_id from parameter or database
     if (!tenantId) {
       if (!supabase) {
@@ -588,28 +598,18 @@ class BaileysWhatsAppService {
         tenantId,
       })
 
-      // Format recipient: support @lid, lid: prefix, @c.us, raw phone
-      const rawTo = String(to || '').trim()
-      let jid
-      if (rawTo.endsWith('@lid') || rawTo.endsWith('@s.whatsapp.net')) {
-        jid = rawTo
-      } else if (rawTo.toLowerCase().startsWith('lid:')) {
-        const lidUser = rawTo.slice(4).replace(/\D/g, '')
-        const looksLikePhone = /^62\d{8,13}$/.test(lidUser)
-        jid = looksLikePhone ? `${lidUser}@s.whatsapp.net` : `${lidUser}@lid`
-      } else {
-        let phoneNumber = rawTo.replace('@c.us', '').replace(/\D/g, '')
-        if (phoneNumber.length < 10 || phoneNumber.length > 15) {
-          throw new Error(`Invalid phone number: ${phoneNumber}`)
-        }
-        jid = `${phoneNumber}@s.whatsapp.net`
-      }
+      const jid = this.formatRecipientJid(to)
 
       // Prepare message content
       const messageContent = { text: message }
 
-      // Add quoted message if provided
-      if (quotedMessageId && supabase) {
+      if (quotedContext?.stanzaId && quotedContext?.quotedMessage) {
+        messageContent.contextInfo = {
+          stanzaId: quotedContext.stanzaId,
+          participant: quotedContext.participant,
+          quotedMessage: quotedContext.quotedMessage,
+        }
+      } else if (quotedMessageId && supabase) {
         try {
           // Try to get the original message from database
           // Strategy:
@@ -763,10 +763,8 @@ class BaileysWhatsAppService {
     const { sock } = session
 
     try {
-      let phoneNumber = to.replace('@c.us', '').replace(/\D/g, '')
-      const jid = `${phoneNumber}@s.whatsapp.net`
-
-      const { mimetype, caption, filename } = options
+      const jid = this.formatRecipientJid(to)
+      const { mimetype, caption, filename, quotedContext } = options
 
       let messageContent = {}
 
@@ -795,6 +793,14 @@ class BaileysWhatsAppService {
         }
       }
 
+      if (quotedContext?.stanzaId && quotedContext?.quotedMessage) {
+        messageContent.contextInfo = {
+          stanzaId: quotedContext.stanzaId,
+          participant: quotedContext.participant,
+          quotedMessage: quotedContext.quotedMessage,
+        }
+      }
+
       const result = await sock.sendMessage(jid, messageContent)
 
       // If it's a document and has caption, send caption as separate message
@@ -808,7 +814,8 @@ class BaileysWhatsAppService {
 
       return {
         success: true,
-        messageId: result.key.id
+        messageId: result.key.id,
+        key: result.key,
       }
     } catch (error) {
       console.error('❌ Failed to send media:', error)
@@ -856,9 +863,7 @@ class BaileysWhatsAppService {
     const { sock } = session
 
     try {
-      let phoneNumber = to.replace('@c.us', '').replace(/\D/g, '')
-      const jid = `${phoneNumber}@s.whatsapp.net`
-
+      const jid = this.formatRecipientJid(to)
       const { address, name } = options
 
       const locationMessage = {
@@ -874,7 +879,8 @@ class BaileysWhatsAppService {
 
       return {
         success: true,
-        messageId: result.key.id
+        messageId: result.key.id,
+        key: result.key,
       }
     } catch (error) {
       console.error('❌ Failed to send location:', error)
@@ -1304,16 +1310,92 @@ class BaileysWhatsAppService {
     return null
   }
 
+  formatRecipientJid(to) {
+    const rawTo = String(to || '').trim()
+    if (rawTo.endsWith('@lid') || rawTo.endsWith('@s.whatsapp.net')) {
+      return rawTo
+    }
+    if (rawTo.toLowerCase().startsWith('lid:')) {
+      const lidUser = rawTo.slice(4).replace(/\D/g, '')
+      const looksLikePhone = /^62\d{8,13}$/.test(lidUser)
+      return looksLikePhone ? `${lidUser}@s.whatsapp.net` : `${lidUser}@lid`
+    }
+    let phoneNumber = rawTo.replace('@c.us', '').replace(/\D/g, '')
+    if (phoneNumber.length < 10 || phoneNumber.length > 15) {
+      throw new Error(`Invalid phone number: ${phoneNumber}`)
+    }
+    return `${phoneNumber}@s.whatsapp.net`
+  }
+
+  analyzeInboundMessage(msg) {
+    const unwrapped = unwrapMessageContent(msg.message)
+    const messageType = classifyInboundMessageType(unwrapped)
+    const messageText = extractInboundTextFromContent(unwrapped)
+    const lastMessagePreview = getInboundPreview(messageText, messageType)
+    const quotedWhatsappId = extractQuotedStanzaId(unwrapped)
+    const mediaMeta = getMediaMetaFromContent(unwrapped)
+    return {
+      unwrapped,
+      messageType,
+      messageText,
+      lastMessagePreview,
+      quotedWhatsappId,
+      mediaMeta,
+    }
+  }
+
   extractInboundText(msg) {
-    return (
-      msg.message?.conversation ||
-      msg.message?.extendedTextMessage?.text ||
-      msg.message?.imageMessage?.caption ||
-      msg.message?.videoMessage?.caption ||
-      msg.message?.documentMessage?.caption ||
-      msg.message?.documentWithCaptionMessage?.message?.documentMessage?.caption ||
-      null
-    )
+    return extractInboundTextFromContent(unwrapMessageContent(msg.message))
+  }
+
+  async downloadInboundMediaBuffer(sessionId, tenantId, msg, mediaMeta) {
+    const sessionKey = this.getSessionKey(tenantId, sessionId)
+    let session = this.sessions.get(sessionKey)
+    if (!session) {
+      for (const [key, s] of this.sessions.entries()) {
+        if (key.endsWith(`:${sessionId}`) || key === sessionId) {
+          session = s
+          break
+        }
+      }
+    }
+    if (!session?.sock) return null
+
+    try {
+      const { downloadMediaMessage } = await import('@whiskeysockets/baileys')
+      let downloadMsg = msg
+      if (msg.message?.documentWithCaptionMessage?.message) {
+        downloadMsg = {
+          ...msg,
+          message: msg.message.documentWithCaptionMessage.message,
+        }
+      }
+      const buffer = await downloadMediaMessage(
+        downloadMsg,
+        'buffer',
+        {},
+        {
+          logger: pino({ level: 'silent' }),
+          reuploadRequest: session.sock.updateMediaMessage,
+        }
+      )
+      if (!buffer || buffer.length === 0) return null
+      const maxBytes = 12 * 1024 * 1024
+      if (buffer.length > maxBytes) {
+        console.warn('[Baileys] inbound media too large for bridge, skipping bytes', buffer.length)
+        return null
+      }
+      return {
+        base64: buffer.toString('base64'),
+        mimetype: mediaMeta.mimetype,
+        filename: mediaMeta.filename,
+        size: buffer.length,
+        messageType: mediaMeta.messageType,
+      }
+    } catch (error) {
+      console.error('[Baileys] inbound media download failed:', error?.message || error)
+      return null
+    }
   }
 
   /**
@@ -1332,16 +1414,35 @@ class BaileysWhatsAppService {
       ? msg.key.remoteJid.split('@')[0]
       : phoneJid.split('@')[0]
 
+    const analysis = this.analyzeInboundMessage(msg)
+    let mediaPayload = null
+    if (analysis.mediaMeta) {
+      mediaPayload = await this.downloadInboundMediaBuffer(
+        sessionId,
+        tenantId,
+        msg,
+        analysis.mediaMeta
+      )
+    }
+
     const payload = {
       sessionId,
       tenantId,
       phoneNumber,
       pushName: msg.pushName || null,
-      messageText: this.extractInboundText(msg),
+      messageText: analysis.messageText,
+      messageType: mediaPayload?.messageType || analysis.messageType,
+      lastMessagePreview: analysis.lastMessagePreview,
+      quotedWhatsappId: analysis.quotedWhatsappId,
       messageId: msg.key.id,
       messageTimestamp: msg.messageTimestamp,
-      // Only mark LID fallback when we do NOT have a phone JID
       fromLid: unresolvedLid,
+      rawMessage: {
+        key: msg.key,
+        message: analysis.unwrapped || msg.message,
+        messageTimestamp: msg.messageTimestamp,
+      },
+      media: mediaPayload,
     }
 
     const headers = { 'Content-Type': 'application/json' }
@@ -1571,19 +1672,14 @@ class BaileysWhatsAppService {
         conversation.whatsapp_session_id = sessionId
       }
 
-      // Extract message content
-      const messageText = msg.message?.conversation || 
-                         msg.message?.extendedTextMessage?.text ||
-                         msg.message?.imageMessage?.caption ||
-                         msg.message?.videoMessage?.caption ||
-                         msg.message?.documentMessage?.caption ||
-                         msg.message?.documentWithCaptionMessage?.message?.documentMessage?.caption ||
-                         null
+      const inboundAnalysis = this.analyzeInboundMessage(msg)
+      const messageText = inboundAnalysis.messageText
+      const lastMessagePreview = inboundAnalysis.lastMessagePreview
 
       // Extract quoted message ID if this is a reply
       let quotedMessageId = null
-      if (msg.message?.extendedTextMessage?.contextInfo?.stanzaId) {
-        const stanzaId = msg.message.extendedTextMessage.contextInfo.stanzaId
+      const stanzaId = inboundAnalysis.quotedWhatsappId
+      if (stanzaId) {
         
         // Find the quoted message in database by whatsapp_message_id
         const { data: quotedMsg } = await supabase
@@ -1612,7 +1708,7 @@ class BaileysWhatsAppService {
             status: 'open',
             read_status: 'unread',
             unread_count: 1,
-            last_message: messageText || '[Media]',
+            last_message: lastMessagePreview,
             last_message_at: new Date(msg.messageTimestamp * 1000).toISOString()
           })
           .select()
@@ -1634,7 +1730,7 @@ class BaileysWhatsAppService {
 
         const isClosed = currentConv?.status === 'closed' || currentConv?.workflow_status === 'done'
         const updateData = {
-          last_message: messageText || '[Media]',
+          last_message: lastMessagePreview,
           last_message_at: new Date(msg.messageTimestamp * 1000).toISOString(),
           read_status: 'unread',
           unread_count: (currentConv?.unread_count || 0) + 1

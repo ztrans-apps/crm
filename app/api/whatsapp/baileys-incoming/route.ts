@@ -1,11 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { getInboundPreview } from '@/lib/whatsapp/inbound-parse'
 
 const FALLBACK_TENANT_ID = '00000000-0000-0000-0000-000000000001'
 
+type BridgeMedia = {
+  base64?: string
+  mimetype?: string
+  filename?: string | null
+  size?: number
+  messageType?: string
+}
+
 /**
  * Receives inbound WhatsApp messages from the VPS Baileys service.
- * Uses SUPABASE_SERVICE_ROLE_KEY on Vercel so the VPS does not need that secret.
  */
 export async function POST(request: NextRequest) {
   try {
@@ -30,9 +38,14 @@ export async function POST(request: NextRequest) {
       phoneNumber,
       pushName,
       messageText,
+      messageType,
+      lastMessagePreview,
+      quotedWhatsappId,
       messageId,
       messageTimestamp,
       fromLid,
+      rawMessage,
+      media,
     } = body || {}
 
     if (!sessionId || !phoneNumber || !messageId) {
@@ -61,7 +74,6 @@ export async function POST(request: NextRequest) {
     const userId = session.user_id
 
     const { normalizeWhatsAppRecipient } = await import('@/lib/whatsapp/phone')
-    // fromLid=true only when PN could not be resolved — otherwise save as real +62...
     const recipient = normalizeWhatsAppRecipient(
       fromLid ? `lid:${String(phoneNumber).replace(/^lid:/i, '')}` : String(phoneNumber)
     )
@@ -69,7 +81,6 @@ export async function POST(request: NextRequest) {
 
     let contact: { id: string; name: string | null } | null = null
 
-    // Heal contacts mistakenly saved as lid:628...
     if (!recipient.isLid) {
       const lidMistaken = `lid:${recipient.user}`
       const { data: mistaken } = await supabase
@@ -131,7 +142,11 @@ export async function POST(request: NextRequest) {
     const lastAt = messageTimestamp
       ? new Date(Number(messageTimestamp) * 1000).toISOString()
       : new Date().toISOString()
-    const preview = messageText || '[Media]'
+
+    const resolvedType = (messageType as string) || 'text'
+    const preview =
+      lastMessagePreview ||
+      getInboundPreview(messageText, resolvedType)
 
     if (!conversation) {
       const { data: newConv, error: convError } = await supabase
@@ -190,15 +205,69 @@ export async function POST(request: NextRequest) {
       })
     }
 
+    let quotedMessageId: string | null = null
+    if (quotedWhatsappId) {
+      const { data: quoted } = await supabase
+        .from('messages')
+        .select('id')
+        .eq('whatsapp_message_id', quotedWhatsappId)
+        .maybeSingle()
+      quotedMessageId = quoted?.id || quotedWhatsappId
+    }
+
+    const bridgeMedia = media as BridgeMedia | null
+    let mediaUrl: string | null = null
+    let mediaFilename: string | null = bridgeMedia?.filename || null
+    let mediaSize: number | null = bridgeMedia?.size || null
+    let mediaMimeType: string | null = bridgeMedia?.mimetype || null
+    let dbMessageType = resolvedType === 'unknown' ? 'text' : resolvedType
+
+    if (bridgeMedia?.base64 && bridgeMedia.mimetype) {
+      const buffer = Buffer.from(bridgeMedia.base64, 'base64')
+      const ext = bridgeMedia.mimetype.split('/')[1]?.split(';')[0] || 'bin'
+      const generatedFilename =
+        bridgeMedia.filename || `${dbMessageType}_${Date.now()}.${ext}`
+      const filePath = `${userId}/${conversation.id}/${generatedFilename}`
+
+      const { error: uploadError } = await supabase.storage
+        .from('chat-media')
+        .upload(filePath, buffer, {
+          contentType: bridgeMedia.mimetype,
+          upsert: false,
+        })
+
+      if (!uploadError) {
+        const { data: urlData } = supabase.storage.from('chat-media').getPublicUrl(filePath)
+        mediaUrl = urlData.publicUrl
+        mediaFilename = generatedFilename
+        mediaSize = buffer.length
+        mediaMimeType = bridgeMedia.mimetype
+        dbMessageType = bridgeMedia.messageType || dbMessageType
+      } else {
+        console.error('[baileys-incoming] media upload failed', uploadError)
+      }
+    }
+
     const { error: msgError } = await supabase.from('messages').insert({
       conversation_id: conversation.id,
       whatsapp_message_id: messageId,
       content: messageText || null,
-      message_type: 'text',
+      message_type: dbMessageType,
       status: 'delivered',
       sender_type: 'customer',
       is_from_me: false,
       tenant_id: resolvedTenant,
+      quoted_message_id: quotedMessageId,
+      media_url: mediaUrl,
+      media_type: mediaUrl ? dbMessageType : null,
+      media_filename: mediaFilename,
+      media_size: mediaSize,
+      media_mime_type: mediaMimeType,
+      metadata: rawMessage
+        ? {
+            raw_message: rawMessage,
+          }
+        : null,
       created_at: lastAt,
     })
 

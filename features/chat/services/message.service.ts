@@ -95,7 +95,7 @@ export class MessageService extends BaseService {
             // Use maybeSingle() to avoid 406 error when not found
             let { data: quoted } = await this.supabase
               .from('messages')
-              .select('id, content, sender_type, is_from_me, sender_id')
+              .select('id, content, sender_type, is_from_me, sender_id, media_url, message_type')
               .eq('whatsapp_message_id', msg.quoted_message_id)
               .eq('conversation_id', conversationId)
               .maybeSingle()
@@ -108,7 +108,7 @@ export class MessageService extends BaseService {
               if (isUUID) {
                 const result = await this.supabase
                   .from('messages')
-                  .select('id, content, sender_type, is_from_me, sender_id')
+                  .select('id, content, sender_type, is_from_me, sender_id, media_url, message_type')
                   .eq('id', msg.quoted_message_id)
                   .eq('conversation_id', conversationId)
                   .maybeSingle()
@@ -204,7 +204,7 @@ export class MessageService extends BaseService {
         // Use maybeSingle() to avoid 406 error when not found
         let { data: quoted } = await this.supabase
           .from('messages')
-          .select('id, content, sender_type, is_from_me, sender_id')
+          .select('id, content, sender_type, is_from_me, sender_id, media_url, message_type')
           .eq('whatsapp_message_id', message.quoted_message_id)
           .eq('conversation_id', message.conversation_id)
           .maybeSingle()
@@ -217,7 +217,7 @@ export class MessageService extends BaseService {
           if (isUUID) {
             const result = await this.supabase
               .from('messages')
-              .select('id, content, sender_type, is_from_me, sender_id')
+              .select('id, content, sender_type, is_from_me, sender_id, media_url, message_type')
               .eq('id', message.quoted_message_id)
               .eq('conversation_id', message.conversation_id)
               .maybeSingle()

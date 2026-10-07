@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { sendTextViaBaileys } from '@/lib/whatsapp/direct-send'
 import { normalizeWhatsAppRecipient } from '@/lib/whatsapp/phone'
+import { resolveQuotedContextForBaileys } from '@/lib/whatsapp/quote-context'
 
 export async function POST(request: NextRequest) {
   try {
@@ -153,11 +154,17 @@ export async function POST(request: NextRequest) {
     try {
       // Send directly to Baileys VPS (Vercel has no BullMQ workers)
       const recipient = normalizeWhatsAppRecipient(to)
+      const recipientJid = recipient.isLid ? recipient.jid : recipient.legacyJid
+      const quotedContext = quotedMessageId
+        ? await resolveQuotedContextForBaileys(supabase, quotedMessageId, recipientJid)
+        : null
+
       const sendResult = await sendTextViaBaileys({
         sessionId,
-        to: recipient.isLid ? recipient.jid : recipient.legacyJid,
+        to: recipientJid,
         message: messageForWhatsApp,
         quotedMessageId,
+        quotedContext,
         tenantId: defaultTenantId,
       })
 
@@ -174,6 +181,15 @@ export async function POST(request: NextRequest) {
             metadata: {
               sentVia: 'baileys-direct',
               baileys: sendResult.raw,
+              raw_message: {
+                key: {
+                  id: sendResult.messageId,
+                  fromMe: true,
+                  remoteJid: recipientJid,
+                },
+                message: { conversation: messageForWhatsApp },
+                messageTimestamp: Math.floor(Date.now() / 1000),
+              },
             },
             updated_at: new Date().toISOString(),
           })
