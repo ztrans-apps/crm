@@ -199,7 +199,9 @@ export default function WhatsAppPage() {
       <div className="mb-8 flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">WhatsApp Connections</h1>
-          <p className="text-gray-600 mt-1">Manage your WhatsApp business numbers</p>
+          <p className="text-gray-600 mt-1">
+            Connect numbers via Baileys (QR scan) — no Meta Cloud API required
+          </p>
         </div>
         {canAddSession && (
           <Button
@@ -208,7 +210,7 @@ export default function WhatsAppPage() {
             className="bg-green-600 hover:bg-green-700 font-medium flex items-center gap-2"
           >
             <Plus className="h-5 w-5" />
-            Add WhatsApp Number
+            Register WhatsApp Number
           </Button>
         )}
       </div>

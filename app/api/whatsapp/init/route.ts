@@ -52,10 +52,15 @@ export async function POST(request: Request) {
 
     if (error) throw error;
 
-    // Initialize session in WhatsApp service
+    // Initialize session in Baileys WhatsApp service
+    const whatsappServiceUrl =
+      process.env.WHATSAPP_SERVICE_URL ||
+      process.env.NEXT_PUBLIC_WHATSAPP_SERVICE_URL ||
+      'http://localhost:3001';
+
     try {
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_WHATSAPP_SERVICE_URL}/api/whatsapp/init`,
+        `${whatsappServiceUrl}/api/whatsapp/init`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },

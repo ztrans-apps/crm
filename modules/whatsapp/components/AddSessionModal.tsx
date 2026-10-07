@@ -5,7 +5,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Loader2 } from 'lucide-react';
+import { Loader2, QrCode } from 'lucide-react';
 
 interface AddSessionModalProps {
   open: boolean;
@@ -13,11 +13,18 @@ interface AddSessionModalProps {
   onSuccess?: (sessionId: string) => void;
 }
 
+/** Register WhatsApp number via Baileys (QR scan). No Meta Cloud API credentials. */
 export function AddSessionModal({ open, onOpenChange, onSuccess }: AddSessionModalProps) {
   const [phoneNumber, setPhoneNumber] = useState('');
   const [name, setName] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const resetForm = () => {
+    setPhoneNumber('');
+    setName('');
+    setError(null);
+  };
 
   const handleSubmit = async () => {
     if (!phoneNumber.trim()) {
@@ -37,13 +44,16 @@ export function AddSessionModal({ open, onOpenChange, onSuccess }: AddSessionMod
       const response = await fetch('/api/whatsapp/init', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phoneNumber, name }),
+        body: JSON.stringify({
+          phoneNumber: phoneNumber.trim(),
+          name: name.trim(),
+          provider: 'baileys',
+        }),
       });
 
       if (response.ok) {
         const data = await response.json();
-        setPhoneNumber('');
-        setName('');
+        resetForm();
         onOpenChange(false);
         onSuccess?.(data.sessionId);
       } else {
@@ -58,17 +68,35 @@ export function AddSessionModal({ open, onOpenChange, onSuccess }: AddSessionMod
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (!loading) {
+          if (!next) resetForm();
+          onOpenChange(next);
+        }
+      }}
+    >
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Add WhatsApp Number</DialogTitle>
+          <DialogTitle>Register WhatsApp Number</DialogTitle>
           <DialogDescription>
-            Enter the phone number you want to connect (with country code)
+            Connect via Baileys (WhatsApp Web). After you continue, scan the QR code with your phone.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4 py-4">
+          <div className="bg-green-50 border border-green-200 rounded-lg p-3 flex gap-3">
+            <QrCode className="h-5 w-5 text-green-700 shrink-0 mt-0.5" />
+            <p className="text-sm text-green-800">
+              No Meta Cloud API or business verification needed. Open WhatsApp on your phone →
+              Linked Devices → Link a Device, then scan the QR that appears next.
+            </p>
+          </div>
+
           <div className="space-y-2">
-            <Label htmlFor="name">Device Name</Label>
+            <Label htmlFor="name">
+              Label <span className="text-red-500">*</span>
+            </Label>
             <Input
               id="name"
               placeholder="e.g., Customer Service, Sales Team"
@@ -77,11 +105,14 @@ export function AddSessionModal({ open, onOpenChange, onSuccess }: AddSessionMod
               disabled={loading}
             />
             <p className="text-sm text-gray-500">
-              A friendly name to identify this WhatsApp device
+              A friendly name to identify this WhatsApp number in the CRM
             </p>
           </div>
+
           <div className="space-y-2">
-            <Label htmlFor="phone">Phone Number</Label>
+            <Label htmlFor="phone">
+              Phone Number <span className="text-red-500">*</span>
+            </Label>
             <Input
               id="phone"
               placeholder="+62812345678"
@@ -98,6 +129,7 @@ export function AddSessionModal({ open, onOpenChange, onSuccess }: AddSessionMod
               Include country code (e.g., +62 for Indonesia)
             </p>
           </div>
+
           {error && (
             <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
               <p className="text-sm text-red-700">{error}</p>
@@ -119,7 +151,7 @@ export function AddSessionModal({ open, onOpenChange, onSuccess }: AddSessionMod
                 Creating...
               </>
             ) : (
-              'Continue'
+              'Continue to QR Scan'
             )}
           </Button>
         </DialogFooter>
@@ -127,3 +159,6 @@ export function AddSessionModal({ open, onOpenChange, onSuccess }: AddSessionMod
     </Dialog>
   );
 }
+
+/** Alias used by Meta-era pages; same Baileys register flow. */
+export const AddNumberModal = AddSessionModal;
