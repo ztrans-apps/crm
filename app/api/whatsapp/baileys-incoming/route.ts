@@ -61,6 +61,16 @@ export async function POST(request: NextRequest) {
 
     const fromMe = !!isFromMe
 
+    const hasText = typeof messageText === 'string' && messageText.trim().length > 0
+    const hasMedia = !!(media && (media as BridgeMedia).base64)
+    const hasLocation =
+      messageType === 'location' &&
+      location &&
+      (location as BridgeLocation).latitude != null
+    if (!hasText && !hasMedia && !hasLocation) {
+      return NextResponse.json({ success: true, skipped: true, reason: 'empty_stub' })
+    }
+
     if (!sessionId || !phoneNumber || !messageId) {
       return NextResponse.json(
         { error: 'Missing sessionId, phoneNumber, or messageId' },

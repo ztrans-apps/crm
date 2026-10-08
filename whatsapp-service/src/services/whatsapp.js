@@ -26,6 +26,7 @@ import {
   extractQuotedStanzaId,
   getMediaMetaFromContent,
   extractLocationFromContent,
+  hasDisplayableInboundContent,
 } from '../utils/inbound-message.js'
 
 const __filename = fileURLToPath(import.meta.url)
@@ -444,6 +445,7 @@ class BaileysWhatsAppService {
         for (const msg of messages) {
           if (msg.key.remoteJid === 'status@broadcast') continue
           if (isReactionOrProtocol(msg.message)) continue
+          if (!hasDisplayableInboundContent(msg)) continue
 
           const isFromMe = !!msg.key.fromMe
 

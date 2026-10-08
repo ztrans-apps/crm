@@ -33,6 +33,18 @@ export function isReactionOrProtocol(message) {
   return !!(u.reactionMessage || u.protocolMessage || u.senderKeyDistributionMessage)
 }
 
+/** Skip stubs (no body): ciphertext, revoke placeholders, empty fromMe echoes. */
+export function hasDisplayableInboundContent(msg) {
+  if (!msg?.message) return false
+  if (msg.messageStubType) return false
+  const unwrapped = unwrapMessageContent(msg.message)
+  if (!unwrapped || isReactionOrProtocol(msg.message)) return false
+  const text = extractInboundTextFromContent(unwrapped)
+  if (text && String(text).trim()) return true
+  const type = classifyInboundMessageType(unwrapped)
+  return ['image', 'video', 'audio', 'document', 'location'].includes(type)
+}
+
 export function extractInboundTextFromContent(unwrapped) {
   if (!unwrapped) return null
   return (
