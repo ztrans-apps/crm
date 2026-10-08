@@ -430,7 +430,7 @@ export function RightSidebar({
                   }`}>
                     {conversation.whatsapp_session.status === 'connected' ? 'Connected' : 
                      conversation.whatsapp_session.status === 'connecting' ? 'Connecting' : 
-                     'Disconnected'}
+                     'Perlu sambung ulang'}
                   </span>
                 </div>
               </div>

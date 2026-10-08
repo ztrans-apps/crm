@@ -10,10 +10,13 @@ import { useChatScrollBehavior } from '@/features/chat/hooks'
 
 // Helper functions - outside component to avoid re-creation
 const getDisplayName = (contact: any) => {
-  if (contact?.name && contact.name.trim()) {
-    return contact.name
+  const name = contact?.name?.trim()
+  if (name && !name.toLowerCase().startsWith('lid:')) return name
+  const phone = contact?.phone_number || ''
+  if (!phone || phone.toLowerCase().startsWith('lid:') || phone.includes('@lid')) {
+    return 'Kontak WhatsApp'
   }
-  return contact?.phone_number || 'Unknown'
+  return phone
 }
 
 const getAvatarInitial = (contact: any) => {
@@ -193,7 +196,13 @@ export function ChatWindow({
             <div>
               <h3 className="font-semibold text-base">{getDisplayName(conversation.contact)}</h3>
               <div className="flex items-center space-x-2 text-xs text-gray-500">
-                <span>{conversation.contact?.phone_number}</span>
+                <span>
+                  {conversation.contact?.phone_number &&
+                  !String(conversation.contact.phone_number).toLowerCase().startsWith('lid:') &&
+                  !String(conversation.contact.phone_number).includes('@lid')
+                    ? conversation.contact.phone_number
+                    : 'Nomor belum terpetakan'}
+                </span>
                 {conversation.assigned_to && (
                   <>
                     <span>•</span>

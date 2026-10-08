@@ -301,15 +301,25 @@ class BaileysWhatsAppService {
           sessionManager.updateStatus(tenantId, sessionId, 'disconnected')
 
           // Update database
+          const crmStatus = shouldReconnect ? 'connecting' : 'disconnected'
+          const disconnectReason =
+            Object.keys(DisconnectReason).find((k) => DisconnectReason[k] === statusCode) ||
+            disconnectError ||
+            null
+
           if (supabase) {
             await supabase
               .from('whatsapp_sessions')
               .update({ 
-                status: shouldReconnect ? 'reconnecting' : 'disconnected',
+                status: crmStatus,
                 metadata: { lastDisconnect: statusCode }
               })
               .eq('id', sessionId)
               .eq('tenant_id', tenantId)
+          } else {
+            await this.forwardSessionStatusToCrm(sessionId, crmStatus, {
+              reason: disconnectReason,
+            })
           }
 
           // Emit via Socket.IO
@@ -414,7 +424,10 @@ class BaileysWhatsAppService {
             } else {
             }
           } else {
-            console.warn(`⚠️  Supabase not configured, phone number not saved to database`)
+            const digits = phoneNumber ? String(phoneNumber).split(':')[0].replace(/\D/g, '') : ''
+            await this.forwardSessionStatusToCrm(sessionId, 'connected', {
+              phoneNumber: digits ? `+${digits}` : null,
+            })
           }
           
           // Emit via Socket.IO
@@ -1191,6 +1204,24 @@ class BaileysWhatsAppService {
         return 'read'
       default:
         return 'sent'
+    }
+  }
+
+  async forwardSessionStatusToCrm(sessionId, status, extra = {}) {
+    const baseUrl = (process.env.CRM_APP_URL || process.env.FRONTEND_URL || '').replace(/\/$/, '')
+    if (!baseUrl) return
+    const headers = { 'Content-Type': 'application/json' }
+    if (process.env.WHATSAPP_BRIDGE_SECRET) {
+      headers['x-bridge-secret'] = process.env.WHATSAPP_BRIDGE_SECRET
+    }
+    try {
+      await fetch(`${baseUrl}/api/whatsapp/baileys-session-status`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ sessionId, status, ...extra }),
+      })
+    } catch (error) {
+      console.warn('[Baileys] forward session status failed:', error?.message || error)
     }
   }
 

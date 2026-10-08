@@ -47,10 +47,13 @@ export function ConversationItem({
   }
 
   const getDisplayName = () => {
-    if (conversation.contact?.name && conversation.contact.name.trim() !== '') {
-      return conversation.contact.name
+    const name = conversation.contact?.name?.trim()
+    if (name && !name.toLowerCase().startsWith('lid:')) return name
+    const phone = conversation.contact?.phone_number || ''
+    if (!phone || phone.toLowerCase().startsWith('lid:') || phone.includes('@lid')) {
+      return 'Kontak WhatsApp'
     }
-    return conversation.contact?.phone_number || 'Unknown'
+    return phone
   }
 
   return (

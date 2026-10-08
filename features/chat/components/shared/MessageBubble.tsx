@@ -39,6 +39,13 @@ export function MessageBubble({
   const [copied, setCopied] = useState(false)
   const [showMediaPreview, setShowMediaPreview] = useState(false)
 
+  const hasVisibleBody = Boolean(
+    (message.content && String(message.content).trim()) ||
+      message.media_url ||
+      message.media_type
+  )
+  if (!hasVisibleBody) return null
+
   const handleTranslateClick = () => {
     if (!translation && onTranslate) {
       onTranslate()
