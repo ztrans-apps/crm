@@ -298,7 +298,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       conversationId: conversation.id,
-      phone: formattedPhone,
+      phone: contact.phone_number || null,
     })
   } catch (error) {
     console.error('[baileys-incoming] error', error)
