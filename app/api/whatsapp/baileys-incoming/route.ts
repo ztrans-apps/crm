@@ -180,7 +180,21 @@ export async function POST(request: NextRequest) {
         console.error('[baileys-incoming] conversation create failed', convError)
         return NextResponse.json({ error: 'Failed to create conversation' }, { status: 500 })
       }
-      conversation = newConv
+
+      // Parallel inbound messages can each insert a room. Keep the oldest open thread.
+      const { data: opens } = await supabase
+        .from('conversations')
+        .select('id, contact_id')
+        .eq('contact_id', contact.id)
+        .eq('status', 'open')
+        .order('created_at', { ascending: true })
+
+      conversation = opens?.[0] || newConv
+      for (const extra of (opens || []).slice(1)) {
+        if (extra.id === newConv.id) {
+          await supabase.from('conversations').delete().eq('id', extra.id)
+        }
+      }
     } else {
       if (conversation.whatsapp_session_id !== sessionId) {
         await supabase
