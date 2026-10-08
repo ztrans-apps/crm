@@ -182,20 +182,48 @@ export async function POST(request: NextRequest) {
       }
 
       // Parallel inbound messages can each insert a room. Keep the oldest open thread.
+      const { consolidatePeerConversations } = await import('@/lib/whatsapp/resolve-contact')
+      await consolidatePeerConversations(supabase, {
+        userId,
+        canonicalContactId: contact.id,
+        canonicalPhone: contact.phone_number || '',
+        aliasPhones: aliases,
+      })
       const { data: opens } = await supabase
         .from('conversations')
-        .select('id, contact_id')
+        .select('id, status, workflow_status, contact_id, unread_count, whatsapp_session_id')
         .eq('contact_id', contact.id)
         .eq('status', 'open')
         .order('created_at', { ascending: true })
-
-      conversation = opens?.[0] || newConv
-      for (const extra of (opens || []).slice(1)) {
-        if (extra.id === newConv.id) {
-          await supabase.from('conversations').delete().eq('id', extra.id)
+        .limit(1)
+      const kept = opens?.[0]
+      if (kept) {
+        conversation = kept
+      } else {
+        conversation = {
+          id: newConv.id,
+          status: 'open' as const,
+          workflow_status: fromMe ? 'in_progress' : 'incoming',
+          whatsapp_session_id: sessionId,
+          unread_count: fromMe ? 0 : 1,
+          contact_id: contact.id,
         }
       }
-    } else {
+      if (conversation.id !== newConv.id) {
+        const convUpdate: Record<string, unknown> = {
+          last_message: preview,
+          last_message_at: lastAt,
+          whatsapp_session_id: sessionId,
+        }
+        if (!fromMe) {
+          convUpdate.read_status = 'unread'
+          convUpdate.unread_count = (conversation.unread_count || 0) + 1
+          convUpdate.status = 'open'
+          convUpdate.workflow_status = 'incoming'
+        }
+        await supabase.from('conversations').update(convUpdate).eq('id', conversation.id)
+      }
+    } else if (conversation) {
       if (conversation.whatsapp_session_id !== sessionId) {
         await supabase
           .from('conversations')
@@ -215,6 +243,25 @@ export async function POST(request: NextRequest) {
       }
 
       await supabase.from('conversations').update(convUpdate).eq('id', conversation.id)
+    }
+
+    const lidTag = typeof chatLid === 'string' && chatLid.endsWith('@lid') ? chatLid : null
+    if (lidTag && conversation?.id) {
+      const { data: metaRow } = await supabase
+        .from('conversations')
+        .select('metadata')
+        .eq('id', conversation.id)
+        .maybeSingle()
+      const prevMeta =
+        metaRow?.metadata && typeof metaRow.metadata === 'object' ? metaRow.metadata : {}
+      await supabase
+        .from('conversations')
+        .update({ metadata: { ...prevMeta, whatsapp_lid: lidTag } })
+        .eq('id', conversation.id)
+    }
+
+    if (!conversation) {
+      return NextResponse.json({ error: 'Failed to resolve conversation' }, { status: 500 })
     }
 
     const { data: existing } = await supabase

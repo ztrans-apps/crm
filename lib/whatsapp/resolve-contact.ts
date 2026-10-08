@@ -103,6 +103,17 @@ export async function lookupSenderPnForChatLid(
   return null
 }
 
+function phoneDigits(value: string | null | undefined): string {
+  return String(value || '').replace(/\D/g, '')
+}
+
+function isRealPhone(value: string | null | undefined): boolean {
+  const raw = String(value || '')
+  if (!raw || raw.includes('lid') || raw.includes('@') || raw.startsWith('merged:')) return false
+  const digits = phoneDigits(raw)
+  return digits.length >= 10 && digits.length <= 15
+}
+
 /**
  * Find conversation already tied to this WhatsApp @lid (any contact).
  */
@@ -112,13 +123,28 @@ export async function findOpenConversationForChatLid(
   chatLid: string
 ): Promise<{ conversationId: string; contactId: string } | null> {
   const lid = chatLid.endsWith('@lid') ? chatLid : `${chatLid.replace(/^lid:/i, '')}@lid`
+  const lidUser = lid.split('@')[0]
+
+  const { data: tagged } = await supabase
+    .from('conversations')
+    .select('id, contact_id, status, contacts!inner(user_id)')
+    .eq('contacts.user_id', userId)
+    .eq('status', 'open')
+    .filter('metadata->>whatsapp_lid', 'eq', lid)
+    .limit(5)
+
+  const taggedHit = (tagged || []).find((row) => row.contact_id)
+  if (taggedHit?.contact_id) {
+    return { conversationId: taggedHit.id, contactId: taggedHit.contact_id }
+  }
 
   const { data: rows } = await supabase
     .from('messages')
     .select('conversation_id, metadata')
     .not('metadata', 'is', null)
+    .filter('metadata::text', 'ilike', `%${lidUser}@lid%`)
     .order('created_at', { ascending: false })
-    .limit(100)
+    .limit(40)
 
   for (const row of rows || []) {
     if (row.metadata?.raw_message?.key?.remoteJid !== lid) continue
@@ -137,6 +163,131 @@ export async function findOpenConversationForChatLid(
   }
 
   return null
+}
+
+const MOVE_TABLES = [
+  'messages',
+  'tickets',
+  'conversation_labels',
+  'conversation_notes',
+  'chatbot_sessions',
+  'handover_logs',
+] as const
+
+/**
+ * One WhatsApp number (or one @lid before the number is known) keeps a single
+ * open room. Alias contacts (lid: vs +62) are folded onto the canonical contact.
+ * Two different +62 numbers are never merged.
+ */
+export async function consolidatePeerConversations(
+  supabase: SupabaseClient,
+  opts: {
+    userId: string
+    canonicalContactId: string
+    canonicalPhone: string
+    aliasPhones: string[]
+  }
+): Promise<void> {
+  const aliasSet = new Set(opts.aliasPhones.filter(Boolean))
+  aliasSet.add(opts.canonicalPhone)
+
+  const { data: aliasContacts } = await supabase
+    .from('contacts')
+    .select('id, phone_number')
+    .eq('user_id', opts.userId)
+    .in('phone_number', [...aliasSet])
+
+  const canonicalDigits = phoneDigits(opts.canonicalPhone)
+  const peerIds = new Set<string>([opts.canonicalContactId])
+
+  for (const row of aliasContacts || []) {
+    if (row.id === opts.canonicalContactId) {
+      peerIds.add(row.id)
+      continue
+    }
+    const phone = String(row.phone_number || '')
+    const digits = phoneDigits(phone)
+    const otherRealPhone = isRealPhone(phone) && digits !== canonicalDigits
+    if (otherRealPhone) continue
+    peerIds.add(row.id)
+  }
+
+  if (peerIds.size > 1) {
+    const others = [...peerIds].filter((id) => id !== opts.canonicalContactId)
+    if (others.length) {
+      await supabase
+        .from('conversations')
+        .update({ contact_id: opts.canonicalContactId })
+        .in('contact_id', others)
+
+      for (const id of others) {
+        const { count } = await supabase
+          .from('conversations')
+          .select('id', { count: 'exact', head: true })
+          .eq('contact_id', id)
+        if (count && count > 0) continue
+        await supabase
+          .from('contacts')
+          .update({ phone_number: `merged:${id.slice(0, 8)}` })
+          .eq('id', id)
+          .eq('user_id', opts.userId)
+      }
+    }
+  }
+
+  const { data: opens } = await supabase
+    .from('conversations')
+    .select('id, unread_count, last_message, last_message_at, created_at')
+    .eq('contact_id', opts.canonicalContactId)
+    .eq('status', 'open')
+    .order('created_at', { ascending: true })
+
+  if (!opens || opens.length < 2) return
+
+  const keeper = opens[0]
+  const extras = opens.slice(1)
+
+  for (const extra of extras) {
+    for (const table of MOVE_TABLES) {
+      const { error } = await supabase
+        .from(table)
+        .update({ conversation_id: keeper.id })
+        .eq('conversation_id', extra.id)
+      if (error && !/does not exist|schema cache|Could not find/i.test(error.message || '')) {
+        console.warn('[consolidate] move failed', table, error.message)
+      }
+    }
+
+    const { error: delErr } = await supabase.from('conversations').delete().eq('id', extra.id)
+    if (delErr) {
+      await supabase
+        .from('conversations')
+        .update({
+          status: 'closed',
+          last_message: '[merged]',
+          closed_at: new Date().toISOString(),
+        })
+        .eq('id', extra.id)
+    }
+  }
+
+  const { data: latest } = await supabase
+    .from('messages')
+    .select('content, message_type, created_at')
+    .eq('conversation_id', keeper.id)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  const unread = opens.reduce((sum, row) => sum + (row.unread_count || 0), 0)
+  await supabase
+    .from('conversations')
+    .update({
+      unread_count: unread,
+      last_message: latest?.content || keeper.last_message,
+      last_message_at: latest?.created_at || keeper.last_message_at,
+    })
+    .eq('id', keeper.id)
 }
 
 /**
@@ -181,6 +332,18 @@ export async function resolveContactForWhatsAppPeer(
         .eq('id', existing.contactId)
         .maybeSingle()
       if (c) {
+        const earlyAliases = buildContactPhoneAliases({
+          phoneNumber: c.phone_number,
+          fromLid: !!opts.fromLid,
+          chatLid,
+          senderPn,
+        })
+        await consolidatePeerConversations(supabase, {
+          userId: opts.userId,
+          canonicalContactId: c.id,
+          canonicalPhone: c.phone_number,
+          aliasPhones: earlyAliases,
+        })
         return {
           contact: c,
           canonicalPhone: c.phone_number,
@@ -243,6 +406,12 @@ export async function resolveContactForWhatsAppPeer(
     if (error || !created) {
       throw new Error(error?.message || 'Failed to create contact')
     }
+    await consolidatePeerConversations(supabase, {
+      userId: opts.userId,
+      canonicalContactId: created.id,
+      canonicalPhone,
+      aliasPhones: aliases,
+    })
     return {
       contact: created,
       canonicalPhone,
@@ -275,5 +444,12 @@ export async function resolveContactForWhatsAppPeer(
     contact = { ...contact, name: opts.pushName }
   }
 
-  return { contact, canonicalPhone, created: false, recoveredSenderPn: senderPn }
+  await consolidatePeerConversations(supabase, {
+    userId: opts.userId,
+    canonicalContactId: contact.id,
+    canonicalPhone: contact.phone_number,
+    aliasPhones: aliases,
+  })
+
+  return { contact, canonicalPhone: contact.phone_number, created: false, recoveredSenderPn: senderPn }
 }
